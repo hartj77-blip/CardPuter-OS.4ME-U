@@ -39,6 +39,27 @@ missing=$(cd "$ROOT/image/stage-zeroos/files" && find . -type f ! -name 'initram
     grep -q "$(basename "$f")" "$ROOT/image/stage-zeroos/payload.sh" || echo "$f"; done)
 [ -z "$missing" ] && ok "every file in files/ is in the payload" || bad "not in payload.sh: $missing"
 
+# --- postinst: /etc/default overrides, kept when edited ------------------
+R=$T/root
+mkdir -p "$R/usr/share/zeroos" "$R/etc/default" "$T/ctl"
+cp -r "$T/x/usr/share/zeroos/overrides" "$R/usr/share/zeroos/"
+dpkg-deb -e "$DEB" "$T/ctl"
+postinst() { ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst"; }
+echo "theirs" > "$R/etc/default/gpsd"
+postinst > "$T/pi.out"
+cmp -s "$R/etc/default/gpsd" "$R/usr/share/zeroos/overrides/etc/default/gpsd" && ok "postinst: first run installs ours" || bad "postinst: first run"
+grep -qx theirs "$R/etc/default/gpsd.zeroos-old" && ok "postinst: first run backs up the old one" || bad "postinst: no backup"
+[ -f "$R/etc/default/earlyoom" ] && ok "postinst: missing file installed" || bad "postinst: missing file"
+postinst > "$T/pi.out"
+grep -qx "changed:" "$T/pi.out" && ok "postinst: unchanged run changes nothing" || bad "postinst: unchanged run: $(cat "$T/pi.out")"
+echo "# mine" >> "$R/etc/default/earlyoom"
+echo "# new" >> "$R/usr/share/zeroos/overrides/etc/default/earlyoom"
+echo "# new" >> "$R/usr/share/zeroos/overrides/etc/default/gpsd"
+postinst > "$T/pi.out"
+tail -1 "$R/etc/default/earlyoom" | grep -qx "# mine" && ok "postinst: edited file kept" || bad "postinst: edited file overwritten"
+tail -1 "$R/etc/default/earlyoom.zeroos-new" | grep -qx "# new" && ok "postinst: new version alongside" || bad "postinst: no .zeroos-new"
+tail -1 "$R/etc/default/gpsd" | grep -qx "# new" && ok "postinst: unedited file updated" || bad "postinst: unedited file not updated"
+
 # --- the updater ---------------------------------------------------------
 mkdir -p "$T/bin" "$T/run" "$T/state"
 # dpkg: "install" = note the version (or fail for the version in

@@ -37,15 +37,53 @@ Description: ZeroOS for the Cardputer Zero
  Installed by the image and by zeroos-update.
 CONTROL
 # Files that another package also ships (/etc/default/gpsd, earlyoom) can't be
-# in ours; they travel under /usr/share/zeroos/overrides and are copied here.
+# in ours (or be dpkg conffiles); they travel under /usr/share/zeroos/overrides
+# and are copied here. Like a conffile, a copy someone has edited is kept: we
+# remember the checksum of what we last wrote, and only replace a file that
+# still has it. The new version then goes next to it as <file>.zeroos-new.
 cat > "$STAGE/DEBIAN/postinst" <<'POSTINST'
 #!/bin/sh
 set -e
-cd /usr/share/zeroos/overrides
-find . -type f | while read -r f; do install -D -m 0644 "$f" "/$f"; done
+ROOT=${ZEROOS_POSTINST_ROOT:-}   # tests only
+SUMS=$ROOT/var/lib/zeroos/overrides.sums
+mkdir -p "$(dirname "$SUMS")"
+touch "$SUMS"
+changed=""
+cd "$ROOT/usr/share/zeroos/overrides"
+for f in $(find . -type f | sed 's|^\./||' | sort); do
+    dst=$ROOT/$f
+    new=$(sha256sum < "$f" | cut -d' ' -f1)
+    was=$(awk -v p="/$f" '$2 == p {print $1}' "$SUMS")
+    have=""
+    [ -f "$dst" ] && have=$(sha256sum < "$dst" | cut -d' ' -f1)
+    if [ "$have" = "$new" ]; then
+        rm -f "$dst.zeroos-new"
+    elif [ -z "$have" ] || [ "$have" = "$was" ]; then
+        install -D -m 0644 "$f" "$dst"
+        rm -f "$dst.zeroos-new"
+        changed="$changed /$f"
+    elif [ -z "$was" ]; then
+        # First time we track it (image build, or an update from an older
+        # zeroos that always overwrote): keep their copy as a backup.
+        cp -p "$dst" "$dst.zeroos-old"
+        install -D -m 0644 "$f" "$dst"
+        echo "zeroos: replaced /$f (the old one is /$f.zeroos-old)"
+        changed="$changed /$f"
+    else
+        install -D -m 0644 "$f" "$dst.zeroos-new"
+        echo "zeroos: kept your edited /$f; ZeroOS's new version is /$f.zeroos-new"
+        continue
+    fi
+    { grep -v " /$f\$" "$SUMS" || true; echo "$new /$f"; } > "$SUMS.tmp"
+    mv -f "$SUMS.tmp" "$SUMS"
+done
+if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
     udevadm control --reload || true
+    # New settings take effect now, not at the next reboot.
+    case $changed in *etc/default/earlyoom*) systemctl try-restart earlyoom.service || true ;; esac
+    case $changed in *etc/default/gpsd*) systemctl try-restart gpsd.service || true ;; esac
 fi
 POSTINST
 chmod 0755 "$STAGE/DEBIAN/postinst"
