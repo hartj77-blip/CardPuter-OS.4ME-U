@@ -75,12 +75,18 @@ cat > "$D/etc/systemd/system/console-setup.service.d/zeroos-unblank.conf" <<'UNI
 [Service]
 ExecStartPost=-/bin/sh -c 'for b in /sys/class/graphics/fb*/blank; do echo 1 > $b; echo 0 > $b; done'
 UNIT
-# Swap: Raspberry Pi OS's rpi-setup-loop@ waits with no time limit for the
-# swap file's /dev/disk/by-backingfile link. If the link never shows up the
-# whole boot stops there (seen once in a slow QEMU boot). Give up after 30 s:
-# that boot has no swap, but it starts, and the journal says why.
+# Swap on a first boot: rpi-resize.service (grow the card) ends with
+# "systemctl disable", which reloads systemd. If that lands while
+# rpi-setup-loop@var-swap is starting, its step that makes the swap file's
+# /dev/disk/by-backingfile link is lost and the unit waits for the link with
+# no time limit: the boot stops there. (QEMU first boots: hung once, no swap
+# three times. M5's image doesn't resize on first boot, so it never races.)
+# Start after the resize, and never wait more than 30 s.
 install -d "$D/etc/systemd/system/rpi-setup-loop@.service.d"
-cat > "$D/etc/systemd/system/rpi-setup-loop@.service.d/zeroos-timeout.conf" <<'UNIT'
+cat > "$D/etc/systemd/system/rpi-setup-loop@.service.d/zeroos.conf" <<'UNIT'
+[Unit]
+After=rpi-resize.service
+
 [Service]
 TimeoutStartSec=30
 UNIT
