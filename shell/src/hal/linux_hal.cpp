@@ -182,6 +182,20 @@ pid_t spawn_pipe(const std::vector<std::string>& argv, int& fd) {
 #endif
 }
 
+// One line of "nmcli -t" output split on ':', with its "\:" and "\\"
+// escapes undone.
+std::vector<std::string> nmcli_fields(const std::string& line) {
+    std::vector<std::string> f;
+    std::string cur;
+    for (size_t i = 0; i < line.size(); ++i) {
+        if (line[i] == '\\' && i + 1 < line.size()) { cur += line[++i]; continue; }
+        if (line[i] == ':') { f.push_back(cur); cur.clear(); continue; }
+        cur += line[i];
+    }
+    f.push_back(cur);
+    return f;
+}
+
 // True if the child has exited (and reaps it).
 bool exited(pid_t pid) {
 #ifdef __EMSCRIPTEN__
@@ -297,7 +311,12 @@ public:
     BatteryInfo battery() override { return bat_cache_; }
     ImuSample imu() override { return imu_cache_; }
     NetStatus net() override {
-        if (net_ticks_ < 20 && net_cache_.ip.empty()) net_cache_ = read_net();
+        // Before poll()'s first 2 s refresh: read it now, but at most once a
+        // second (read_net forks ~7 times; the status bar asks every frame).
+        if (net_ticks_ < 20 && net_cache_.ip.empty() && time(nullptr) != net_early_at_) {
+            net_early_at_ = time(nullptr);
+            net_cache_ = read_net();
+        }
         return net_cache_;
     }
 
@@ -338,14 +357,7 @@ public:
         std::string line;
         while (std::getline(in, line)) {
             // IN-USE:SSID:SIGNAL:SECURITY (SSID colons are escaped as \:)
-            std::vector<std::string> f;
-            std::string cur;
-            for (size_t i = 0; i < line.size(); ++i) {
-                if (line[i] == '\\' && i + 1 < line.size()) { cur += line[++i]; continue; }
-                if (line[i] == ':') { f.push_back(cur); cur.clear(); continue; }
-                cur += line[i];
-            }
-            f.push_back(cur);
+            std::vector<std::string> f = nmcli_fields(line);
             if (f.size() < 4 || f[1].empty()) continue;
             WifiNetwork n;
             n.connected = f[0] == "*";
@@ -358,14 +370,29 @@ public:
     }
 
     bool wifi_connect(const std::string& ssid, const std::string& psk) override {
-        std::string cmd = "nmcli dev wifi connect " + shell_quote(ssid);
+        std::string id = shell_quote(ssid);
+        // A saved profile for this network, and its password, from before
+        // this attempt: a mistyped retry must not lose a working one.
+        bool existed = !trim_nl(run("nmcli -g connection.id connection show id " + id)).empty();
+        std::string old_psk;
+        if (existed && !psk.empty())
+            old_psk = trim_nl(run("nmcli -s -g 802-11-wireless-security.psk connection show id " + id));
+        // --wait bounds the attempt (default 90 s): this runs on the UI thread.
+        std::string cmd = "nmcli --wait 20 dev wifi connect " + id;
         if (!psk.empty()) cmd += " password " + shell_quote(psk);
         if (run(cmd + " && echo OK").find("OK") != std::string::npos) return true;
+        if (psk.empty()) return false;
         // A failed attempt with a typed password must not leave that password
         // saved: NetworkManager would keep retrying it and the next connect
-        // would reuse it instead of asking (M5 launcher fix #62).
-        if (!psk.empty()) run("nmcli connection delete id " + shell_quote(ssid));
+        // would reuse it instead of asking (M5 launcher fix #62). A profile
+        // that was there before gets its old password back instead.
+        if (!existed) run("nmcli connection delete id " + id);
+        else if (!old_psk.empty()) run("nmcli connection modify id " + id + " wifi-sec.psk " + shell_quote(old_psk));
         return false;
+    }
+    static std::string trim_nl(std::string s) {
+        while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+        return s;
     }
     void set_wifi_enabled(bool on) override { run(std::string("nmcli radio wifi ") + (on ? "on" : "off")); }
     void set_bt_enabled(bool on) override { run(std::string("rfkill ") + (on ? "unblock" : "block") + " bluetooth"); }
@@ -1598,11 +1625,11 @@ private:
         std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi"));
         std::string line;
         while (std::getline(in, line)) {
-            if (line.rfind("yes:", 0) == 0) {
-                auto last = line.rfind(':');
+            std::vector<std::string> f = nmcli_fields(line);   // unescapes "\:" in the SSID
+            if (f.size() >= 3 && f[0] == "yes") {
                 n.wifi_connected = true;
-                n.wifi_ssid = line.substr(4, last - 4);
-                n.wifi_signal = std::atoi(line.c_str() + last + 1);
+                n.wifi_ssid = f[1];
+                n.wifi_signal = std::atoi(f[2].c_str());
             }
         }
         std::string ip = run("hostname -I");
@@ -1686,6 +1713,7 @@ private:
     BatteryInfo bat_cache_;
     ImuSample imu_cache_;
     NetStatus net_cache_;
+    time_t net_early_at_ = 0;
     long net_ticks_ = 0;
 };
 
