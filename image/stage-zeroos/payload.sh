@@ -75,16 +75,29 @@ cat > "$D/etc/systemd/system/console-setup.service.d/zeroos-unblank.conf" <<'UNI
 [Service]
 ExecStartPost=-/bin/sh -c 'for b in /sys/class/graphics/fb*/blank; do echo 1 > $b; echo 0 > $b; done'
 UNIT
-# M5's boot logo (fb_load.service, from the LCD driver) waits with --keep-open
-# until M5's launcher starts, holding the LCD's DRM device the whole time. We
-# don't ship that launcher, so it never let go and ZeroShell's drawing never
-# reached the screen. Show the logo, then exit.
-install -d "$D/etc/systemd/system/fb_load.service.d"
-cat > "$D/etc/systemd/system/fb_load.service.d/zeroos.conf" <<'UNIT'
+# Swap on a first boot: rpi-resize.service (grow the card) ends with
+# "systemctl disable", which reloads systemd. If that lands while
+# rpi-setup-loop@var-swap is starting, its step that makes the swap file's
+# /dev/disk/by-backingfile link is lost and the unit waits for the link with
+# no time limit: the boot stops there. (QEMU first boots: hung once, no swap
+# three times. M5's image doesn't resize on first boot, so it never races.)
+# Start after the resize, and never wait more than 30 s.
+install -d "$D/etc/systemd/system/rpi-setup-loop@.service.d"
+cat > "$D/etc/systemd/system/rpi-setup-loop@.service.d/zeroos.conf" <<'UNIT'
+[Unit]
+After=rpi-resize.service
+
 [Service]
-ExecStart=
-ExecStart=/usr/sbin/fb_load
+TimeoutStartSec=30
 UNIT
+# LCD driver: never load the kernel's panel-mipi-dbi; it takes the driver name
+# M5's panel-mipi-dbi-m needs, and the LCD stays black (see 01-run.sh).
+install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-panel.conf"
+# M5's boot logo (fb_load.service, from the LCD driver) holds the LCD's DRM
+# device until M5's launcher starts, and waits forever for /dev/dri/card1. We
+# ship neither that launcher nor a logo (boot text is on the LCD instead), so
+# switch it off; held open, nothing ZeroShell draws reaches the screen.
+ln -sf /dev/null "$D/etc/systemd/system/fb_load.service"
 
 # Overrides: settings files that belong to another Debian package, so ours
 # can't ship them in place. The package's postinst copies this tree over /.

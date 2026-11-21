@@ -4,6 +4,10 @@
 # speed, turn the backlight and panel fully off, and switch the expansion
 # port 5 V (an LED-class supply, e.g. ext_5v_out) for GPS and LoRa modules. These sysfs files appear
 # when the drivers load, so a udev rule can't reliably catch all of them.
+# The panel driver loads about 15 s into the boot; wait for it (30 s at most)
+# so its files are there to open up, and ZeroShell starts with a screen.
+udevadm wait --timeout=30 /dev/fb_lcd 2>/dev/null ||
+    echo "zeroos: no /dev/fb_lcd after 30 s (LCD driver not loaded?)" >&2
 for f in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor \
          /sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq \
          /sys/class/backlight/*/bl_power \

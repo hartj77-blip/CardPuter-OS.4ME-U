@@ -21,8 +21,13 @@ sed -i -e 's/^FONTFACE=.*/FONTFACE="Terminus"/' -e 's/^FONTSIZE=.*/FONTSIZE="6x1
 # have no sound server to talk to. M5's image gets this from its launcher.
 install -d -m 0755 "${ROOTFS_DIR}/var/lib/systemd/linger"
 touch "${ROOTFS_DIR}/var/lib/systemd/linger/${FIRST_USER_NAME}"
-cat files/initramfs-modules >>               "${ROOTFS_DIR}/etc/initramfs-tools/modules"
-install -m 0755 files/initramfs-hook         "${ROOTFS_DIR}/etc/initramfs-tools/hooks/zeroos-panel"
+# LCD driver: M5's panel-mipi-dbi-m.ko and the kernel's own panel-mipi-dbi.ko
+# both register an SPI driver called "panel-mipi-dbi-spi", so only the first
+# one loaded works. Only M5's matches this panel. Loading the kernel's one
+# first (we used to, from the initramfs) left the LCD with no driver: black
+# screen. Like M5, load nothing early; udev loads M5's driver by its alias.
+# The zeroos package blacklists the kernel's one (modprobe-zeroos-panel.conf),
+# so it never gets in first.
 
 CONFIG_TXT="${ROOTFS_DIR}/boot/firmware/config.txt"
 CMDLINE_TXT="${ROOTFS_DIR}/boot/firmware/cmdline.txt"
@@ -35,6 +40,11 @@ sed -i -e 's/cfg80211.ieee80211_regdom=[A-Z]*//' -e 's/ splash//' -e 's/ plymout
 sed -i '1 s/$/ cfg80211.ieee80211_regdom=@WIFI_COUNTRY@/' "$CMDLINE_TXT"
 # The UART belongs to GPS modules, not a serial console.
 sed -i -e 's/console=serial0,[0-9]* *//' -e 's/console=ttyS0,[0-9]* *//' -e 's/console=ttyAMA0,[0-9]* *//' "$CMDLINE_TXT"
+# Boot text on the LCD: M5 hides it (quiet, fbcon=map:off) behind their logo.
+# We have no Plymouth and no logo, so leave the console on: it takes the first
+# framebuffer, which is the LCD. Without it the LCD is black until ZeroShell
+# starts, minutes on a first boot. 90-zeroos.udev covers a monitor at boot.
+sed -i -e 's/ *fbcon=map:[^ ]*//' -e 's/ quiet//' "$CMDLINE_TXT"
 grep -q '^enable_uart=' "$CONFIG_TXT" && sed -i 's/^enable_uart=.*/enable_uart=1/' "$CONFIG_TXT" || echo 'enable_uart=1' >> "$CONFIG_TXT"
 
 # Keyboard symbol layer system-wide, not only under M5's launcher (owner report).
@@ -63,8 +73,8 @@ curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
     -o /usr/share/keyrings/tailscale-archive-keyring.gpg
 curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list \
     -o /etc/apt/sources.list.d/tailscale.list
-apt-get update
-apt-get install -y tailscale
+apt-get update -o Acquire::Retries=3
+apt-get install -y -o Acquire::Retries=3 tailscale || { sleep 30; apt-get update; apt-get install -y -o Acquire::Retries=3 tailscale; }
 sed -i 's/^FLAGS=.*/FLAGS="--no-logs-no-support"/' /etc/default/tailscaled
 systemctl disable tailscaled.service
 systemctl enable zeroos-taildrop.service
@@ -73,9 +83,23 @@ curl -fsSL https://download.opensuse.org/repositories/network:/Meshtastic:/beta/
     -o /usr/share/keyrings/meshtastic.asc
 echo 'deb [signed-by=/usr/share/keyrings/meshtastic.asc] http://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/ /' \
     > /etc/apt/sources.list.d/meshtastic.list
-apt-get update
-apt-get install -y meshtasticd
-systemctl disable meshtasticd.service
+# openSUSE's mirrors are sometimes mid-sync and serve a truncated .deb
+# ("File has unexpected size"), which failed a whole image build once. Retry,
+# and if it still fails, build without it: only the Cap LoRa-1262 needs it.
+meshtastic_ok=
+for try in 1 2 3; do
+    apt-get update -o Acquire::Retries=3 || true
+    if apt-get install -y -o Acquire::Retries=3 meshtasticd; then meshtastic_ok=1; break; fi
+    echo "zeroos: meshtasticd install failed (try $try), retrying in 30 s"
+    apt-get clean
+    sleep 30
+done
+if [ -n "$meshtastic_ok" ]; then
+    systemctl disable meshtasticd.service
+    echo "zeroos: meshtasticd installed: $(dpkg-query -W -f '${Version}' meshtasticd)"
+else
+    echo "zeroos: WARNING: meshtasticd NOT installed (Mesh app needs: sudo apt install meshtasticd)"
+fi
 # The camera app and the libraries it names (libcamera, libfmt, cJSON...).
 # If it can't be installed the image is still built: ZeroShell's Camera app
 # then says the camera app is missing.
@@ -121,6 +145,11 @@ disable_if_present apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_
     e2scrub_reap.service NetworkManager-wait-online.service rpi-eeprom-update.service \
     ModemManager.service
 systemctl --global disable rpi-connect.service rpi-connect-wayvnc.service 2>/dev/null || true
+# adbd (in M5's package list) is enabled by its package: at every boot it sets
+# up a USB gadget and offers a root shell to whatever the USB port is plugged
+# into, with no pairing. M5 turn it off in the script we drop; do the same.
+systemctl disable adbd.service 2>/dev/null || true
+rm -f /etc/systemd/system/multi-user.target.wants/adbd.service
 
 groupadd -f spi   # /dev/spidev* stays root-only without it (owner report)
 groupadd -f bluetooth   # normally made by bluez; zeroshell.service names it

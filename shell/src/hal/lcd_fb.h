@@ -1,10 +1,11 @@
 // Which /dev/fbN is the Cardputer's own LCD.
 //
 // The LCD (ST7789V on SPI, M5's panel-mipi-dbi driver) and HDMI (vc4) are both
-// DRM devices with an emulated framebuffer, and their numbers depend on which
-// driver loads first. On M5's image vc4 is usually card0/fb0, so the LCD is
-// fb1. M5's udev rule adds /dev/fb_lcd for it; we use that, then look in sysfs,
-// and only then fall back to fb0. ZS_FRAMEBUFFER still overrides everything.
+// DRM devices, and the framebuffer numbers depend on what is plugged in. With
+// no monitor, vc4 makes no framebuffer and the LCD is fb0 (seen in the stock
+// image's boot log); with a monitor connected at boot, vc4 is fb0 and the LCD
+// is fb1. M5's udev rule adds /dev/fb_lcd for it; we use that, then look in
+// sysfs, and only then fall back to a guess. ZS_FRAMEBUFFER overrides everything.
 #pragma once
 
 #include <dirent.h>
@@ -23,13 +24,13 @@ inline std::string lcd_fb_read(const std::string& path) {
     return s;
 }
 
-// Device path, e.g. "/dev/fb1".
-inline std::string lcd_framebuffer() {
-    if (const char* e = std::getenv("ZS_FRAMEBUFFER"); e && e[0]) return e;
+// The LCD's framebuffer if it is there, e.g. "/dev/fb_lcd" or "/dev/fb0";
+// empty while the panel driver hasn't loaded yet. `fallback` gets the first
+// framebuffer that isn't HDMI's, for lcd_framebuffer() below.
+inline std::string lcd_framebuffer_find(std::string* fallback = nullptr) {
     if (access("/dev/fb_lcd", F_OK) == 0) return "/dev/fb_lcd";
-    std::string fallback;
+    std::string found;
     if (DIR* d = opendir("/sys/class/graphics")) {
-        std::string found;
         while (dirent* e = readdir(d)) {
             std::string n = e->d_name;
             if (n.rfind("fb", 0) != 0 || n.size() < 3) continue;
@@ -42,15 +43,24 @@ inline std::string lcd_framebuffer() {
                 found = "/dev/" + n;
                 break;
             }
-            if (fallback.empty() && name.find("vc4") == std::string::npos) fallback = "/dev/" + n;
+            if (fallback && fallback->empty() && name.find("vc4") == std::string::npos)
+                *fallback = "/dev/" + n;
         }
         closedir(d);
-        if (!found.empty()) return found;
     }
+    return found;
+}
+
+// Device path to draw to, e.g. "/dev/fb_lcd".
+inline std::string lcd_framebuffer() {
+    if (const char* e = std::getenv("ZS_FRAMEBUFFER"); e && e[0]) return e;
+    std::string fallback;
+    std::string found = lcd_framebuffer_find(&fallback);
+    if (!found.empty()) return found;
     return fallback.empty() ? "/dev/fb0" : fallback;
 }
 
-// sysfs name of that framebuffer ("fb1"), following the /dev/fb_lcd symlink.
+// sysfs name of that framebuffer ("fb0"), following the /dev/fb_lcd symlink.
 inline std::string lcd_fb_sysfs_name() {
     std::string dev = lcd_framebuffer();
     char buf[PATH_MAX];

@@ -4,3 +4,7 @@ SUBSYSTEM=="leds", RUN+="/bin/chgrp video /sys%p/brightness", RUN+="/bin/chmod g
 # IR transmit/receive for the IR Remote app.
 SUBSYSTEM=="lirc", GROUP="video", MODE="0660"
 SUBSYSTEM=="rc", RUN+="/bin/chgrp -R video /sys%p", RUN+="/bin/chmod -R g+w /sys%p"
+# Boot text on the LCD. The console takes the first framebuffer, which is the
+# LCD unless a monitor was connected at boot (then HDMI is fb0, the LCD fb1).
+# Move tty1 onto the LCD whichever number it got. Same match as M5's fb_lcd rule.
+SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", ATTRS{of_node/compatible}=="*st7789v*", RUN+="/usr/bin/con2fbmap 1 %n"

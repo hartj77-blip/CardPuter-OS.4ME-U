@@ -9,5 +9,9 @@ ConditionPathExists=!/etc/cloud/cloud-init.disabled
 Type=oneshot
 ExecStart=/usr/bin/touch /etc/cloud/cloud-init.disabled
 
+# cloud-final.service runs after multi-user.target, so being wanted by
+# multi-user.target while ordered after cloud-final was a loop: systemd
+# dropped this unit ("deleted to break ordering cycle") and cloud-init ran
+# on every boot. cloud-init.target is where cloud-final itself hangs.
 [Install]
-WantedBy=multi-user.target
+WantedBy=cloud-init.target

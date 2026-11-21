@@ -9,7 +9,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | Part | Chip | Linux interface | ZeroOS uses it for |
 | --- | --- | --- | --- |
 | SoC | RP3A0 (BCM2837), 4x A53 @ 1 GHz, 512 MB | | Everything |
-| Display | ST7789V3 320x170, SPI | `/dev/fb_lcd`, usually fb1 (DRM mipi-dbi + firmware blob) | ZeroShell |
+| Display | ST7789V3 320x170, SPI | `/dev/fb_lcd`: fb0, or fb1 with a monitor connected at boot (DRM mipi-dbi + firmware blob) | ZeroShell |
 | Backlight | PWM | `/sys/class/backlight/*` | Settings > Brightness |
 | Keyboard | TCA8418 (I2C 0x34) | evdev input device | All input |
 | Key LEDs | Shift, Fn, Sym, 3 status | `/sys/class/leds/*` | `Hal::set_led` (modifier state, alerts: Phase 1) |
@@ -22,7 +22,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | Ethernet | SR9900A (USB) | `eth0` | Status, System app |
 | USB | GL852G hub, USB-A, 2x USB-C, Host/Slave switch (Slave: right USB-C is a device port) | `dwc2`, configfs gadgets | USB stick mode in the Car app, see CAR.md |
 | Camera* | IMX219 8 MP, CSI | libcamera (RPi fork) | Camera app (M5's CameraApp, started by ZeroShell; QR codes read by ZeroShell through `rpicam-vid`), see CAMERA.md |
-| Video | HDMI 1080p30, H.264 enc/dec | vc4 (usually card0/fb0), V4L2 M2M | Dock mode (labwc on the HDMI card only; mpv hardware H.264), see DOCK.md |
+| Video | HDMI 1080p30, H.264 enc/dec | vc4 (card0; fb0 only with a monitor connected), V4L2 M2M | Dock mode (labwc on the HDMI card only; mpv hardware H.264), see DOCK.md |
 | Storage | microSD | | Root filesystem |
 | Expansion | Grove HY2.0 (I2C/UART), 14-pin EXT bus | i2c-dev, spidev, UART | GPS app (gpsd), Mesh app (meshtasticd, Cap LoRa-1262); see EXPANSION.md |
 
@@ -32,9 +32,14 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | --- | --- |
 | Symbol layer only correct while M5's launcher runs | Load `tca8418_keypad_m5stack_keymap.map` system-wide via `/etc/default/keyboard` |
 | Keys leak to the Linux console behind the UI | Mask `getty@tty1`; ZeroShell conflicts with it |
-| LCD blank without Plymouth (driver not in initramfs) | Panel modules + `cardputerzero,st7789v_lcd.bin` in the initramfs |
+| LCD black, no driver bound: the kernel's `panel-mipi-dbi` and M5's `panel-mipi-dbi-m` register the same SPI driver name (`panel-mipi-dbi-spi`), so the second one to load fails, and only M5's matches this panel | Nothing display-related is forced into the initramfs (as on M5's image); `/etc/modprobe.d/zeroos-panel.conf` (in the zeroos package) blacklists the kernel's one |
 | LCD blanks when console-setup runs | Drop-in that unblanks the framebuffers afterwards |
-| LCD stays on M5's logo or blank: `fb_load --keep-open` holds the LCD until M5's launcher starts, which ZeroOS doesn't ship | Drop-in runs `fb_load` without `--keep-open` |
+| LCD stays on M5's logo or blank: `fb_load --keep-open` holds the LCD until M5's launcher starts, which ZeroOS doesn't ship | `fb_load.service` masked |
+| LCD black until ZeroShell starts (M5 boots with `quiet fbcon=map:off` behind a logo) | Console left on: boot text shows on the LCD. A udev rule runs `con2fbmap` to move it there when a monitor took fb0 |
+| ZeroShell started before the LCD driver, or with no LCD, and ran on drawing nowhere | The service waits up to 30 s for the LCD; with no display ZeroShell exits so systemd restarts it; the reason is in the journal |
+| First boot can stop forever in `rpi-setup-loop@var-swap`, or come up without swap: `rpi-resize.service` reloads systemd while the swap file's loop device is being set up (QEMU first boots; M5's image doesn't resize on first boot) | The loop setup starts after `rpi-resize.service` and has a 30 s start timeout |
+| `adbd` enabled by its package: USB gadget and a root shell with no pairing at every boot | Disabled, as on M5's image |
+| A failed boot left nothing to read (logs were in RAM) | Journal kept on the card, capped at 24 MB: `journalctl -D <card>/var/log/journal -b` |
 | 512 MB RAM is tight | No desktop, `gpu_mem=32`, zram (zstd, 1.5x RAM) with SD writeback via rpi-swap, earlyoom, trimmed services; see PERFORMANCE.md |
 | armhf enabled, apt twice as slow | Remove the armhf architecture |
 | nexmon breaks onboard Wi-Fi | Purge `brcmfmac-nexmon-dkms` |
