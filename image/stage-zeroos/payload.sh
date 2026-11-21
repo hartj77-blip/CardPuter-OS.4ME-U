@@ -75,6 +75,15 @@ cat > "$D/etc/systemd/system/console-setup.service.d/zeroos-unblank.conf" <<'UNI
 [Service]
 ExecStartPost=-/bin/sh -c 'for b in /sys/class/graphics/fb*/blank; do echo 1 > $b; echo 0 > $b; done'
 UNIT
+# Swap: Raspberry Pi OS's rpi-setup-loop@ waits with no time limit for the
+# swap file's /dev/disk/by-backingfile link. If the link never shows up the
+# whole boot stops there (seen once in a slow QEMU boot). Give up after 30 s:
+# that boot has no swap, but it starts, and the journal says why.
+install -d "$D/etc/systemd/system/rpi-setup-loop@.service.d"
+cat > "$D/etc/systemd/system/rpi-setup-loop@.service.d/zeroos-timeout.conf" <<'UNIT'
+[Service]
+TimeoutStartSec=30
+UNIT
 # LCD driver: never load the kernel's panel-mipi-dbi; it takes the driver name
 # M5's panel-mipi-dbi-m needs, and the LCD stays black (see 01-run.sh).
 install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-panel.conf"

@@ -37,6 +37,8 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | LCD stays on M5's logo or blank: `fb_load --keep-open` holds the LCD until M5's launcher starts, which ZeroOS doesn't ship | `fb_load.service` masked |
 | LCD black until ZeroShell starts (M5 boots with `quiet fbcon=map:off` behind a logo) | Console left on: boot text shows on the LCD. A udev rule runs `con2fbmap` to move it there when a monitor took fb0 |
 | ZeroShell started before the LCD driver, or with no LCD, and ran on drawing nowhere | The service waits up to 30 s for the LCD; with no display ZeroShell exits so systemd restarts it; the reason is in the journal |
+| Boot can stop forever in `rpi-setup-loop@var-swap` (it waits with no limit for the swap file's device link; seen in a slow QEMU boot, not on hardware) | 30 s start timeout: that boot runs without swap instead of hanging |
+| `adbd` enabled by its package: USB gadget and a root shell with no pairing at every boot | Disabled, as on M5's image |
 | A failed boot left nothing to read (logs were in RAM) | Journal kept on the card, capped at 24 MB: `journalctl -D <card>/var/log/journal -b` |
 | 512 MB RAM is tight | No desktop, `gpu_mem=32`, zram (zstd, 1.5x RAM) with SD writeback via rpi-swap, earlyoom, trimmed services; see PERFORMANCE.md |
 | armhf enabled, apt twice as slow | Remove the armhf architecture |
