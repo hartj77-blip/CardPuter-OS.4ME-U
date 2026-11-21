@@ -122,7 +122,9 @@ public:
                 shown_title_ = name;
             }
             lv_label_set_text(artist_, q ? q->artist.c_str() : "");
-            if (pb.path != listed_playing_) rebuild_list();   // the play mark follows the queue
+            // The play mark follows the queue, but not under an open text box:
+            // rebuilding the list takes the box out of the focus group.
+            if (pb.path != listed_playing_ && !input_) rebuild_list();
             int permille = pb.dur_ms > 0 ? int(1000LL * pb.pos_ms / pb.dur_ms) : 0;
             lv_bar_set_value(progress_, permille, LV_ANIM_OFF);
             lv_label_set_text(time_, (mmss(pb.pos_ms) + " / " + mmss(pb.dur_ms) +
@@ -518,6 +520,14 @@ private:
         int i = focused_index();
         if (i < 0 || i >= int(notes_.size())) return;
         std::string name = notes_[i].title;
+        // Ask once: the second press within 3 s on the same note deletes it.
+        if (confirm_path_ != notes_[i].path || lv_tick_elaps(confirm_at_) > 3000) {
+            confirm_path_ = notes_[i].path;
+            confirm_at_ = lv_tick_get();
+            shell_toast("Press again to delete " + name);
+            return;
+        }
+        confirm_path_.clear();
         if (hal().delete_recording(notes_[i].path)) {
             shell_toast("Deleted " + name);
             rebuild_list();
@@ -534,6 +544,8 @@ private:
         }, self);
     }
 
+    std::string confirm_path_;   // voice note waiting for a second X to delete
+    uint32_t confirm_at_ = 0;
     lv_obj_t* root_ = nullptr;
     lv_obj_t* tabs_[kTabs] = {};
     lv_obj_t* tab_line_ = nullptr;
