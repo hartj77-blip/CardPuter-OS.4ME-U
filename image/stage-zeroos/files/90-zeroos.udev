@@ -4,3 +4,6 @@ SUBSYSTEM=="leds", RUN+="/bin/chgrp video /sys%p/brightness", RUN+="/bin/chmod g
 # IR transmit/receive for the IR Remote app.
 SUBSYSTEM=="lirc", GROUP="video", MODE="0660"
 SUBSYSTEM=="rc", RUN+="/bin/chgrp -R video /sys%p", RUN+="/bin/chmod -R g+w /sys%p"
+# Boot text on the LCD: put tty1 on the LCD's framebuffer (fbcon=map:1 in
+# cmdline.txt covers the usual fb1; this catches any other number).
+SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", ATTR{name}=="*mipi-dbi*", RUN+="/usr/bin/con2fbmap 1 %n"

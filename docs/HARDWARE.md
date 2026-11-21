@@ -35,6 +35,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | LCD blank without Plymouth (driver not in initramfs) | Panel modules + `cardputerzero,st7789v_lcd.bin` in the initramfs |
 | LCD blanks when console-setup runs | Drop-in that unblanks the framebuffers afterwards |
 | LCD stays on M5's logo or blank: `fb_load --keep-open` holds the LCD until M5's launcher starts, which ZeroOS doesn't ship | Drop-in runs `fb_load` without `--keep-open` |
+| LCD black until ZeroShell starts (no Plymouth; console on fb0, the HDMI framebuffer) | `fbcon=map:1` in `cmdline.txt` puts boot text on the LCD; a udev rule runs `con2fbmap` if the LCD isn't fb1 |
 | 512 MB RAM is tight | No desktop, `gpu_mem=32`, zram (zstd, 1.5x RAM) with SD writeback via rpi-swap, earlyoom, trimmed services; see PERFORMANCE.md |
 | armhf enabled, apt twice as slow | Remove the armhf architecture |
 | nexmon breaks onboard Wi-Fi | Purge `brcmfmac-nexmon-dkms` |

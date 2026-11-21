@@ -35,6 +35,10 @@ sed -i -e 's/cfg80211.ieee80211_regdom=[A-Z]*//' -e 's/ splash//' -e 's/ plymout
 sed -i '1 s/$/ cfg80211.ieee80211_regdom=@WIFI_COUNTRY@/' "$CMDLINE_TXT"
 # The UART belongs to GPS modules, not a serial console.
 sed -i -e 's/console=serial0,[0-9]* *//' -e 's/console=ttyS0,[0-9]* *//' -e 's/console=ttyAMA0,[0-9]* *//' "$CMDLINE_TXT"
+# Boot text on the LCD: no Plymouth, and the console defaults to fb0 (HDMI), so
+# the LCD stayed black until ZeroShell started (minutes on a first boot). The
+# LCD is usually fb1; 90-zeroos.udev remaps the console if it comes up elsewhere.
+sed -i -e 's/ *fbcon=map:[0-9]*//' -e '1 s/$/ fbcon=map:1/' "$CMDLINE_TXT"
 grep -q '^enable_uart=' "$CONFIG_TXT" && sed -i 's/^enable_uart=.*/enable_uart=1/' "$CONFIG_TXT" || echo 'enable_uart=1' >> "$CONFIG_TXT"
 
 # Keyboard symbol layer system-wide, not only under M5's launcher (owner report).
