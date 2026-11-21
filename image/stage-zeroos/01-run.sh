@@ -131,6 +131,11 @@ disable_if_present apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_
     e2scrub_reap.service NetworkManager-wait-online.service rpi-eeprom-update.service \
     ModemManager.service
 systemctl --global disable rpi-connect.service rpi-connect-wayvnc.service 2>/dev/null || true
+# adbd (in M5's package list) is enabled by its package: at every boot it sets
+# up a USB gadget and offers a root shell to whatever the USB port is plugged
+# into, with no pairing. M5 turn it off in the script we drop; do the same.
+systemctl disable adbd.service 2>/dev/null || true
+rm -f /etc/systemd/system/multi-user.target.wants/adbd.service
 
 groupadd -f spi   # /dev/spidev* stays root-only without it (owner report)
 groupadd -f bluetooth   # normally made by bluez; zeroshell.service names it

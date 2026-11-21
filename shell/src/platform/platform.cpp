@@ -95,20 +95,21 @@ void tty_graphics(bool on) {
 }
 
 // The panel driver loads about 15 s into the boot (stock image log), which
-// can be after we start. Wait for the LCD's framebuffer, then check it opens
-// and switch its output on. If there is no screen to draw on, exit: systemd
+// can be after we start. zeroshell.service already waits up to 30 s for it;
+// wait a little more here, then check the framebuffer opens and switch its
+// output on. If there is no screen to draw on, exit: systemd
 // starts us again (Restart=always) and the reason is in the journal, instead
 // of a shell that runs for hours drawing nowhere.
 std::string open_lcd_or_exit() {
     const bool forced = std::getenv("ZS_FRAMEBUFFER") && std::getenv("ZS_FRAMEBUFFER")[0];
-    for (int i = 0; !forced && i < 300 && lcd_framebuffer_find().empty(); ++i) {
+    for (int i = 0; !forced && i < 100 && lcd_framebuffer_find().empty(); ++i) {
         if (i == 0) std::printf("zeroshell: waiting for the LCD framebuffer\n");
         std::fflush(stdout);
         usleep(100 * 1000);
     }
     std::string fb = lcd_framebuffer();  // fb_lcd / the panel's fbN, not HDMI's
     if (!forced && lcd_framebuffer_find().empty())
-        std::fprintf(stderr, "zeroshell: no LCD framebuffer after 30 s (panel driver not loaded?), trying %s\n", fb.c_str());
+        std::fprintf(stderr, "zeroshell: no LCD framebuffer (panel driver not loaded?), trying %s\n", fb.c_str());
     int fd = open(fb.c_str(), O_RDWR);
     fb_var_screeninfo v{};
     if (fd < 0 || ioctl(fd, FBIOGET_VSCREENINFO, &v) != 0) {
