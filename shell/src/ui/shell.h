@@ -34,6 +34,10 @@ public:
     // The same, for the camera app (see Hal::camera_open).
     bool open_camera();
     const std::string& current_app() const { return app_id_; }
+    // Bumped each time an app opens or closes (key repeat stops at a switch).
+    uint32_t app_generation() const { return app_generation_; }
+    // Before a forced power-off: close the app (it saves) and the GPS track.
+    void prepare_power_off();
 
 private:
     void apply_pending();
@@ -54,7 +58,9 @@ private:
     bool handoff_ = false;
     bool handoff_camera_ = false;   // handed to the camera app, not the terminal
     uint32_t handoff_since_ = 0;
-    uint32_t toast_until_ = 0;
+    uint32_t toast_since_ = 0;
+    bool toast_shown_ = false;
+    uint32_t app_generation_ = 0;
     lv_indev_t* keypad_ = nullptr;
     std::unique_ptr<App> app_;
     std::string app_id_;
