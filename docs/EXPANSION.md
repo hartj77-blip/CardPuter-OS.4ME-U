@@ -63,6 +63,19 @@ The first time, set your **region** (for example US or EU_868) in the web
 client's radio settings. The radio doesn't transmit until a region is set,
 and it must match where you are and what other nodes use.
 
+If the radio doesn't come up, the Mesh app says so instead of showing an
+empty chat:
+
+- **No radio:** meshtasticd started but couldn't talk to the SX1262 (its log
+  says `SX126x init result -N` or `No SX1262 radio`). The cap isn't seated,
+  has no 5 V, or a pin is wrong.
+- **Radio error:** meshtasticd keeps exiting and systemd keeps restarting
+  it. The app shows its last error line; **Turn on mesh** tries again.
+
+The mesh node has no position of its own: meshtasticd can't read gpsd, and
+gpsd already owns the GPS's serial port. Set a fixed position in the web
+client if you want this node on the map.
+
 Still to do: direct messages to one node, other channels, and keeping
 messages after a restart (they're kept in memory, the last 200).
 
@@ -77,8 +90,8 @@ uses its own battery: leave it off when you don't need it **(measure)**.
 | Grove | UART on G14/G15 by default (G4 low), or I2C1 (G4 high). Same UART as EXT. |
 | 5 V | An LED-class supply under `/sys/class/leds/` (`ext_5v_out` on M5's image). ZeroShell switches every `*5v*` one; `power-perms` lets it. |
 | `config.txt`, `cmdline.txt` | `enable_uart=1`; no serial console on the UART, so it's free for GPS. |
-| `gpsd` | Reads `/dev/serial0` at 115200 (and USB GPS dongles). Socket-activated: it starts when the GPS app or meshtasticd connects and stops reading the receiver when they stop watching. Config: `/etc/default/gpsd`. |
-| `meshtasticd` | Meshtastic's Linux daemon, from Meshtastic's Debian repository (beta channel). Off at boot; the Mesh app starts it (polkit allows `pi` exactly this unit). Radio config: `/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml` (SX1262 on `spidev0.1`, RESET 26, BUSY 22, IRQ 23, DIO2 as RF switch, DIO3 TCXO). It takes its position from gpsd, serves the web client on port 9443 and the app API on TCP 4403. |
+| `gpsd` | Reads `/dev/serial0` at 115200 (and USB GPS dongles). Socket-activated: it starts when the GPS app connects and stops reading the receiver when they stop watching. Config: `/etc/default/gpsd`. |
+| `meshtasticd` | Meshtastic's Linux daemon, from Meshtastic's Debian repository (beta channel), pinned to a tested build (`MESHTASTICD_VERSION` in `image/build.sh`) and held so `apt upgrade` leaves it alone; `sudo apt-mark unhold meshtasticd` to take newer betas. Off at boot; the Mesh app starts it (polkit allows `pi` exactly this unit). Radio config: `/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml` (SX1262 on `spidev0.1`, RESET 26, BUSY 22, IRQ 23, DIO2 as RF switch, DIO3 TCXO). It doesn't use the GPS (it can't read gpsd, and a second reader on the UART would garble gpsd's). It serves the web client on port 9443 and the app API on TCP 4403. |
 | Chat in ZeroShell | A small client for that API (`hal/meshtastic.cpp`, hand-written protobuf, no library): asks for the node list, reads text messages, sends to the primary channel. |
 
 ## To confirm on hardware

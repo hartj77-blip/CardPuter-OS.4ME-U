@@ -11,10 +11,11 @@ Lora:
   DIO2_AS_RF_SWITCH: true
   DIO3_TCXO_VOLTAGE: true
 
-# Position from gpsd, which shares the GPS with ZeroShell's GPS app.
-GPS:
-  GpsdHost: localhost
-  GpsdPort: 2947
+# No GPS section: meshtasticd (2.7) can't read gpsd, only a serial port
+# (GPS: SerialPath). gpsd already owns /dev/serial0 for ZeroShell's GPS app
+# and tracks, and two readers on one UART garble each other, so the mesh
+# node has no position of its own. Set a fixed one in the web client if
+# you want it on the map.
 
 # The Meshtastic web client, for chatting from a phone or the Dock browser.
 Webserver:
