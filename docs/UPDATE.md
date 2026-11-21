@@ -68,6 +68,13 @@ publishes a GitHub release with two files: `zeroos_0.2.0_arm64.deb` and
 `zeroos-update.manifest`. Devices look at the newest release, so they see it
 the next time someone opens **Update**. The tag is the version.
 
+It first runs all of CI on the tagged commit (simulator, screenshots, browser
+build, device build, update tests) and publishes nothing if any of it fails.
+A tag with a `-`, such as `v0.3.0-rc1`, is published as a pre-release:
+devices only look at the latest full release, so it reaches nobody until you
+mark it as the latest release on GitHub (or install it by hand with
+`tools/push-update.sh`).
+
 Builds between releases get versions such as `0.2.0+3.gabc1234` (three commits
 after v0.2.0), which count as newer than 0.2.0 and older than 0.2.1
 (`image/version.sh`).
