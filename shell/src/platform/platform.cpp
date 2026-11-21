@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #if ZS_BACKEND_DEVICE
+#include <linux/fb.h>
 #include <linux/input.h>
 #include <linux/kd.h>
 #endif
@@ -15,6 +16,7 @@
 #include <emscripten.h>
 #endif
 
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -92,12 +94,45 @@ void tty_graphics(bool on) {
     ioctl(0, KDSKBMODE, on ? K_OFF : K_UNICODE);
 }
 
+// The panel driver loads about 15 s into the boot (stock image log), which
+// can be after we start. Wait for the LCD's framebuffer, then check it opens
+// and switch its output on. If there is no screen to draw on, exit: systemd
+// starts us again (Restart=always) and the reason is in the journal, instead
+// of a shell that runs for hours drawing nowhere.
+std::string open_lcd_or_exit() {
+    const bool forced = std::getenv("ZS_FRAMEBUFFER") && std::getenv("ZS_FRAMEBUFFER")[0];
+    for (int i = 0; !forced && i < 300 && lcd_framebuffer_find().empty(); ++i) {
+        if (i == 0) std::printf("zeroshell: waiting for the LCD framebuffer\n");
+        std::fflush(stdout);
+        usleep(100 * 1000);
+    }
+    std::string fb = lcd_framebuffer();  // fb_lcd / the panel's fbN, not HDMI's
+    if (!forced && lcd_framebuffer_find().empty())
+        std::fprintf(stderr, "zeroshell: no LCD framebuffer after 30 s (panel driver not loaded?), trying %s\n", fb.c_str());
+    int fd = open(fb.c_str(), O_RDWR);
+    fb_var_screeninfo v{};
+    if (fd < 0 || ioctl(fd, FBIOGET_VSCREENINFO, &v) != 0) {
+        std::fprintf(stderr, "zeroshell: cannot use display %s: %s\n", fb.c_str(), std::strerror(errno));
+        std::exit(1);
+    }
+    // Setting the mode again makes DRM's framebuffer emulation enable the
+    // panel if nothing has yet (no console on it, no boot logo); then unblank.
+    v.activate = FB_ACTIVATE_NOW | FB_ACTIVATE_FORCE;
+    if (ioctl(fd, FBIOPUT_VSCREENINFO, &v) != 0)
+        std::fprintf(stderr, "zeroshell: FBIOPUT_VSCREENINFO on %s: %s\n", fb.c_str(), std::strerror(errno));
+    if (ioctl(fd, FBIOBLANK, FB_BLANK_UNBLANK) != 0)
+        std::fprintf(stderr, "zeroshell: unblank %s: %s\n", fb.c_str(), std::strerror(errno));
+    close(fd);
+    std::printf("zeroshell: display %s %ux%u %u bpp\n", fb.c_str(), v.xres, v.yres, v.bits_per_pixel);
+    std::fflush(stdout);
+    return fb;
+}
+
 lv_indev_t* platform_init(int, int, int) {
+    std::string fb = open_lcd_or_exit();
     tty_graphics(true);
     std::atexit([] { tty_graphics(false); });
     lv_display_t* d = lv_linux_fbdev_create();
-    std::string fb = lcd_framebuffer();  // fb_lcd / the panel's fbN, not HDMI's
-    std::printf("zeroshell: display %s\n", fb.c_str());
     lv_linux_fbdev_set_file(d, fb.c_str());
     std::string kb = find_keyboard();
     std::printf("zeroshell: keyboard %s\n", kb.c_str());

@@ -18,7 +18,7 @@ as they come in.
 | 512 MB SD swap file as zram writeback | `files/swap.conf` (`Mechanism=zram+file`) | Pages that stay idle get moved from zram to the card now and then, which frees RAM with very little card wear. It is also the last-resort safety net. |
 | `vm.swappiness=100`, `vfs_cache_pressure=80`, `min_free_kbytes=8192` | `files/90-zeroos-memory.conf` | Swap to zram early (it is RAM speed), keep file and directory caches, keep a reserve for the display and Wi-Fi drivers. |
 | earlyoom (4% RAM and 8% swap left) | `files/earlyoom` | Kills the biggest app (browser, player, Python) before the whole system stalls. Never picks ZeroShell, ssh, networking or audio. |
-| Logs in RAM, capped at 16 MB | `files/journald.conf` | No constant log writes to the card. |
+| Logs on the card, capped at 24 MB | `files/journald.conf` | Small enough to keep card writes low; a failed boot can still be read afterwards. |
 | Services off: apt-daily, man-db, e2scrub, wait-online, eeprom-update, ModemManager, rpi-connect | `stage-zeroos/01-run.sh` | Each costs RAM, CPU at boot, or random background work. Update with `sudo apt upgrade` when you choose. |
 | Removed: armhf, nexmon, plymouth, desktop packages | `stage-zeroos/01-run.sh` | Smaller image, fewer things starting. |
 | ZeroShell instead of a desktop | `shell/` | One small C++ process (LVGL) with a fixed 512 KB UI memory pool. |
@@ -44,7 +44,7 @@ by doing less while awake and almost nothing while the screen is off.
 | Screen off: keyboard and redraw timers stop; the loop wakes every 0.5 s (to read the motion sensor) or on a key | always | `platform.cpp` |
 | Screen off as soon as it's placed face down (1.5 s) | on | Settings → Screen off face down |
 | Screen on when picked up and tilted toward you; off again after 8 s with no key; paused for 15 min after 3 such wakes in 5 min (a bag or pocket) | on | Settings → Wake on pickup |
-| Logs in RAM, background jobs off | always | step 1 |
+| Small log cap, background jobs off | always | step 1 |
 
 **Time left** in the top bar and the Battery app comes from our own average of
 the gauge's voltage x current with a 3-minute time constant, divided into the

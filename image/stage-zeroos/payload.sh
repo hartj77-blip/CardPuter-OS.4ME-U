@@ -75,16 +75,11 @@ cat > "$D/etc/systemd/system/console-setup.service.d/zeroos-unblank.conf" <<'UNI
 [Service]
 ExecStartPost=-/bin/sh -c 'for b in /sys/class/graphics/fb*/blank; do echo 1 > $b; echo 0 > $b; done'
 UNIT
-# M5's boot logo (fb_load.service, from the LCD driver) waits with --keep-open
-# until M5's launcher starts, holding the LCD's DRM device the whole time. We
-# don't ship that launcher, so it never let go and ZeroShell's drawing never
-# reached the screen. Show the logo, then exit.
-install -d "$D/etc/systemd/system/fb_load.service.d"
-cat > "$D/etc/systemd/system/fb_load.service.d/zeroos.conf" <<'UNIT'
-[Service]
-ExecStart=
-ExecStart=/usr/sbin/fb_load
-UNIT
+# M5's boot logo (fb_load.service, from the LCD driver) holds the LCD's DRM
+# device until M5's launcher starts, and waits forever for /dev/dri/card1. We
+# ship neither that launcher nor a logo (boot text is on the LCD instead), so
+# switch it off; held open, nothing ZeroShell draws reaches the screen.
+ln -sf /dev/null "$D/etc/systemd/system/fb_load.service"
 
 # Overrides: settings files that belong to another Debian package, so ours
 # can't ship them in place. The package's postinst copies this tree over /.

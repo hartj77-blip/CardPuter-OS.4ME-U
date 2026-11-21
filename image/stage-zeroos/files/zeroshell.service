@@ -5,6 +5,8 @@ After=systemd-user-sessions.service NetworkManager.service sound.target
 Wants=user@1000.service
 After=user@1000.service
 Conflicts=getty@tty1.service
+# ZeroShell exits when it has no screen to draw on; keep starting it.
+StartLimitIntervalSec=0
 
 [Service]
 User=pi
@@ -18,7 +20,7 @@ TTYPath=/dev/tty1
 StandardInput=tty-force
 StandardOutput=journal
 StandardError=journal
-# ZeroShell finds the LCD itself (/dev/fb_lcd, usually fb1; fb0 is HDMI).
+# ZeroShell finds the LCD itself (/dev/fb_lcd: fb0, or fb1 with a monitor).
 # Set ZS_FRAMEBUFFER here only to force a framebuffer.
 # "+" runs as root: open up the CPU speed and screen power files to video.
 ExecStartPre=+/usr/lib/zeroos/power-perms
