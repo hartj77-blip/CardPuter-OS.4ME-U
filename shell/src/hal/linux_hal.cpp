@@ -39,6 +39,7 @@
 #include <cmath>
 #include <ctime>
 #include <cstdio>
+#include <climits>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -584,7 +585,10 @@ public:
         return rec_;
     }
     bool delete_recording(const std::string& path) override {
-        if (path.rfind(home() + "/Recordings/", 0) != 0) return false;  // only our own files
+        // Only our own files: resolve "..", symlinks first.
+        char real[PATH_MAX], dir[PATH_MAX];
+        if (!realpath(path.c_str(), real) || !realpath((home() + "/Recordings").c_str(), dir)) return false;
+        if (std::string(real).rfind(std::string(dir) + "/", 0) != 0) return false;
         if (pb_.path == path) stop();
         return std::remove(path.c_str()) == 0;
     }
@@ -1147,10 +1151,7 @@ private:
         if (m.failing) {
             if (now - mesh_err_at_ >= 10) {   // the journal is slow: not every refresh
                 mesh_err_at_ = now;
-                mesh_err_ = run("journalctl -u meshtasticd -b --no-pager -n 60 -o cat 2>/dev/null | "
-                                "grep -i -E 'error|fail|could not|cannot|unable|no such|denied' | tail -n1");
-                while (!mesh_err_.empty() && std::isspace(uint8_t(mesh_err_.back()))) mesh_err_.pop_back();
-                if (mesh_err_.size() > 160) mesh_err_.resize(160);
+                mesh_err_ = mesh_last_error();
             }
             m.error = mesh_err_;
         }
@@ -1186,6 +1187,7 @@ private:
         mesh_log_checks_ = 0;
         mesh_err_at_ = 0;
         mesh_err_.clear();
+        mesh_started_at_ = time(nullptr);
         mesh_restarts_ = -1;
         mesh_fail_until_ = 0;
         set_ext_power(true);
@@ -1232,6 +1234,8 @@ private:
             mesh_beat_ = now;
         }
         if (mesh_hello_ && now - mesh_beat_ > 240 && mesh_write(mt::heartbeat())) mesh_beat_ = now;
+        mesh_flush();
+        if (mesh_fd_ < 0) return;
         char buf[2048];
         for (;;) {
             ssize_t n = recv(mesh_fd_, buf, sizeof buf, MSG_DONTWAIT);
@@ -1277,21 +1281,65 @@ private:
         std::snprintf(b, sizeof b, "!%08x", num);
         return b;
     }
+    // The daemon's last error from this run (since mesh_start, else this
+    // boot): ERROR/CRIT lines first, then anything that reads like one.
+    std::string mesh_last_error() {
+        std::string since = mesh_started_at_ ? "--since @" + std::to_string(long(mesh_started_at_) - 1) : "-b";
+        std::istringstream in(run("journalctl -u meshtasticd " + since + " --no-pager -n 200 -o cat 2>/dev/null"));
+        std::string worst, any;
+        for (std::string line; std::getline(in, line);) {
+            if (line.find("ERROR") != std::string::npos || line.find("CRIT") != std::string::npos) worst = line;
+            std::string l = line;
+            std::transform(l.begin(), l.end(), l.begin(), ::tolower);
+            for (const char* k : {"error", "fail", "could not", "cannot", "unable", "no such", "denied"})
+                if (l.find(k) != std::string::npos) any = line;
+        }
+        std::string e = worst.empty() ? any : worst;
+        while (!e.empty() && std::isspace(uint8_t(e.back()))) e.pop_back();
+        if (e.size() > 160) e.resize(160);
+        return e;
+    }
+    // Queue a frame and send what the socket takes now; mesh_pump sends the
+    // rest. A partial send must not drop the tail of a frame: the daemon's
+    // framing would be off until we reconnect.
     bool mesh_write(const std::string& frame) {
-        if (mesh_fd_ < 0) return false;
-        return send(mesh_fd_, frame.data(), frame.size(), MSG_NOSIGNAL | MSG_DONTWAIT) == ssize_t(frame.size());
+        if (mesh_fd_ < 0 || mesh_out_.size() + frame.size() > 16384) return false;
+        mesh_out_ += frame;
+        mesh_flush();
+        return mesh_fd_ >= 0;
+    }
+    void mesh_flush() {
+        while (mesh_fd_ >= 0 && !mesh_out_.empty()) {
+            ssize_t n = send(mesh_fd_, mesh_out_.data(), mesh_out_.size(), MSG_NOSIGNAL | MSG_DONTWAIT);
+            if (n > 0) {
+                mesh_out_.erase(0, size_t(n));
+            } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOTCONN || errno == EINTR)) {
+                break;   // still connecting, or the buffer is full: next pump
+            } else {
+                mesh_close();
+            }
+        }
     }
     void mesh_close() {
         if (mesh_fd_ >= 0) close(mesh_fd_);
         mesh_fd_ = -1;
+        mesh_out_.clear();
         mesh_hello_ = mesh_connected_ = false;
+    }
+    // At most max bytes, not ending inside a UTF-8 character.
+    static std::string utf8_cut(const std::string& s, size_t max) {
+        if (s.size() <= max) return s;
+        size_t n = max;
+        while (n > 0 && (uint8_t(s[n]) & 0xc0) == 0x80) --n;
+        return s.substr(0, n);
     }
     std::vector<MeshMessage> mesh_messages() override { return mesh_log_; }
     bool mesh_send(const std::string& text) override {
         if (!mesh_connected_ || text.empty()) return false;
-        if (!mesh_write(mt::text_message(text.substr(0, 200), mt::kBroadcast, 0, ++mesh_packet_id_))) return false;
+        std::string t = utf8_cut(text, 200);
+        if (!mesh_write(mt::text_message(t, mt::kBroadcast, 0, ++mesh_packet_id_))) return false;
         MeshMessage m;
-        m.text = text.substr(0, 200);
+        m.text = t;
         m.mine = true;
         m.time = long(time(nullptr));
         mesh_log_.push_back(m);
@@ -1702,6 +1750,8 @@ private:
     time_t mesh_try_ = 0, mesh_beat_ = 0;
     uint32_t mesh_me_ = 0, mesh_packet_id_ = uint32_t(time(nullptr)) & 0xfffff;
     mt::Stream mesh_in_;
+    std::string mesh_out_;   // frames not yet taken by the socket
+    time_t mesh_started_at_ = 0;
     std::map<uint32_t, std::string> mesh_names_;
     std::vector<MeshMessage> mesh_log_;
     time_t sync_at_ = 0, sync_run_at_ = 0;

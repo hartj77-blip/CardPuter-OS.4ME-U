@@ -81,6 +81,17 @@ struct Reader {
     }
 };
 
+// A real frame's payload is a protobuf that parses to its last byte.
+bool whole_message(const std::string& m) {
+    Reader r(m);
+    uint32_t n, w;
+    uint64_t v;
+    std::string b;
+    while (r.more())
+        if (!r.field(n, w, v, b) || n == 0) return false;
+    return true;
+}
+
 void read_user(const std::string& m, Event& e) {
     Reader r(m);
     uint32_t n, w;
@@ -160,6 +171,12 @@ bool Stream::next(std::string& payload) {
         }
         if (buf_.size() < 4 + len) return false;
         payload = buf_.substr(4, len);
+        if (!whole_message(payload)) {
+            // Start bytes that happened to appear in other data: skip just
+            // them, so a real frame inside the next len bytes isn't lost.
+            buf_.erase(0, 2);
+            continue;
+        }
         buf_.erase(0, 4 + len);
         return true;
     }
