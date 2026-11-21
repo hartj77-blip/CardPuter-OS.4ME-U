@@ -1,7 +1,10 @@
 #include "ui/tracker.h"
 
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
+#include <cerrno>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -48,6 +51,7 @@ void add_point(const GpsFix& fix, uint32_t now_ms) {
     if (fix.mode >= 3) std::fprintf(g_file, "<ele>%.1f</ele>", fix.alt_m);
     std::fprintf(g_file, "<time>%s</time></trkpt>\n%s", when, kFooter);
     std::fflush(g_file);
+    fsync(fileno(g_file));   // on the card, not just in the page cache, before the battery dies
     if (g_state.points) g_state.meters += distance_m(g_lat, g_lon, fix.lat, fix.lon);
     g_lat = fix.lat;
     g_lon = fix.lon;
@@ -68,19 +72,33 @@ bool track_start() {
     std::tm lt{};
     localtime_r(&now, &lt);
     char name[48], title[32];
-    std::strftime(name, sizeof name, "track-%Y%m%d-%H%M%S.gpx", &lt);
+    std::strftime(name, sizeof name, "track-%Y%m%d-%H%M%S", &lt);
     std::strftime(title, sizeof title, "%Y-%m-%d %H:%M", &lt);
-    g_file = std::fopen((dir + "/" + name).c_str(), "w+");
-    if (!g_file) return false;
+    // Never reuse a name: a stop and start in the same second must not
+    // overwrite the track just saved. O_EXCL fails if the file exists.
+    std::string file;
+    int fd = -1;
+    for (int i = 1; i < 100 && fd < 0; ++i) {
+        file = std::string(name) + (i > 1 ? "-" + std::to_string(i) : std::string()) + ".gpx";
+        fd = open((dir + "/" + file).c_str(), O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
+        if (fd < 0 && errno != EEXIST) return false;
+    }
+    if (fd < 0) return false;
+    g_file = fdopen(fd, "w+");
+    if (!g_file) {
+        close(fd);
+        return false;
+    }
     std::fprintf(g_file,
                  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                  "<gpx version=\"1.1\" creator=\"ZeroOS\" xmlns=\"http://www.topografix.com/GPX/1/1\">\n"
                  "<trk><name>%s</name><trkseg>\n%s",
                  title, kFooter);
     std::fflush(g_file);
+    fsync(fd);
     g_state = TrackState{};
     g_state.recording = true;
-    g_state.name = name;
+    g_state.name = file;
     g_started = g_last_tick = lv_tick_get();
     g_last_point = 0;
     hal().set_ext_power(true);
@@ -90,7 +108,11 @@ bool track_start() {
 void track_stop() {
     if (!g_state.recording) return;
     g_state.recording = false;
-    if (g_file) std::fclose(g_file);
+    if (g_file) {
+        std::fflush(g_file);
+        fsync(fileno(g_file));
+        std::fclose(g_file);
+    }
     g_file = nullptr;
 }
 
