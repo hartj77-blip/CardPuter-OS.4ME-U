@@ -17,6 +17,7 @@
 #endif
 
 #include <cerrno>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -60,6 +61,19 @@ namespace {
 lv_indev_t* g_keypad = nullptr;
 int g_kb_fd = -1;
 bool g_low_power = false;
+volatile std::sig_atomic_t g_quit = 0;
+int g_saved_kbmode = -1;   // tty1's keyboard mode before we turned it off
+
+// systemd stops us with SIGTERM (updates, restarts): leave the main loop
+// so main() returns and the atexit handlers restore tty1. No SA_RESTART,
+// so the poll() in the main loop wakes up at once.
+void on_quit_signal(int) { g_quit = 1; }
+void install_quit_handlers() {
+    struct sigaction sa{};
+    sa.sa_handler = on_quit_signal;
+    sigemptyset(&sa.sa_mask);
+    for (int sig : {SIGTERM, SIGINT, SIGHUP}) sigaction(sig, &sa, nullptr);
+}
 }  // namespace
 // ---------------------------------------------------------------- device
 namespace {
@@ -90,8 +104,12 @@ std::string find_keyboard() {
 // tty1 (or reaching a login prompt). Restored on exit.
 void tty_graphics(bool on) {
     if (!isatty(0)) return;
+    if (on && g_saved_kbmode < 0) {
+        int mode;
+        if (ioctl(0, KDGKBMODE, &mode) == 0 && mode != K_OFF) g_saved_kbmode = mode;
+    }
     ioctl(0, KDSETMODE, on ? KD_GRAPHICS : KD_TEXT);
-    ioctl(0, KDSKBMODE, on ? K_OFF : K_UNICODE);
+    ioctl(0, KDSKBMODE, on ? K_OFF : (g_saved_kbmode >= 0 ? g_saved_kbmode : K_UNICODE));
 }
 
 // The panel driver loads about 15 s into the boot (stock image log), which
@@ -133,6 +151,7 @@ lv_indev_t* platform_init(int, int, int) {
     std::string fb = open_lcd_or_exit();
     tty_graphics(true);
     std::atexit([] { tty_graphics(false); });
+    install_quit_handlers();
     lv_display_t* d = lv_linux_fbdev_create();
     lv_linux_fbdev_set_file(d, fb.c_str());
     std::string kb = find_keyboard();
@@ -161,7 +180,7 @@ void platform_set_low_power(bool on) {
 }
 
 int platform_run() {
-    for (;;) {
+    while (!g_quit) {
         uint32_t ms = lv_timer_handler();
         // Sleep until the next LVGL timer is due or a key arrives, instead of
         // waking every few ms. Awake, keys are also read on LVGL's own timer.
@@ -169,11 +188,22 @@ int platform_run() {
         if (ms == LV_NO_TIMER_READY || ms > cap) ms = cap;
         if (g_kb_fd >= 0) {
             pollfd p{g_kb_fd, POLLIN, 0};
-            if (poll(&p, 1, int(ms)) > 0 && g_keypad) lv_indev_read(g_keypad);
+            if (poll(&p, 1, int(ms)) > 0) {
+                if (p.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+                    // The keyboard went away (driver unbound): poll() would
+                    // return at once forever. Exit; systemd restarts us and
+                    // we open the keyboard afresh.
+                    std::fprintf(stderr, "zeroshell: keyboard lost, restarting\n");
+                    return 1;
+                }
+                if (g_keypad) lv_indev_read(g_keypad);
+            }
         } else {
             usleep(ms * 1000);
         }
     }
+    std::printf("zeroshell: stopping\n");
+    return 0;
 }
 
 int platform_run_script(const std::string&) {
