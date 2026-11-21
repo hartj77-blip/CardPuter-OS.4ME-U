@@ -73,8 +73,8 @@ curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
     -o /usr/share/keyrings/tailscale-archive-keyring.gpg
 curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list \
     -o /etc/apt/sources.list.d/tailscale.list
-apt-get update
-apt-get install -y tailscale
+apt-get update -o Acquire::Retries=3
+apt-get install -y -o Acquire::Retries=3 tailscale || { sleep 30; apt-get update; apt-get install -y -o Acquire::Retries=3 tailscale; }
 sed -i 's/^FLAGS=.*/FLAGS="--no-logs-no-support"/' /etc/default/tailscaled
 systemctl disable tailscaled.service
 systemctl enable zeroos-taildrop.service
@@ -83,9 +83,23 @@ curl -fsSL https://download.opensuse.org/repositories/network:/Meshtastic:/beta/
     -o /usr/share/keyrings/meshtastic.asc
 echo 'deb [signed-by=/usr/share/keyrings/meshtastic.asc] http://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/ /' \
     > /etc/apt/sources.list.d/meshtastic.list
-apt-get update
-apt-get install -y meshtasticd
-systemctl disable meshtasticd.service
+# openSUSE's mirrors are sometimes mid-sync and serve a truncated .deb
+# ("File has unexpected size"), which failed a whole image build once. Retry,
+# and if it still fails, build without it: only the Cap LoRa-1262 needs it.
+meshtastic_ok=
+for try in 1 2 3; do
+    apt-get update -o Acquire::Retries=3 || true
+    if apt-get install -y -o Acquire::Retries=3 meshtasticd; then meshtastic_ok=1; break; fi
+    echo "zeroos: meshtasticd install failed (try $try), retrying in 30 s"
+    apt-get clean
+    sleep 30
+done
+if [ -n "$meshtastic_ok" ]; then
+    systemctl disable meshtasticd.service
+    echo "zeroos: meshtasticd installed: $(dpkg-query -W -f '${Version}' meshtasticd)"
+else
+    echo "zeroos: WARNING: meshtasticd NOT installed (Mesh app needs: sudo apt install meshtasticd)"
+fi
 # The camera app and the libraries it names (libcamera, libfmt, cJSON...).
 # If it can't be installed the image is still built: ZeroShell's Camera app
 # then says the camera app is missing.
