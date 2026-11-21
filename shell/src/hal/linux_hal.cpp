@@ -1109,8 +1109,9 @@ private:
                 mesh_log_at_ = now;
                 ++mesh_log_checks_;
                 mesh_no_radio_ = !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
-                                      "grep -m1 -i -E 'simradio|sim radio|radio init failed|"
-                                      "failed to find.*radio|no .*radio (found|detected)'").empty();
+                                      // 2.7.x: "SX126x init result -2", "No SX1262 radio"
+                                      "grep -m1 -E 'init result -[0-9]|No [A-Za-z0-9]+ radio|SimRadio|"
+                                      "[Rr]adio init failed'").empty();
             }
             m.no_radio = mesh_no_radio_;
             const NetStatus& n = net_cache_;   // poll() refreshes it; read_net() forks ~7 times
