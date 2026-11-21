@@ -26,6 +26,7 @@ SETTLE=${ZEROOS_UPDATE_SETTLE:-10}      # seconds ZeroShell must stay up
 STATUS=$RUN_DIR/update.status
 
 UPDATE_URL=https://github.com/hartj77-blip/cardputer-zero/releases/latest/download
+ALLOW_HTTP=0
 # shellcheck disable=SC1090
 [ -r "$CONF" ] && . "$CONF"
 UPDATE_URL=${UPDATE_URL%/}
@@ -44,8 +45,10 @@ current_version() {
 # status <state> [percent] [message]
 # States: checking, up-to-date, available, offline, downloading, installing,
 # restarting, done, rolled-back, failed.
+last_state=""
 status() {
     local tmp="$STATUS.tmp.$$"
+    last_state=$1
     {
         echo "state=$1"
         echo "current=$current"
@@ -59,6 +62,41 @@ status() {
 fail() {
     status failed 0 "$1"
     exit 1
+}
+
+# Whatever ends the script part-way (a failed command, a signal, a bug) must
+# not leave ZeroShell showing "downloading" or "installing" for ever.
+on_exit() {
+    local rc=$?
+    case $last_state in
+        checking|downloading|installing|restarting)
+            status failed 0 "The update stopped unexpectedly (code $rc). Try again" ;;
+    esac
+}
+
+# The SHA-256 in the manifest only proves the download is complete: it comes
+# from the same server as the package. So the server must be trusted, and
+# reached over https, or over plain http only on your own network
+# (docs/UPDATE.md, "Trust").
+url_ok() {
+    local rest host
+    case $UPDATE_URL in
+        https://*|file://*) return 0 ;;
+        http://*) ;;
+        *) return 1 ;;
+    esac
+    [ "$ALLOW_HTTP" = 1 ] && return 0
+    rest=${UPDATE_URL#http://}
+    host=${rest%%/*}
+    host=${host##*@}
+    host=${host%:*}
+    case $host in
+        localhost|*.local|*.lan|*.home.arpa|*.ts.net) return 0 ;;
+        127.*|10.*|192.168.*) return 0 ;;
+        172.1[6-9].*|172.2[0-9].*|172.3[01].*) return 0 ;;
+        100.6[4-9].*|100.[7-9][0-9].*|100.1[01][0-9].*|100.12[0-7].*) return 0 ;;   # Tailscale
+    esac
+    return 1
 }
 
 need_root() {
@@ -91,6 +129,7 @@ fetch_manifest() {
 
 # 0 = a newer version exists, 1 = up to date; exits when it can't tell.
 check() {
+    url_ok || fail "Updates over plain http only from your own network (or set ALLOW_HTTP=1 in update.conf)"
     status checking
     fetch_manifest
     case $? in
@@ -114,7 +153,10 @@ download() {
         fail "Not enough free space for the update"
     fi
     rm -f "$out"
-    curl -fsSL --connect-timeout 10 --retry 3 --retry-delay 2 -o "$out" "$UPDATE_URL/$m_file" &
+    # A stalled connection (Wi-Fi gone) gives up after a minute under 1 kB/s
+    # instead of sitting at "downloading" until the service times out.
+    curl -fsSL --connect-timeout 10 --speed-limit 1000 --speed-time 60 \
+        --retry 3 --retry-delay 2 -o "$out" "$UPDATE_URL/$m_file" &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         got=$(stat -c %s "$out" 2>/dev/null || echo 0)
@@ -161,18 +203,26 @@ install_deb() {
     latest=$ver
 
     status installing 0
+    # Finish anything an earlier run left half-done (power cut mid-dpkg).
+    DEBIAN_FRONTEND=noninteractive dpkg --force-confold --force-confdef --configure -a >&2 ||
+        fail "The package system needs repair first: sudo dpkg --configure -a"
     if ! put_on "$deb"; then
         if [ -f "$STATE_DIR/current.deb" ]; then
-            put_on "$STATE_DIR/current.deb"
+            put_on "$STATE_DIR/current.deb" ||
+                fail "Could not install $ver, and putting $current back failed too. Run: sudo dpkg --configure -a"
+            fail "Could not install $ver. $current is still on"
         fi
-        fail "Could not install $ver. Nothing was changed"
+        fail "Could not install $ver, and no earlier package is kept to put back"
     fi
 
     status restarting 0
     if ! shell_stays_up; then
         if [ -f "$STATE_DIR/current.deb" ]; then
             log "ZeroShell $ver did not stay up; going back"
-            put_on "$STATE_DIR/current.deb"
+            if ! put_on "$STATE_DIR/current.deb"; then
+                status failed 0 "$ver would not start, and going back failed. Run: sudo zeroos-update rollback"
+                exit 1
+            fi
             systemctl restart zeroshell.service
             status rolled-back 0 "$ver would not start. The old version is back"
         else
@@ -189,6 +239,8 @@ install_deb() {
     current=$ver
     status done 100 "Now on $ver"
 }
+
+trap on_exit EXIT
 
 case "${1:-}" in
     check)

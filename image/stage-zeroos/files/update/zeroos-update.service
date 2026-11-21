@@ -4,6 +4,7 @@
 [Unit]
 Description=ZeroOS update: download and install
 Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=oneshot
