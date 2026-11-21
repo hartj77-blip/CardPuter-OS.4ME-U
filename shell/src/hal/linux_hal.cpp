@@ -8,7 +8,7 @@
 //   Wi-Fi      nmcli (NetworkManager)
 //   Bluetooth  bluetoothctl / rfkill
 //   audio      wpctl (PipeWire), falls back to amixer
-//   IR         ir-ctl / ir-keytable (rc-core, gpio-ir-tx / gpio-ir-recv)
+//   IR         ir-ctl (rc-core, gpio-ir-tx / gpio-ir-recv); codes encoded in ir/ir.cpp
 //   QR codes   rpicam-vid (preview frames on a pipe)
 //   tethering  /usr/bin/zeroos-tether (bluetoothctl + nmcli), run in the background
 //   media      sox: `play` for mp3/flac/ogg/wav, `rec` for voice notes, `soxi` for
@@ -548,26 +548,68 @@ public:
         }
     }
 
-    bool ir_send(const IrCode& c) override {
-        char sc[32];
-        std::snprintf(sc, sizeof sc, "0x%x", c.scancode);
-        std::string out = run("ir-ctl -S " + shell_quote(c.protocol) + ":" + sc + " && echo OK");
+    // IR: rc-core gives one /dev/lircN per direction (gpio-ir-tx sends,
+    // gpio-ir-recv receives); ask ir-ctl which is which.
+    std::string ir_device(bool send) {
+        std::string& cached = send ? ir_tx_ : ir_rx_;
+        if (!cached.empty()) return cached;
+        for (auto& n : list_dir("/dev/")) {
+            if (n.rfind("lirc", 0) != 0) continue;
+            std::string dev = "/dev/" + n;
+            std::string f = run("ir-ctl -d " + dev + " --features");
+            if (f.find(send ? "can send" : "can receive") != std::string::npos) return cached = dev;
+        }
+        return "";
+    }
+
+    bool ir_send(const ir::Wave& w) override {
+        std::string dev = ir_device(true);
+        if (dev.empty() || w.timings.empty() || w.timings.size() > 1023) return false;
+        char path[] = "/tmp/zeroos-ir-XXXXXX";
+        int fd = mkstemp(path);
+        if (fd < 0) return false;
+        std::string body;
+        for (size_t i = 0; i < w.timings.size(); ++i)
+            body += (i % 2 ? "space " : "pulse ") + std::to_string(w.timings[i]) + "\n";
+        bool wrote = write(fd, body.data(), body.size()) == ssize_t(body.size());
+        close(fd);
+        std::string out;
+        if (wrote)
+            out = run("ir-ctl -d " + dev + " -c " + std::to_string(w.carrier) + " -s " + path + " && echo OK");
+        unlink(path);
         return out.find("OK") != std::string::npos;
     }
 
-    bool ir_learn(IrCode& out, int timeout_ms) override {
-        // ir-keytable -t prints lines like:
-        //   lirc protocol(nec): scancode = 0x40bf12
+    bool ir_learn(std::vector<uint32_t>& timings, int timeout_ms) override {
+        std::string dev = ir_device(false);
+        if (dev.empty()) return false;
         int secs = timeout_ms / 1000 > 0 ? timeout_ms / 1000 : 1;
-        std::string o = run("timeout " + std::to_string(secs) +
-                            " ir-keytable -c -p all -t");
-        auto p = o.find("protocol(");
-        auto s = o.find("scancode = ");
-        if (p == std::string::npos || s == std::string::npos) return false;
-        auto e = o.find(')', p);
-        out.protocol = o.substr(p + 9, e - p - 9);
-        out.scancode = unsigned(std::strtoul(o.c_str() + s + 11, nullptr, 16));
-        return true;
+        // One message (--one-shot where this ir-ctl has it). Output is either
+        // "+9000 -4500 +560 ..." or "pulse 9000 / space 4500" lines.
+        std::string o = run("o=; ir-ctl --help 2>&1 | grep -q -- --one-shot && o=-1; timeout " +
+                            std::to_string(secs) + " ir-ctl -d " + dev + " -r $o");
+        timings.clear();
+        std::istringstream in(o);
+        std::string tok;
+        int want = -1;   // after "pulse"/"space": 1 mark, 0 space; -2: skip a value
+        auto add = [&](bool mark, long v) {
+            if (v <= 0) return;
+            if (timings.empty() && !mark) return;
+            bool last_mark = timings.size() % 2 == 1;
+            if (!timings.empty() && last_mark == mark) timings.back() += uint32_t(v);
+            else timings.push_back(uint32_t(v));
+        };
+        while (in >> tok) {
+            if (want == -2) { want = -1; continue; }
+            if (want >= 0) { add(want == 1, std::atol(tok.c_str())); want = -1; continue; }
+            if (tok == "pulse") want = 1;
+            else if (tok == "space") want = 0;
+            else if (tok == "timeout" || tok == "carrier") want = -2;
+            else if (tok[0] == '+') add(true, std::atol(tok.c_str() + 1));
+            else if (tok[0] == '-') add(false, std::atol(tok.c_str() + 1));
+        }
+        if (timings.size() % 2 == 0 && !timings.empty()) timings.pop_back();
+        return timings.size() >= 7;
     }
 
     void power_off() override { run("systemctl poweroff"); }
@@ -612,6 +654,7 @@ private:
     RecordState rec_;
     PlayClock clock_, rec_clock_;
     std::vector<std::pair<std::string, int>> durations_;
+    std::string ir_tx_, ir_rx_;   // /dev/lircN, found on first use
 
     DisplayStatus display() override {
         DisplayStatus d;

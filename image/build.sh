@@ -58,6 +58,12 @@ rm -f stage4/EXPORT_IMAGE stage5/EXPORT_IMAGE
 rm -rf stage2/06-zeroos
 cp -r "$HERE/stage-zeroos" stage2/06-zeroos
 install -m 0755 "$ZEROSHELL_BIN" stage2/06-zeroos/files/zeroshell
+# IR Remote's code database (docs/IR.md), built here where git and the network are.
+IRDB=${ZEROOS_IRDB:-$ROOT/build/irdb}
+if [ ! -f "$IRDB/index.tsv" ]; then
+    python3 -I "$ROOT/tools/irdb/build_irdb.py" --fetch --cache "$ROOT/build/irdb-src" --out "$IRDB"
+fi
+cp -r "$IRDB" stage2/06-zeroos/files/irdb
 ZEROOS_VERSION=${ZEROOS_VERSION:-$("$HERE/version.sh")}
 sed -i -e "s|@WIFI_COUNTRY@|${WIFI_COUNTRY:-US}|g" -e "s|@ZEROOS_VERSION@|${ZEROOS_VERSION}|g" stage2/06-zeroos/01-run.sh
 

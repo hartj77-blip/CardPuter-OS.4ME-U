@@ -16,7 +16,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | Fuel gauge | BQ27220 | `/sys/class/power_supply/bq27220-0/` | Status bar, Battery app |
 | RTC | RX8130CE | `/dev/rtc0` | Offline time, Clock app |
 | IMU* | BMI270 + BMM150 | iio (`in_accel_*`, `in_anglvel_*`, `in_magn_*`) | Compass, level |
-| IR | TX + RX on GPIO | rc-core: `ir-ctl`, `ir-keytable` | IR Remote |
+| IR | TX + RX on GPIO | rc-core: `ir-ctl` sends our own encoded timings and learns raw (docs/IR.md) | IR Remote |
 | Audio | ES8389 codec, AW8737A amp, 1 W speaker, mic, TRRS | ALSA/PipeWire; sox `play`/`rec` | Media app (music, voice notes), volume, mute |
 | Wi-Fi / BT | BCM43439 2.4 GHz | NetworkManager, BlueZ | Wi-Fi app, Settings, Bluetooth audio in the Car app |
 | Ethernet | SR9900A (USB) | `eth0` | Status, System app |

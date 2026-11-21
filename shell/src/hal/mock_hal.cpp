@@ -587,13 +587,21 @@ public:
 
     void set_led(Led, bool) override {}
 
-    bool ir_send(const IrCode& c) override {
-        std::printf("[mock-ir] send %s %s 0x%x\n", c.name.c_str(), c.protocol.c_str(), c.scancode);
+    bool ir_send(const ir::Wave& w) override {
+        uint32_t us = 0;
+        for (auto t : w.timings) us += t;
+        std::printf("[mock-ir] send %zu timings, %u Hz, %u us\n", w.timings.size(), w.carrier, us);
         return true;
     }
-    bool ir_learn(IrCode& out, int) override {
-        out.protocol = "nec";
-        out.scancode = 0x40bf00 + (unsigned)(std::time(nullptr) & 0xff);
+    bool ir_learn(std::vector<uint32_t>& timings, int) override {
+        // A pretend remote: NEC address 0x40, a different button each time.
+        ir::Signal s;
+        s.protocol = "NEC";
+        s.address = 0x40;
+        s.command = unsigned(std::time(nullptr) & 0xff);
+        ir::Wave w;
+        ir::encode(s, w);
+        timings = w.timings;
         return true;
     }
 
