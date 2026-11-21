@@ -275,9 +275,11 @@ public:
         if (m.running) {
             m.web_url = "https://192.168.1.42:9443";
             m.api = "192.168.1.42";
-            m.connected = true;
-            m.my_name = "CZ01";
-            m.nodes = 3;
+            m.connected = mesh_clock_.ms() > 3000;   // the API handshake takes a moment
+            if (m.connected) {
+                m.my_name = "CZ01";
+                m.nodes = 3;
+            }
         }
         return m;
     }

@@ -46,7 +46,9 @@ Open **Mesh** and choose **Turn on mesh**. The radio starts in a few seconds,
 and Mesh switches to its chat page:
 
 - **On the Cardputer:** messages on the primary channel scroll above a text
-  box; type and press **Enter** to send to everyone. Messages sent only to you
+  box; type and press **Enter** to send to everyone. The box takes typing
+  straight away; while the top line says **Connecting to the radio...**,
+  Enter keeps your text in the box until the radio is ready. Messages sent only to you
   are orange. **Tab** switches between chat and the info page (QR code, on/off).
   A message that arrives while you're in another app shows at the top of the
   screen with a beep.
@@ -81,8 +83,13 @@ uses its own battery: leave it off when you don't need it **(measure)**.
 
 ## To confirm on hardware
 
-- The radio pins and `/dev/spidev0.1`. If the Mesh app says **No radio**,
-  check `journalctl -u meshtasticd` and the pins in the config file.
+- The radio pins and `/dev/spidev0.1`. If the Mesh app says **No radio**
+  or **Radio error** (the daemon keeps stopping; the app shows its last
+  error line), check `journalctl -u meshtasticd` and the pins in the config
+  file. `ls /dev/spidev0.*` should list `spidev0.1` (needs `dtparam=spi=on`;
+  M5's overlay turns off only `spidev0.0`, which the LCD uses). GPIO 22
+  (BUSY) is also M5's optional third chip select: don't load their
+  `spi0-spidev2-gpio22` overlay with the LoRa cap fitted.
 - The RF switch: M5's page drives it from an IO expander on the Cardputer
   ADV; trail-mate uses DIO2 on the Zero, as we do.
 - Whether `ext_5v_out` (and a Grove 5 V switch) appear under

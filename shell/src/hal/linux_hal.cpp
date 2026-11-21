@@ -34,6 +34,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <ctime>
@@ -1066,8 +1067,31 @@ private:
         mesh_at_ = now;
         MeshStatus m;
         m.installed = access("/usr/bin/meshtasticd", X_OK) == 0 || access("/usr/sbin/meshtasticd", X_OK) == 0;
-        std::string st = run("systemctl is-active meshtasticd.service");
-        m.running = st.rfind("active", 0) == 0 || st.rfind("activating", 0) == 0;
+        // ActiveState/SubState/NRestarts, so a daemon that keeps crashing
+        // (Restart= puts it in "activating (auto-restart)") isn't shown as on.
+        std::string active, sub;
+        int restarts = 0;
+        std::istringstream show(run("systemctl show meshtasticd.service -p ActiveState -p SubState -p NRestarts 2>/dev/null"));
+        for (std::string line; std::getline(show, line);) {
+            size_t eq = line.find('=');
+            if (eq == std::string::npos) continue;
+            std::string k = line.substr(0, eq), v = line.substr(eq + 1);
+            if (k == "ActiveState") active = v;
+            else if (k == "SubState") sub = v;
+            else if (k == "NRestarts") restarts = std::atoi(v.c_str());
+        }
+        m.running = active == "active" || active == "activating" || active == "reloading";
+        m.failing = mesh_wanted_ && (active == "failed" || sub == "auto-restart" || restarts > 0);
+        if (m.failing) {
+            if (now - mesh_err_at_ >= 10) {   // the journal is slow: not every refresh
+                mesh_err_at_ = now;
+                mesh_err_ = run("journalctl -u meshtasticd -b --no-pager -n 60 -o cat 2>/dev/null | "
+                                "grep -i -E 'error|fail|could not|cannot|unable|no such|denied' | tail -n1");
+                while (!mesh_err_.empty() && std::isspace(uint8_t(mesh_err_.back()))) mesh_err_.pop_back();
+                if (mesh_err_.size() > 160) mesh_err_.resize(160);
+            }
+            m.error = mesh_err_;
+        }
         if (m.running) {
             // Without a working radio the daemon falls back to a simulated
             // one and says so in its log (pi is in the adm group). Look three
@@ -1076,7 +1100,8 @@ private:
                 mesh_log_at_ = now;
                 ++mesh_log_checks_;
                 mesh_no_radio_ = !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
-                                      "grep -m1 -i -E 'simradio|sim radio|radio init failed'").empty();
+                                      "grep -m1 -i -E 'simradio|sim radio|radio init failed|"
+                                      "failed to find.*radio|no .*radio (found|detected)'").empty();
             }
             m.no_radio = mesh_no_radio_;
             NetStatus n = read_net();
@@ -1096,7 +1121,11 @@ private:
         mesh_no_radio_ = false;
         mesh_log_at_ = time(nullptr);   // give it 15 s before reading its log
         mesh_log_checks_ = 0;
+        mesh_err_at_ = 0;
+        mesh_err_.clear();
         set_ext_power(true);
+        // Start clean: a unit left "failed" by an earlier try won't restart.
+        run("systemctl reset-failed meshtasticd.service 2>/dev/null");
         run("systemctl --no-block start meshtasticd.service");
         mesh_at_ = 0;
     }
@@ -1592,7 +1621,8 @@ private:
     MeshStatus mesh_cache_;
     int mesh_fd_ = -1, mesh_seq_ = 0;
     bool mesh_wanted_ = false, mesh_no_radio_ = false;
-    time_t mesh_log_at_ = 0;
+    time_t mesh_log_at_ = 0, mesh_err_at_ = 0;
+    std::string mesh_err_;
     int mesh_log_checks_ = 3;   // none until mesh_start
     bool mesh_hello_ = false, mesh_connected_ = false;
     time_t mesh_try_ = 0, mesh_beat_ = 0;
