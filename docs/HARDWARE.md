@@ -32,7 +32,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | --- | --- |
 | Symbol layer only correct while M5's launcher runs | Load `tca8418_keypad_m5stack_keymap.map` system-wide via `/etc/default/keyboard` |
 | Keys leak to the Linux console behind the UI | Mask `getty@tty1`; ZeroShell conflicts with it |
-| LCD black, no driver bound: the kernel's `panel-mipi-dbi` and M5's `panel-mipi-dbi-m` register the same SPI driver name (`panel-mipi-dbi-spi`), so the second one to load fails, and only M5's matches this panel | Nothing display-related is forced into the initramfs (as on M5's image); `/etc/modprobe.d/zeroos-panel.conf` blacklists the kernel's one |
+| LCD black, no driver bound: the kernel's `panel-mipi-dbi` and M5's `panel-mipi-dbi-m` register the same SPI driver name (`panel-mipi-dbi-spi`), so the second one to load fails, and only M5's matches this panel | Nothing display-related is forced into the initramfs (as on M5's image); `/etc/modprobe.d/zeroos-panel.conf` (in the zeroos package) blacklists the kernel's one |
 | LCD blanks when console-setup runs | Drop-in that unblanks the framebuffers afterwards |
 | LCD stays on M5's logo or blank: `fb_load --keep-open` holds the LCD until M5's launcher starts, which ZeroOS doesn't ship | `fb_load.service` masked |
 | LCD black until ZeroShell starts (M5 boots with `quiet fbcon=map:off` behind a logo) | Console left on: boot text shows on the LCD. A udev rule runs `con2fbmap` to move it there when a monitor took fb0 |

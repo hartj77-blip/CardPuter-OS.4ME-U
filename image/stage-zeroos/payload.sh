@@ -75,6 +75,9 @@ cat > "$D/etc/systemd/system/console-setup.service.d/zeroos-unblank.conf" <<'UNI
 [Service]
 ExecStartPost=-/bin/sh -c 'for b in /sys/class/graphics/fb*/blank; do echo 1 > $b; echo 0 > $b; done'
 UNIT
+# LCD driver: never load the kernel's panel-mipi-dbi; it takes the driver name
+# M5's panel-mipi-dbi-m needs, and the LCD stays black (see 01-run.sh).
+install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-panel.conf"
 # M5's boot logo (fb_load.service, from the LCD driver) holds the LCD's DRM
 # device until M5's launcher starts, and waits forever for /dev/dri/card1. We
 # ship neither that launcher nor a logo (boot text is on the LCD instead), so

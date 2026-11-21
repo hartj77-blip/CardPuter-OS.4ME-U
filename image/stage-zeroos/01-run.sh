@@ -26,8 +26,8 @@ touch "${ROOTFS_DIR}/var/lib/systemd/linger/${FIRST_USER_NAME}"
 # one loaded works. Only M5's matches this panel. Loading the kernel's one
 # first (we used to, from the initramfs) left the LCD with no driver: black
 # screen. Like M5, load nothing early; udev loads M5's driver by its alias.
-# The blacklist makes sure the kernel's one never gets in first.
-install -m 0644 files/modprobe-zeroos-panel.conf "${ROOTFS_DIR}/etc/modprobe.d/zeroos-panel.conf"
+# The zeroos package blacklists the kernel's one (modprobe-zeroos-panel.conf),
+# so it never gets in first.
 
 CONFIG_TXT="${ROOTFS_DIR}/boot/firmware/config.txt"
 CMDLINE_TXT="${ROOTFS_DIR}/boot/firmware/cmdline.txt"
