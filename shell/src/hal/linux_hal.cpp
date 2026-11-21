@@ -246,7 +246,11 @@ public:
             break;
         }
         // The mesh may still be running from before ZeroShell restarted.
-        mesh_wanted_ = run("systemctl is-active meshtasticd.service 2>/dev/null").rfind("active", 0) == 0;
+        {
+            std::string st = run("systemctl is-active meshtasticd.service 2>/dev/null");
+            mesh_wanted_ = st.rfind("active", 0) == 0 || st.rfind("activating", 0) == 0;
+            if (mesh_wanted_) mesh_log_checks_ = 0;   // look for "no radio" as if it just started
+        }
         // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
         // Grove port's, if the kernel exposes it the same way).
         for (auto& n : list_dir("/sys/class/leds/")) {
@@ -1081,7 +1085,12 @@ private:
             else if (k == "NRestarts") restarts = std::atoi(v.c_str());
         }
         m.running = active == "active" || active == "activating" || active == "reloading";
-        m.failing = mesh_wanted_ && (active == "failed" || sub == "auto-restart" || restarts > 0);
+        // NRestarts stays up after the daemon recovers, so only a new
+        // restart counts, and only for 30 s: one slow start isn't an error.
+        if (mesh_restarts_ < 0) mesh_restarts_ = restarts;   // baseline after a start
+        if (restarts > mesh_restarts_) mesh_fail_until_ = now + 30;
+        mesh_restarts_ = restarts;
+        m.failing = mesh_wanted_ && (active == "failed" || sub == "auto-restart" || now < mesh_fail_until_);
         if (m.failing) {
             if (now - mesh_err_at_ >= 10) {   // the journal is slow: not every refresh
                 mesh_err_at_ = now;
@@ -1104,7 +1113,7 @@ private:
                                       "failed to find.*radio|no .*radio (found|detected)'").empty();
             }
             m.no_radio = mesh_no_radio_;
-            NetStatus n = read_net();
+            const NetStatus& n = net_cache_;   // poll() refreshes it; read_net() forks ~7 times
             std::string ip = !n.tailscale_ip.empty() && n.ip.empty() ? n.tailscale_ip : n.ip;
             if (!ip.empty()) {
                 m.web_url = "https://" + ip + ":9443";
@@ -1123,6 +1132,8 @@ private:
         mesh_log_checks_ = 0;
         mesh_err_at_ = 0;
         mesh_err_.clear();
+        mesh_restarts_ = -1;
+        mesh_fail_until_ = 0;
         set_ext_power(true);
         // Start clean: a unit left "failed" by an earlier try won't restart.
         run("systemctl reset-failed meshtasticd.service 2>/dev/null");
@@ -1130,6 +1141,8 @@ private:
         mesh_at_ = 0;
     }
     void mesh_stop() override {
+        mesh_wanted_ = false;   // stop polling systemd and the journal
+        mesh_fail_until_ = 0;
         run("systemctl --no-block stop meshtasticd.service");
         mesh_at_ = 0;
         mesh_close();
@@ -1621,7 +1634,8 @@ private:
     MeshStatus mesh_cache_;
     int mesh_fd_ = -1, mesh_seq_ = 0;
     bool mesh_wanted_ = false, mesh_no_radio_ = false;
-    time_t mesh_log_at_ = 0, mesh_err_at_ = 0;
+    time_t mesh_log_at_ = 0, mesh_err_at_ = 0, mesh_fail_until_ = 0;
+    int mesh_restarts_ = -1;
     std::string mesh_err_;
     int mesh_log_checks_ = 3;   // none until mesh_start
     bool mesh_hello_ = false, mesh_connected_ = false;
