@@ -193,14 +193,29 @@ bool exited(pid_t pid) {
 #endif
 }
 
+// Stops a child from spawn(): the signal goes to its whole process group
+// (spawn() calls setpgid), so "sh -c" wrappers don't leave their own
+// children running. Waits at most ~1 s, then SIGKILLs, so a child that
+// ignores the signal can't freeze the UI.
 void kill_child(pid_t pid, int sig) {
 #ifndef __EMSCRIPTEN__
-    if (pid > 0) {
-        kill(pid, SIGCONT);  // a stopped process can't act on SIGTERM
-        kill(pid, sig);
-        int st;
-        waitpid(pid, &st, 0);
+    if (pid <= 0) return;
+    auto signal_all = [pid](int s) {
+        if (kill(-pid, s) < 0) kill(pid, s);   // no group (setpgid failed): just the child
+    };
+    signal_all(SIGCONT);   // a stopped process can't act on SIGTERM
+    signal_all(sig);
+    int st;
+    for (int i = 0; i < 100; ++i) {   // 100 x 10 ms
+        pid_t r = waitpid(pid, &st, WNOHANG);
+        if (r == pid || (r < 0 && errno == ECHILD)) {
+            if (sig != SIGKILL) kill(-pid, SIGTERM);   // group members the child left behind
+            return;
+        }
+        usleep(10000);
     }
+    signal_all(SIGKILL);
+    waitpid(pid, &st, 0);   // SIGKILL can't be ignored: this returns at once
 #endif
 }
 
@@ -264,6 +279,7 @@ public:
         // Nobody has asked for the position for 5 s: let gpsd go idle.
         if (gps_fd_ >= 0 && time(nullptr) - gps_want_ > 5) gps_stop();
         mesh_pump();
+        if (visible_pid_ > 0 && exited(visible_pid_)) visible_pid_ = -1;   // reap the pairing window
         // Nobody has looked through the camera for 3 s: turn it off.
         if (scan_pid_ > 0 && time(nullptr) - scan_want_ > 3) scan_stop();
         tether_pump();
@@ -1346,8 +1362,14 @@ private:
     }
     void bt_set_visible(int seconds) override {
 #ifndef __EMSCRIPTEN__
-        kill_child(visible_pid_, SIGTERM);
-        visible_pid_ = -1;
+        if (visible_pid_ > 0) {
+            // Ends the agent and the timer (the whole group), then does
+            // what the timer would have: hide, and trust what paired.
+            kill_child(visible_pid_, SIGTERM);
+            visible_pid_ = -1;
+            run("bluetoothctl discoverable off");
+            run("bluetoothctl devices Paired | while read -r _ a _; do bluetoothctl trust \"$a\"; done");
+        }
         if (seconds <= 0) return;
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
