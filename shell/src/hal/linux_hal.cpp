@@ -266,8 +266,13 @@ public:
             mesh_wanted_ = st.rfind("active", 0) == 0 || st.rfind("activating", 0) == 0;
             if (mesh_wanted_) mesh_log_checks_ = 0;   // look for "no radio" as if it just started
         }
-        // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
-        // Grove port's, if the kernel exposes it the same way).
+        find_ext5v();
+    }
+
+    // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
+    // Grove port's, if the kernel exposes it the same way).
+    void find_ext5v() {
+        ext5v_.clear();
         for (auto& n : list_dir("/sys/class/leds/")) {
             std::string l = n;
             std::transform(l.begin(), l.end(), l.begin(), ::tolower);
@@ -811,6 +816,9 @@ private:
     // --- Expansion 5 V
     bool ext_power() override { return !ext5v_.empty() && read_long(ext5v_[0] + "brightness") > 0; }
     void set_ext_power(bool on) override {
+        // ext_5v_out sits behind an I2C IO expander whose LEDs can appear
+        // after ZeroShell starts: look again rather than skip the power.
+        if (ext5v_.empty()) find_ext5v();
         for (auto& d : ext5v_) {
             long max = read_long(d + "max_brightness", 1);
             write_str(d + "brightness", on ? std::to_string(max > 0 ? max : 1) : "0");
@@ -833,6 +841,7 @@ private:
                 errno != EINPROGRESS) {
                 close(gps_fd_);
                 gps_fd_ = -1;
+                gps_ = GpsFix{};   // gpsd unreachable: no fix, not the last one seen
             }
             gps_sent_ = false;
             gps_buf_.clear();
@@ -871,6 +880,7 @@ private:
         if (send(gps_fd_, kOff, sizeof kOff - 1, MSG_NOSIGNAL | MSG_DONTWAIT) < 0) {}
         close(gps_fd_);
         gps_fd_ = -1;
+        gps_ = GpsFix{};   // the next look starts from "searching", never a stale fix
     }
     void gps_line(const std::string& js) {
         std::string cls = json_str(js, "class");
