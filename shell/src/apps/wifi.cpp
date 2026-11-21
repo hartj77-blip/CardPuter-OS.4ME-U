@@ -12,6 +12,11 @@ public:
         show_list();
     }
 
+    ~WifiApp() override {   // left before a deferred step ran: don't run it on a freed app
+        lv_async_call_cancel(show_password_cb, this);
+        lv_async_call_cancel(connect_cb, this);
+    }
+
     bool on_back() override {
         if (pw_page_) {
             show_list();
@@ -62,7 +67,7 @@ private:
         size_t i = (size_t)(intptr_t)lv_obj_get_user_data(lv_event_get_target_obj(e));
         // Defer: we're inside an event of a widget that show_password() deletes.
         self->pick_ = int(i);
-        lv_async_call([](void* p) { static_cast<WifiApp*>(p)->show_password(); }, self);
+        lv_async_call(show_password_cb, self);
     }
 
     void show_password() {
@@ -87,17 +92,20 @@ private:
         lv_obj_set_style_border_color(ta_, c(kAccent), 0);
         lv_obj_add_event_cb(ta_, on_submit, LV_EVENT_READY, this);
         shell_add_focus(ta_);
-        lv_obj_t* h = label(pw_page_, "Enter to connect   ` or Esc to go back", &zs_font_12, kMuted);
-        lv_obj_set_pos(h, 10, 90);
+        // ` types a character here; it only means Back while the box is empty.
+        lv_obj_t* h = label(pw_page_, "Enter to connect\nEsc to go back (or ` with the box empty)", &zs_font_12, kMuted);
+        lv_obj_set_pos(h, 10, 86);
     }
 
     static void on_submit(lv_event_t* e) {
         auto* self = static_cast<WifiApp*>(lv_event_get_user_data(e));
         self->pw_ = lv_textarea_get_text(self->ta_);
-        lv_async_call([](void* p) {
-            auto* s = static_cast<WifiApp*>(p);
-            s->connect(s->nets_[s->pick_].ssid, s->pw_);
-        }, self);
+        lv_async_call(connect_cb, self);
+    }
+    static void show_password_cb(void* p) { static_cast<WifiApp*>(p)->show_password(); }
+    static void connect_cb(void* p) {
+        auto* s = static_cast<WifiApp*>(p);
+        if (s->pick_ >= 0 && s->pick_ < int(s->nets_.size())) s->connect(s->nets_[size_t(s->pick_)].ssid, s->pw_);
     }
 
     void connect(const std::string& ssid, const std::string& pw) {

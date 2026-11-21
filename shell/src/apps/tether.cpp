@@ -47,8 +47,9 @@ public:
         for (size_t i = 0; i < phone_btns_.size(); ++i) {
             if (phone_btns_[i] != f) continue;
             const TetherPhone& p = st_.phones[i];
-            if (confirm_ != p.mac) {
+            if (confirm_ != p.mac || lv_tick_elaps(confirm_at_) > 3000) {   // a fresh warning each time
                 confirm_ = p.mac;
+                confirm_at_ = lv_tick_get();
                 shell_toast("Del again to forget " + p.name);
                 return true;
             }
@@ -238,6 +239,7 @@ private:
     std::vector<lv_obj_t*> phone_btns_;
     TetherStatus st_;
     std::string sig_, confirm_, shown_error_, mac_, name_;
+    uint32_t confirm_at_ = 0;
     Page page_ = Page::Main, built_ = Page::Main;
     bool dirty_ = false;
     bool started_ = false;   // the pairing we asked for has been seen running
