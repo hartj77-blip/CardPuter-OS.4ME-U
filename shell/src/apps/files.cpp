@@ -9,6 +9,9 @@
 
 #include <cctype>
 
+#include <fstream>
+#include <iterator>
+
 #include "apps/common.h"
 #include "ui/remote.h"
 
@@ -118,6 +121,23 @@ private:
         lv_async_call([](void* p) { static_cast<FilesApp*>(p)->open(); }, self);
     }
 
+    // No NUL bytes and valid UTF-8 (ASCII is a subset). Files are < 64 KB here.
+    static bool looks_like_text(const std::string& path) {
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return false;
+        std::string b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        for (size_t i = 0; i < b.size();) {
+            uint8_t ch = uint8_t(b[i]);
+            if (ch == 0) return false;
+            int n = ch < 0x80 ? 0 : (ch >> 5) == 0x6 ? 1 : (ch >> 4) == 0xe ? 2 : (ch >> 3) == 0x1e ? 3 : -1;
+            if (n < 0 || i + size_t(n) >= b.size() + (n ? 0 : 1)) return false;
+            for (int k = 1; k <= n; ++k)
+                if ((uint8_t(b[i + size_t(k)]) & 0xc0) != 0x80) return false;
+            i += size_t(n) + 1;
+        }
+        return true;
+    }
+
     void open() {
         if (pick_ < 0 || pick_ >= int(entries_.size())) return;
         auto e = entries_[pick_];
@@ -139,6 +159,12 @@ private:
             hal().play(full);
             shell_toast("Playing " + e.name);
         } else if (e.size < 64 * 1024) {
+            // Notes would save an image or archive back as text (cut at the
+            // first NUL), breaking it. Only open what reads as text.
+            if (!looks_like_text(full)) {
+                shell_toast("Not a text file");
+                return;
+            }
             notes_set_pending_file(full);
             shell_open_app("notes");
         } else {

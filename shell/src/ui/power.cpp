@@ -11,6 +11,7 @@ namespace zs {
 namespace {
 constexpr int kDimPct = 10;
 constexpr int kLowBattery = 15, kCriticalBattery = 3;
+constexpr uint32_t kShutdownAfterMs = 15000;   // from the "battery empty" warning
 constexpr uint32_t kWifiSleepAfterMs = 10 * 60 * 1000;
 constexpr double kNominalV = 3.7;        // for mAh -> mWh
 constexpr int kDesignMwh = 6475;         // 1750 mAh x 3.7 V
@@ -326,11 +327,17 @@ void Power::tick(uint32_t now_ms) {
         if (b.percent <= kCriticalBattery) {
             if (!shutdown_warned_) {
                 shutdown_warned_ = true;
+                shutdown_warned_at_ = now_ms;
                 set_state(State::On, now_ms);
-                shell_toast("Battery empty: shutting down");
-            } else {
+                shell_toast("Battery empty: shutting down in 15 s. Plug in to stay on.");
+            } else if (now_ms - shutdown_warned_at_ >= kShutdownAfterMs) {
+                // Still empty after the warning had time to be read (and one
+                // bad gauge reading can't do it): save, then power off.
+                shell_prepare_power_off();
                 h.power_off();
             }
+        } else {
+            shutdown_warned_ = false;   // a glitch, or it recovered under less load
         }
     } else if (b.external_power) {
         shutdown_warned_ = false;

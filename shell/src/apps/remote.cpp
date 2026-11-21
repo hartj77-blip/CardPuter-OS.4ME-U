@@ -39,6 +39,9 @@ public:
 
     void tick() override {
         remote_note_use();
+        // Never rebuild under the open text box: it would vanish mid-typing.
+        // Closing it sets dirty_, so the refresh comes then.
+        if (input_) return;
         if (dirty_) {
             dirty_ = false;
             rebuild();
@@ -253,6 +256,7 @@ private:
         lv_obj_t* in = input_;
         input_ = nullptr;
         lv_obj_delete_async(in);
+        dirty_ = true;   // catch up on refreshes held back while it was open
     }
 
     lv_obj_t* root_ = nullptr;

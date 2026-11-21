@@ -140,7 +140,7 @@ public:
         });
         // Deferred: the reader covers (and outlives) the button being clicked.
         button(ZS_ICON_SEARCH "  Scan a QR code (Q)", 144, 152, [](lv_event_t* e) {
-            lv_async_call([](void* p) { static_cast<CameraApp*>(p)->start_scan(); }, lv_event_get_user_data(e));
+            lv_async_call(start_scan_cb, lv_event_get_user_data(e));
         });
 
         if (g_scan_first) {
@@ -152,8 +152,12 @@ public:
         }
     }
 
+    static void start_scan_cb(void* p) { static_cast<CameraApp*>(p)->start_scan(); }
+
     ~CameraApp() override {
-        lv_async_call_cancel([](void* p) { static_cast<CameraApp*>(p)->start_scan(); }, this);
+        // Same function as the call, or the cancel matches nothing and the
+        // scan would start on a freed app.
+        lv_async_call_cancel(start_scan_cb, this);
         if (scan_) hal().scan_stop();
     }
 
