@@ -239,8 +239,13 @@ tools/push-update.sh cardputer.local
 See [Updates](docs/UPDATE.md) for details.
 
 Every change is built and tested by the [CI](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/ci.yml)
-workflow. A pull request can only be merged into `main` once all five CI checks pass. Tagged versions are published by the
-[Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml) workflow.
+workflow. A pull request can only be merged into `main` once all five CI checks pass.
+
+To publish a new version, open the
+[Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml) workflow,
+press **Run workflow** and type the version, such as `0.4.0`. The update, the apps and the SD card
+image are built and attached to the release in about 15 minutes. See
+[Publishing an update](docs/UPDATE.md#publishing-an-update).
 
 ## Security
 
