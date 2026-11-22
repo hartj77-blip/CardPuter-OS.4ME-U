@@ -1,137 +1,144 @@
 # ZeroOS for the Cardputer Zero
 
-A custom OS for the [M5Stack Cardputer Zero](https://docs.m5stack.com/en/CardputerZero), the pocket
-computer built on a Raspberry Pi CM0 (4x Cortex-A53, 512 MB RAM, 320x170 screen, 46-key keyboard).
+ZeroOS is a custom operating system for the [M5Stack Cardputer Zero](https://docs.m5stack.com/en/CardputerZero),
+the pocket computer with a keyboard, a 320x170 screen and a Raspberry Pi CM0 inside.
 
-ZeroOS is a lean Debian (trixie, arm64) image with its own keyboard-driven home screen, **ZeroShell**,
-styled after the Ubuntu desktop (top bar, dock, app grid, Yaru dark colours, the Ubuntu typeface),
-and one hardware layer that covers every part of the board: battery gauge, motion sensors, IR,
-radios, audio, camera, real-time clock, key LEDs and the expansion ports.
+It is Debian Linux with a home screen made for the Cardputer: everything works from the keyboard,
+it looks like a small Ubuntu desktop, and it supports all of the board's hardware (battery, motion
+sensors, IR, radios, audio, camera, clock, key lights and the expansion ports).
 
-ZeroOS is an unofficial community project. It is not made, endorsed or supported by M5Stack.
+> **Early project.** The apps work in the simulator and the image builds in CI, but much of it
+> has not yet been tested on a real device. Expect rough edges, and please report what you find.
+>
+> ZeroOS is an unofficial community project. It is not made, endorsed or supported by M5Stack.
 
 ![All screens](docs/screenshots/contact-sheet.png)
 
-*Every screen above is rendered by CI from the real UI code at 320x170, shown at 2x.*
+## Features
+
+- **Keyboard first.** Arrow keys and Enter for everything, letters jump to apps, Esc goes back.
+- **Install only what you need.** Seven apps come built in; the rest install from the **Apps** app.
+- **Updates over the air.** New versions install from the **Update** app, with no re-flashing.
+- **Long battery life.** The screen dims after 30 seconds and turns off after a minute on battery.
+  Placing the device face down turns the screen off at once; picking it up turns it back on.
+- **Desktop mode.** Plug in an HDMI monitor for a desktop with a web browser, video, terminal and files.
+
+### Built-in apps
+
+| App | What it does |
+| --- | --- |
+| **Apps** | Browse and install more apps |
+| **Dock** | Desktop on an HDMI monitor: browser, video, terminal, files |
+| **Files** | Browse the files on the card |
+| **Settings** | Wi-Fi, Bluetooth, brightness, volume, power saving, restart, shut down |
+| **Terminal** | A Linux console on the built-in screen |
+| **Update** | Install a newer ZeroOS over the network |
+| **Wi-Fi** | Find and join networks |
+
+### Apps you can install
+
+| App | What it does |
+| --- | --- |
+| **IR Remote** | Universal remote for TVs, projectors, audio, ACs and lights (about 2,000 remotes), plus learning your own |
+| **Media** | Music player, music from a Jellyfin server, voice notes |
+| **Notes** | Quick text notes |
+| **Remote** | Tailscale: reach your other devices, SSH, remote desktop, file sharing |
+| **Sync** | Keep notes, documents and recordings in step with your PC and phone (Syncthing) |
+| **Tether** | Get online through your phone over Wi-Fi, USB or Bluetooth |
+| **Camera** | Photos, gallery, and a QR code reader that can join Wi-Fi networks (models with a camera) |
+| **GPS** | Position, saved places, track recording (needs a GPS module) |
+| **Mesh** | Text messaging over LoRa with Meshtastic (needs the Cap LoRa-1262) |
+| **Car** | Music in the car, as a USB stick or over Bluetooth |
+| **Compass** | Compass and spirit level |
+| **Battery** | Time left, power use, power profile |
+| **Clock** | Clock and stopwatch |
+| **System** | CPU and memory use |
+
+Radio apps are available from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
 
 ## Install
 
-1. Download the newest image:
+1. Download the image:
    [zeroos-cardputerzero-arm64.img.xz](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest/download/zeroos-cardputerzero-arm64.img.xz)
-   (about 1.5 GB; checksum in the `.sha256` file next to it on the
-   [releases page](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest)).
+   (about 1.5 GB; a checksum is on the [releases page](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest)).
 2. Write it to a microSD card with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-   (*Choose OS > Use custom*) or [balenaEtcher](https://etcher.balena.io/). Either takes the `.img.xz` as is.
-3. Put the card in the Cardputer Zero and switch it on. The first boot takes a few minutes.
+   (*Choose OS > Use custom*) or [balenaEtcher](https://etcher.balena.io/). There's no need to unzip it first.
+3. Put the card in the Cardputer Zero and switch it on. The first start takes a few minutes.
 
-Log in as `pi` at `cardputer.local` (SSH) or with the **Terminal** app. Every card starts with the
-password `raspberry`, so the first login asks you to choose a new one before anything else.
-Until then, SSH commands without a terminal (`scp`, `tools/push-update.sh`) are refused; signing in
-with an SSH key set in Raspberry Pi Imager skips the question (change the password later with `passwd`).
-After that, new versions arrive over the network with the **Update** app, no re-flash needed.
+### First login
 
-Every release gets an image: the Release workflow builds it after publishing the update package
-(1.5-3 hours later), so the link above can trail a new release by that long.
+The user name is `pi` and the starting password is `raspberry`. The first time you log in, in the
+**Terminal** app or over SSH (`ssh pi@cardputer.local`), you are asked to choose a new password.
+If you set up an SSH key in Raspberry Pi Imager, you can skip this and change the password later with `passwd`.
 
-## What's here (Phase 0)
+## How to use it
 
-| Part | Status |
+| Key | Action |
 | --- | --- |
-| `shell/` ZeroShell: status bar, launcher, 21 apps (7 built in, the rest installable), toasts, keyboard navigation | Working in the simulator |
-| `image/apps/` installable apps: one package each, and the index the Apps app reads | Built and tested in CI; never run on a device |
-| `shell/src/hal/` hardware layer: simulated (PC) and Linux (device) | Linux side written, not yet tested on hardware |
-| `image/` image builder on M5's open pi-gen, pinned kernel and drivers | Built in CI on every image change |
-| `.github/workflows/` CI: simulator, screenshots, arm64 build, browser build, full SD image | Ready |
+| Arrow keys | Move |
+| **Enter** | Open |
+| **Esc** or **`** | Go back |
+| A letter | Jump to an app on the home screen |
+| **1** to **5** | Open the dock's apps from the home screen |
 
-ZeroOS comes with seven apps: **Apps** (install more, downloaded from GitHub), **Dock** (desktop with web
-browser, video, terminal and files on an HDMI monitor), **Files**, **Settings** (Wi-Fi, Bluetooth, brightness,
-volume, mute, power profile, screen dimming and screen-off, Bluetooth auto-off, restart, shut down),
-**Terminal** (a real console on the built-in screen, with tmux), **Update** (a newer ZeroOS over Wi-Fi or
-Ethernet, no re-flash) and **Wi-Fi**. Everything else is an app you install from **Apps**, and only then
-takes up space ([docs/APPS.md](docs/APPS.md)):
+Some apps have their own keys, shown on screen. For example, in **Media** **Space** pauses and
+**N** skips, and in **IR Remote** **L** learns a button from your own remote.
 
-**Remote** (Tailscale sign-in by QR code, your devices, one-key SSH, remote desktop on a monitor, Taildrop),
-**Sync** (Notes, Documents and Recordings kept the same on your PC and phone with Syncthing), **GPS** (position,
-saved spots, track recording to GPX), **Mesh** (Meshtastic text messaging over LoRa with the Cap LoRa-1262),
-**Car** (USB stick mode for a car stereo; Bluetooth audio with the car's play and skip buttons), **Camera**
-(M5's camera app: viewfinder, photos, gallery; plus a QR code reader that joins Wi-Fi networks; full model
-only), **Tether** (online through your phone over Wi-Fi, USB or Bluetooth), **Notes**, **Media** (music player,
-music from a Jellyfin server, voice notes), **IR Remote** (a universal remote: about 2,000 remotes from Flipper-IRDB to browse and search, "send every Power code" for TVs, projectors, audio, ACs, fans and lights, and your own remotes learned button by button, in the Flipper Zero's file format), **Compass** (with spirit level),
-**Battery** (time left, power draw, power profile), **Clock** (with stopwatch), **System** monitor (CPU and
-where the memory goes), and the radio apps from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
+To get new versions, open **Update**. To add apps, open **Apps**.
 
-The screen dims after 30 s idle and turns off after 1 minute on battery; the first key only wakes it.
-Placing it face down turns the screen off at once; picking it up turns it back on.
+## Guides
+
+- [Apps](docs/APPS.md): installing apps, and making your own
+- [Updates](docs/UPDATE.md): updating over the network
+- [IR Remote](docs/IR.md): the universal remote
+- [Remote](docs/REMOTE.md): Tailscale, SSH and file sharing
+- [Sync](docs/SYNC.md): syncing notes and files
+- [Tether](docs/TETHER.md): getting online through your phone
+- [Media and Jellyfin](docs/JELLYFIN.md): music from your server
+- [Car](docs/CAR.md): music in the car
+- [Camera](docs/CAMERA.md): photos and QR codes
+- [Dock](docs/DOCK.md): desktop mode on a monitor
+- [GPS and LoRa](docs/EXPANSION.md): expansion modules
+- [Battery and performance](docs/PERFORMANCE.md)
+
+For developers: [architecture](docs/ARCHITECTURE.md), [hardware notes](docs/HARDWARE.md), [roadmap](docs/ROADMAP.md).
 
 ## Try it on a PC
+
+You can run the same home screen and apps in a window on Linux:
 
 ```sh
 sudo apt install cmake g++ libsdl2-dev
 cmake -S shell -B build/sim -DZS_BACKEND=sim
 cmake --build build/sim -j
-./build/sim/zeroshell            # 3x window; --zoom 4 for bigger
+./build/sim/zeroshell            # add --zoom 4 for a bigger window
 ```
 
-Keys: arrows move, **Enter** opens, **Esc** or **`** goes back, letters jump to an app on the home screen.
-On the home screen, **Left** from the first column moves into the dock, and **1** to **5** open the dock's apps.
-Inside apps: **R** rescans Wi-Fi (and records a GPS track), **L** learns an IR button, **A** adds one, **S** saves a remote, **Space** pauses music or runs the stopwatch, **N** skips a track, **R** records a voice note. Notes save when you leave.
+There is also a browser version (WebAssembly, needs [Emscripten](https://emscripten.org)):
+`web/build.sh build/zeroos-simulator.html`.
 
-Or build the browser version (same code, WebAssembly, one HTML file with on-screen keys):
-
-```sh
-source /path/to/emsdk/emsdk_env.sh
-web/build.sh build/zeroos-simulator.html
-```
-
-Render all screens to PNG (what CI does):
-
-```sh
-cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/headless -j
-shell/tools/screenshots.sh build/headless/zeroshell build/screenshots
-```
-
-## Build for the device
+## Build it yourself
 
 ```sh
 sudo apt install g++-aarch64-linux-gnu
 cmake -S shell -B build/device -DZS_BACKEND=device -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/aarch64-linux-gnu.cmake
-cmake --build build/device -j                # zeroshell, plus build/device/apps/*.so
-image/apps/build.sh build/device/apps        # the app packages and zeroos-apps.index, in build/apps
-image/build.sh build/device/zeroshell        # needs Docker; 1-2 hours on x86 (qemu), much less on an arm64 machine. ZEROOS_APPS="notes media" preinstalls apps
+cmake --build build/device -j
+image/apps/build.sh build/device/apps        # the installable apps
+image/build.sh build/device/zeroshell        # the SD card image; needs Docker, takes 1-2 hours
 ```
 
-After the first flash, new versions go on over the network: open **Update** on the device, or push
-a build from a PC with `tools/push-update.sh cardputer.local` (see [docs/UPDATE.md](docs/UPDATE.md)).
-
-Or run the **Build image** workflow from the Actions tab. To try ZeroShell on the stock M5 image
-first, copy `build/device/zeroshell` over, stop the stock launcher
-(`systemctl --user stop APPLaunch` or the system service), and run it.
-
-## Docs
-
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the layers fit together
-- [docs/HARDWARE.md](docs/HARDWARE.md): every chip, how Linux exposes it, known issues and our fixes
-- [docs/APPS.md](docs/APPS.md): the Apps app, where apps come from, making an app
-- [docs/UPDATE.md](docs/UPDATE.md): updates over Wi-Fi or Ethernet, pushing a build from a PC, publishing a release
-- [docs/ROADMAP.md](docs/ROADMAP.md): phases and what's next
-- [docs/REMOTE.md](docs/REMOTE.md): Remote mode, Tailscale, Terminal and Taildrop
-- [docs/CAR.md](docs/CAR.md): music in the car over USB or Bluetooth
-- [docs/JELLYFIN.md](docs/JELLYFIN.md): music from a Jellyfin server in the Media app
-- [docs/SYNC.md](docs/SYNC.md): Sync for Notes, Documents and Recordings
-- [docs/EXPANSION.md](docs/EXPANSION.md): GPS and LoRa modules on the expansion ports, track recording
-- [docs/CAMERA.md](docs/CAMERA.md): the Camera app and QR codes
-- [docs/IR.md](docs/IR.md): IR Remote, the universal remote and its code database
-- [docs/TETHER.md](docs/TETHER.md): getting online through your phone
-- [docs/DOCK.md](docs/DOCK.md): Dock mode, the desktop on an HDMI monitor
-- [docs/PERFORMANCE.md](docs/PERFORMANCE.md): memory and battery tuning, measurements, and `zeroos-measure`
-
-## License
-
-MIT. Builds on [LVGL](https://lvgl.io) (MIT), [quirc](https://github.com/dlbeer/quirc) (ISC), IR codes from [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) (CC0, see docs/IR.md), M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen)
-(BSD-3) and [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays).
-
-Cardputer and M5Stack are trademarks of M5Stack; they are used here only to name the hardware.
+Or run the **Build image** workflow from the Actions tab. To send a build to a running device,
+use `tools/push-update.sh cardputer.local` (see [docs/UPDATE.md](docs/UPDATE.md)).
 
 ## Security
 
 To report a security problem, see [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. ZeroOS builds on [LVGL](https://lvgl.io) (MIT), [quirc](https://github.com/dlbeer/quirc) (ISC),
+IR codes from [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) (CC0), M5Stack's
+[pi-gen fork](https://github.com/CardputerZero/pi-gen) (BSD-3) and
+[board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays).
+
+Cardputer and M5Stack are trademarks of M5Stack, used here only to name the hardware.
