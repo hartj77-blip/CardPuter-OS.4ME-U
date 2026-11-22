@@ -239,7 +239,7 @@ tools/push-update.sh cardputer.local
 See [Updates](docs/UPDATE.md) for details.
 
 Every change is built and tested by the [CI](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/ci.yml)
-workflow. Tagged versions are published by the
+workflow. A pull request can only be merged into `main` once all five CI checks pass. Tagged versions are published by the
 [Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml) workflow.
 
 ## Security
