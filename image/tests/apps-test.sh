@@ -103,6 +103,7 @@ STUB
 cat > "$T/bin/dpkg" <<'STUB'
 #!/bin/sh
 case " $* " in *" --print-architecture "*) echo arm64; exit 0 ;; *" --configure "*) exit 0 ;; esac
+case " $* " in *" --remove "*) echo "dpkg $*" >> "$APT_LOG"; exit 0 ;; esac
 exec /usr/bin/dpkg "$@"
 STUB
 # apt-get: log; "install" fails while $T/apt-fail exists.
@@ -116,7 +117,8 @@ cat > "$T/bin/apt-mark" <<STUB
 #!/bin/sh
 echo "apt-mark \$*" >> "$T/apt.log"
 STUB
-# dpkg-query: what $T/installed lists ("<package> <version>" lines).
+# dpkg-query: what $T/installed lists ("<package> <version>" lines; a third
+# word stands for the package's Depends).
 cat > "$T/bin/dpkg-query" <<STUB
 #!/bin/sh
 for a; do pat=\$a; done
@@ -131,7 +133,7 @@ chmod +x "$T/bin"/* "$T/zeroshell"
 printf '# test\nfile://%s/a\nfile://%s/b\n' "$T" "$T" > "$T/sources"
 
 apps() {
-    PATH="$T/bin:$PATH" ZEROOS_APPS_SOURCES=$T/sources ZEROOS_APPS_STATE=$T/state ZEROOS_APPS_CACHE=$T/cache \
+    PATH="$T/bin:$PATH" APT_LOG=$T/apt.log ZEROOS_APPS_SOURCES=$T/sources ZEROOS_APPS_STATE=$T/state ZEROOS_APPS_CACHE=$T/cache \
         ZEROOS_APPS_RUN=$T/run ZEROOS_APPS_ZEROSHELL=$T/zeroshell ZEROOS_APPS_ROOT=$T/root \
         ZEROOS_APPS_ALLOW_FILE=1 ZEROOS_APPS_ARCH=arm64 \
         "$ROOT/image/stage-zeroos/files/apps/zeroos-apps" "$@" 2>>"$T/log"
@@ -242,6 +244,26 @@ expect "upgrade, restore: done" state done
 grep -q "zeroos-app-gps_1.0.0_arm64.deb" "$T/apt.log" && ok "upgrade, restore: installs what was built in" || bad "upgrade, restore: $(cat "$T/apt.log")"
 grep -q "zeroos-app-notes_" "$T/apt.log" && bad "upgrade, restore: reinstalled an installed app" || ok "upgrade, restore: leaves installed apps alone"
 [ -e "$T/state/restore" ] && bad "upgrade, restore: list left behind" || ok "upgrade, restore: only once"
+# Apps built for an older app ABI block apt until they are gone: an install
+# takes them off first and lists them for update-all to put back.
+printf 'zeroos-app-notes 1.0.0 zeroos-app-abi-0\nzeroos-app-old 1.0.0 zeroos-app-abi-0\n' > "$T/installed"
+: > "$T/apt.log"
+apps install gps
+expect "old app ABI: install still works" state done
+grep -q 'dpkg --remove zeroos-app-notes' "$T/apt.log" && grep -q 'dpkg --remove zeroos-app-old' "$T/apt.log" &&
+    ok "old app ABI: old builds taken off" || bad "old app ABI: $(cat "$T/apt.log")"
+[ "$(sed -n '/dpkg --remove/=' "$T/apt.log" | tail -1)" -lt "$(sed -n '/apt-get install/=' "$T/apt.log" | head -1)" ] &&
+    ok "old app ABI: taken off before apt runs" || bad "old app ABI: order"
+grep -qx notes "$T/state/restore" && ok "old app ABI: listed for update-all" || bad "old app ABI: no restore list"
+: > "$T/installed"
+: > "$T/apt.log"
+apps run upgrade
+grep -q "zeroos-app-notes_1.0.0_arm64.deb" "$T/apt.log" && ok "old app ABI: update-all puts the new build back" || bad "old app ABI, upgrade: $(cat "$T/apt.log")"
+printf 'zeroos-app-notes 1.0.0 zeroos-app-abi-%s\n' "$ABI" > "$T/installed"
+: > "$T/apt.log"
+apps install gps
+grep -q 'dpkg --remove' "$T/apt.log" && bad "current app ABI: app taken off" || ok "current app ABI: apps left alone"
+rm -f "$T/state/restore"
 
 # --- sources -----------------------------------------------------------------
 apps run add-source:someone/cardputer-apps || true

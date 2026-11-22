@@ -25,6 +25,27 @@ sudo zeroos-update rollback      # back to the version before the last update
 zeroos-update status
 ```
 
+## It says "Up to date" but a newer release exists
+
+This happens on a Cardputer set up from the project's old home
+(`hartj77-blip/cardputer-zero`, versions 0.1.x). It still asks the old address,
+where 0.1.1 is the last version. Point it at this repository once:
+
+1. Open the **Terminal** app on the Cardputer, or from a PC on the same
+   network run `ssh pi@cardputer.local`.
+2. Run this one line (copy it exactly):
+
+   ```sh
+   sudo sed -i 's#cardputer-zero#CardPuter-OS.4ME-U#' /etc/zeroos/update.conf
+   ```
+
+3. Open **Update** again. It now finds the newest version; press **Enter**
+   to install it.
+
+To see which address a device asks, run `cat /etc/zeroos/update.conf`. If you
+would rather not type anything, flash the newest image instead (README,
+Install); that erases the card.
+
 ## From a PC, over Ethernet or Wi-Fi
 
 For trying a build that is not a release yet. The PC and the Cardputer need

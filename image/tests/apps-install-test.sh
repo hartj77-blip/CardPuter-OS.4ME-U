@@ -122,5 +122,41 @@ left=$(comm -13 <(echo "$before") <(pkgs))
 leftfiles=$(find /usr/lib/zeroos/apps -name '*.so' 2>/dev/null)
 [ -z "$leftfiles" ] && ok "no modules left" || bad "modules left: $leftfiles"
 
+echo "--- after an update from an older ZeroOS"
+# A device that had apps installed, then took a ZeroOS update that changed
+# the app ABI (0.1.x to 0.2.0 did): the old builds depend on an ABI nothing
+# provides any more, and apt refuses every install while they are there.
+# Stand-ins for the old ZeroOS and two old apps, then the update, then the
+# real zeroos-apps and the real apt.
+# shellcheck disable=SC2086
+set -- $ids
+one=$1 two=${2:-}
+old_pkg() {   # old_pkg <package> <control lines...>: build and install a stand-in
+    local d name=$1
+    d=$(mktemp -d); shift
+    mkdir -p "$d/DEBIAN"
+    { printf 'Package: %s\nVersion: 0.0.0-old\nArchitecture: all\nMaintainer: test <noreply@github.com>\n' "$name"
+      printf '%s\n' "$@" "Description: test stand-in"; } > "$d/DEBIAN/control"
+    dpkg-deb --root-owner-group --build "$d" "/tmp/$name-old.deb" >/dev/null && dpkg -i "/tmp/$name-old.deb" >/dev/null 2>&1
+}
+dpkg --purge zeroos >/dev/null 2>&1
+old_pkg zeroos "Provides: zeroos-app-abi-0" || bad "stand-in old zeroos"
+for id in $one $two; do old_pkg "zeroos-app-$id" "Depends: zeroos, zeroos-app-abi-0" || bad "stand-in old $id"; done
+dpkg -i /tmp/zeroos-test.deb >/dev/null 2>&1 && ok "ZeroOS updated over old apps" || bad "update over old apps"
+rm -f /var/lib/zeroos/apps/restore
+if zeroos-apps install "$one" > /tmp/upgrade-install.log 2>&1; then
+    ok "after the update: $one installs"
+else
+    bad "after the update: $one won't install"; tail -25 /tmp/upgrade-install.log | sed 's/^/     /'
+fi
+if [ -n "$two" ]; then
+    zeroos-apps upgrade > /tmp/upgrade-all.log 2>&1 || true
+    [ "$(dpkg-query -W -f '${db:Status-Abbrev}${Version}' "zeroos-app-$two" 2>/dev/null)" != "ii 0.0.0-old" ] &&
+        dpkg-query -W -f '${db:Status-Abbrev}' "zeroos-app-$two" 2>/dev/null | grep -q '^ii' &&
+        ok "after the update: update-all brings $two back" ||
+        { bad "after the update: update-all did not bring $two back"; tail -25 /tmp/upgrade-all.log | sed 's/^/     /'; }
+fi
+for id in $one $two; do zeroos-apps remove "$id" >/dev/null 2>&1 || true; done
+
 if [ "$fails" -gt 0 ]; then echo "apps-install-test: $fails failed"; exit 1; fi
 echo "apps-install-test: all passed"

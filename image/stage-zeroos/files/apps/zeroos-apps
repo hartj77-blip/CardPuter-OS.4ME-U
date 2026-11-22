@@ -226,9 +226,31 @@ apt_sources_from() {
     [ -n "$files" ]
 }
 
+# Apps built for an older app ABI (a ZeroOS update changed it). ZeroShell
+# can't load them, and while they are installed apt refuses to install
+# anything at all ("unmet dependencies"). Take them off and note them in the
+# restore list, so update-all (U) puts the new builds back.
+drop_stale_apps() {
+    local abi stale id
+    abi=$(app_abi)
+    stale=$(dpkg-query -W -f '${db:Status-Abbrev} ${Package} ${Depends}\n' 'zeroos-app-*' 2>/dev/null |
+            awk -v want="zeroos-app-abi-$abi" '
+                $1 ~ /^i/ { for (i = 3; i <= NF; i++) { d = $i; sub(/,$/, "", d)
+                    if (d ~ /^zeroos-app-abi-[0-9]+$/ && d != want) { print $2; break } } }')
+    [ -n "$stale" ] || return 0
+    for id in $stale; do
+        id=${id#zeroos-app-}
+        [[ $id =~ ^[a-z0-9][a-z0-9-]*$ ]] || continue
+        log "$id was built for an older ZeroOS; taking it off (update-all puts it back)"
+        echo "$id" >> "$STATE_DIR/restore"
+        dpkg --remove "zeroos-app-$id" >&2 || log "could not take off $id"
+    done
+}
+
 # apt_put_on <deb>...: install packages and what they depend on.
 apt_put_on() {
     dpkg --configure -a >&2 || fail "The package system needs repair first: sudo dpkg --configure -a"
+    drop_stale_apps
     apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2 &&
         return 0
     # Old or missing package lists (a fresh card has none): fetch them, try again.
@@ -322,6 +344,7 @@ upgrade_all() {
     local id ver have n=0 todo
     refresh || exit 1
     action=upgrade
+    drop_stale_apps
     todo=$(dpkg-query -W -f '${db:Status-Abbrev} ${Package} ${Version}\n' 'zeroos-app-*' 2>/dev/null |
            awk '$1 == "ii" {sub(/^zeroos-app-/, "", $2); print $2, $3}')
     while read -r id ver; do
