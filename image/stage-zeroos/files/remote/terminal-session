@@ -15,13 +15,19 @@ cmdfile="$HOME/.cache/zeroos/terminal-cmd"
 cmd=$(cat "$cmdfile" 2>/dev/null); rm -f "$cmdfile"
 cmd=$(printf '%s' "$cmd" | sed 's/^ *//; s/ *$//')
 conf=/etc/zeroos/tmux.conf
+set --
 if [ -n "$cmd" ]; then
     # Keep the window open after ssh ends, so errors stay readable.
-    run="$cmd; echo; printf 'Press Enter to close'; read _"
-    if tmux -f "$conf" has-session -t main 2>/dev/null; then
-        tmux -f "$conf" new-window -t main -n "${cmd##* }" "$run"
-    else
-        tmux -f "$conf" new-session -d -s main -n "${cmd##* }" "$run"
-    fi
+    set -- -n "${cmd##* }" "$cmd; echo; printf 'Press Enter to close'; read _"
 fi
-exec tmux -f "$conf" new-session -A -s main
+if tmux -f "$conf" has-session -t main 2>/dev/null; then
+    [ $# -gt 0 ] && tmux -f "$conf" new-window -t main "$@"
+else
+    # Start the tmux server in pi's user manager, not in this service: the
+    # service is stopped (KillMode=mixed) when we leave the Terminal, and
+    # the sessions must outlive it. Without the user manager, start it here.
+    systemd-run --user --scope --quiet --collect \
+        tmux -f "$conf" new-session -d -s main "$@" 2>/dev/null \
+        || tmux -f "$conf" new-session -d -s main "$@"
+fi
+exec tmux -f "$conf" attach-session -t main
