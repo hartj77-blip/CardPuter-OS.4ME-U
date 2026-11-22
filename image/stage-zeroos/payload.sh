@@ -27,6 +27,8 @@ install -m 0644 "$F/journald.conf"             "$D/etc/systemd/journald.conf.d/9
 install -m 0644 "$F/zeroos-cloud-init-once.service" "$D/etc/systemd/system/"
 install -m 0755 "$F/zeroos-measure"            "$D/usr/bin/zeroos-measure"
 install -m 0755 "$F/zeroos-power-perms"        "$D/usr/lib/zeroos/power-perms"
+# BlueZ options for Bluetooth LE gamepads; the postinst applies them.
+install -m 0755 "$F/bluetooth/zeroos-bluetooth-conf" "$D/usr/lib/zeroos/bluetooth-conf"
 # Dock mode: labwc desktop on the HDMI monitor (docs/DOCK.md).
 install -m 0644 "$F/dock/rc.xml" "$F/dock/menu.xml" "$F/dock/autostart" "$F/dock/environment" \
                 "$F/dock/waybar.json" "$F/dock/waybar.css" "$D/etc/zeroos/dock/"

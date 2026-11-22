@@ -1550,22 +1550,25 @@ private:
         });
         return v;
     }
-    // A bluetoothctl that is BlueZ's default agent and says yes to every
-    // pairing question, for `seconds`. Gamepads (Xbox) ask "Accept pairing?"
-    // the moment they connect; with no agent BlueZ refuses ("No agent
-    // available") and they connect unpaired, then drop. Only for a short
-    // window while someone is pairing: always saying yes would let anyone
-    // nearby pair a keyboard. No pause between dropping bluetoothctl's own
-    // agent and registering ours: a question in that gap goes unanswered.
-    static std::string yes_agent(const std::string& then, int seconds) {
-        return "{ sleep 1; echo 'agent off'; sleep 0.5; echo 'agent NoInputNoOutput'; sleep 0.5; echo default-agent; " + then +
-               "i=0; while [ $i -lt " + std::to_string(seconds) + " ]; do sleep 1; echo yes; i=$((i+1)); done; "
-               "echo quit; } | bluetoothctl";
+    // A bluetoothctl that is BlueZ's default agent and accepts every pairing
+    // request (its built-in "agent auto"), with the adapter pairable, for
+    // `seconds`. Gamepads (Xbox) ask "Accept pairing?" the moment they
+    // connect; with no default agent BlueZ refuses ("No agent available") and
+    // they connect unpaired, then drop. Only for a short window while someone
+    // is pairing: an always-on yes would let anyone nearby pair a keyboard.
+    // bluetoothctl registers its own agent first; dropping it is async, hence
+    // the pauses. `extra` runs inside the window (Car's "Be found").
+    static std::string pairing_window_cmd(int seconds, const std::string& extra_on = "",
+                                          const std::string& extra_off = "") {
+        return "{ sleep 1; echo 'agent off'; sleep 0.5; echo 'agent auto'; sleep 0.5; echo default-agent; "
+               "echo 'pairable on'; " + extra_on + "sleep " + std::to_string(seconds) + "; " + extra_off +
+               "echo 'pairable off'; echo quit; } | bluetoothctl >/dev/null 2>&1";
     }
     void bt_pairing_window(int seconds) {
 #ifndef __EMSCRIPTEN__
         if (pair_pid_ > 0) kill_child(pair_pid_, SIGTERM);
-        pair_pid_ = spawn({"sh", "-c", yes_agent("", seconds) + " >/dev/null 2>&1"});
+        pair_pid_ = spawn({"sh", "-c", pairing_window_cmd(seconds)});
+        usleep(2500 * 1000);   // registered and pairable before anything asks
 #endif
     }
     void bt_scan() override {
@@ -1583,22 +1586,13 @@ private:
         run("bluetoothctl power on");
         std::string info = run("bluetoothctl info " + address);
         if (info.find("Paired: yes") == std::string::npos) {
-            // "Just works" pairing: nothing to type here; the car may ask you to confirm.
-            // bluetoothctl --agent can't answer a prompt, and gamepads (Xbox)
-            // ask "Accept pairing?": with no default agent to say yes, BlueZ
-            // refuses ("No agent available") and they connect unpaired, then
-            // drop. So drive it interactively: register the default agent,
-            // pair, and say yes to whatever it asks until it's paired.
-            bt_pairing_window(60);   // answers if it asks before or after our pair
-            std::string out = run(
-                "{ sleep 1; echo 'agent off'; sleep 0.5; echo 'agent NoInputNoOutput'; sleep 0.5; echo default-agent; "
-                "echo 'pair " + address + "'; "
-                "for i in $(seq 1 13); do sleep 2; echo yes; "
-                "bluetoothctl info " + address + " | grep -q 'Paired: yes' && break; done; "
-                "echo quit; } | bluetoothctl 2>&1");
+            // "Just works" pairing: nothing to type here. The window's agent
+            // answers whatever the device asks, before or after our pair.
+            bt_pairing_window(60);
+            std::string out = run("bluetoothctl --timeout 25 pair " + address);
             if (out.find("Pairing successful") == std::string::npos &&
                 run("bluetoothctl info " + address).find("Paired: yes") == std::string::npos) {
-                error = "Pairing failed. Is it in pairing mode?";
+                error = "Pairing failed. Put it in pairing mode (lights flash fast), then try again";
                 return false;
             }
         }
@@ -1630,12 +1624,11 @@ private:
         if (seconds <= 0) return;
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
-        // bluetoothctl stays open as the pairing agent for the whole time,
-        // then trusts whatever paired so it can reconnect by itself.
-        std::string s = std::to_string(seconds);
+        // bluetoothctl stays open as the (default, accept-all) pairing agent
+        // for the whole time, then trusts whatever paired so it can
+        // reconnect by itself.
         visible_pid_ = spawn({"sh", "-c",
-            "(echo 'discoverable on'; echo 'pairable on'; sleep " + s + "; echo 'discoverable off') "
-            "| bluetoothctl --agent=NoInputNoOutput >/dev/null 2>&1; "
+            pairing_window_cmd(seconds, "echo 'discoverable on'; ", "echo 'discoverable off'; ") + "; "
             "bluetoothctl devices Paired | while read -r _ a _; do bluetoothctl trust \"$a\"; done"});
 #endif
     }
