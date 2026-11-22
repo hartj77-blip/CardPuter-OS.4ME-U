@@ -13,7 +13,7 @@ use, and the console service behind Terminal. Remote's SSH and mosh need the Ter
 
 Apps installed under 0.1.x were built for the old app ABI and can't run on a newer ZeroOS. The
 first install or **U** after the update takes those old builds off (your files and settings stay)
-and **U** installs the new builds. Before ZeroOS 0.3.1 the old builds were left on and every
+and **U** installs the new builds. It then clears extras that only the old builds needed. Before ZeroOS 0.3.1 the old builds were left on and every
 install failed with "Could not install"; if you see that, update ZeroOS first, or run
 `sudo apt-get -f install -y` over SSH once.
 

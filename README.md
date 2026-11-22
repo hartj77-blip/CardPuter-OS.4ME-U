@@ -140,6 +140,10 @@ fix.
 If apps won't install or the Terminal app opens nothing after coming from 0.1.x, open Update and
 install the newest version (0.3.2 or later), then open Apps and press U.
 
+If Update or Apps says the package system "needs repair first", see
+[Updates](docs/UPDATE.md#it-says-the-package-system-needs-repair-first). From 0.3.3 they repair it
+themselves.
+
 ## Speed and memory
 
 ZeroOS is tuned for the Cardputer Zero's 512 MB of RAM and small battery.

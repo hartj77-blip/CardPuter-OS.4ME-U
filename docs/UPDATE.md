@@ -46,6 +46,23 @@ To see which address a device asks, run `cat /etc/zeroos/update.conf`. If you
 would rather not type anything, flash the newest image instead (README,
 Install); that erases the card.
 
+## It says the package system "needs repair first"
+
+Up to ZeroOS 0.3.2, Update and Apps stopped with this message when an earlier
+install had been left half done (a power cut, or an app's extra that would
+not set up). From 0.3.3 they run the repair themselves, and Update also waits
+for Apps to finish what it is installing instead of failing.
+
+A device on 0.3.2 or older has to be repaired once by hand before it can take
+the newer version. From a PC on the same network:
+
+```sh
+ssh -t pi@cardputer.local "sudo apt-get -f install -y; sudo dpkg --configure -a"
+```
+
+Then open **Update** again. Flashing the newest image (README, Install) also
+works, and erases the card.
+
 ## From a PC, over Ethernet or Wi-Fi
 
 For trying a build that is not a release yet. The PC and the Cardputer need
