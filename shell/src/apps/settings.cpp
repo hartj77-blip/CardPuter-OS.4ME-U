@@ -31,10 +31,10 @@ public:
             hal().set_bt_enabled(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
         });
         slider_row(col, LV_SYMBOL_EYE_OPEN "  Brightness", power().user_brightness(), [](lv_event_t* e) {
-            power().set_user_brightness(lv_slider_get_value(lv_event_get_target_obj(e)));
+            power().set_user_brightness(lv_slider_get_value(lv_event_get_target_obj(e)) * kSliderStep);
         });
         slider_row(col, LV_SYMBOL_VOLUME_MAX "  Volume", h.volume(), [](lv_event_t* e) {
-            hal().set_volume(lv_slider_get_value(lv_event_get_target_obj(e)));
+            hal().set_volume(lv_slider_get_value(lv_event_get_target_obj(e)) * kSliderStep);
         });
         switch_row(col, LV_SYMBOL_MUTE "  Mute", h.muted(), [](lv_event_t* e) {
             hal().set_muted(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
@@ -127,13 +127,16 @@ private:
         return sw;
     }
 
+    static constexpr int kSliderStep = 5;
     lv_obj_t* slider_row(lv_obj_t* parent, const char* text, int value, lv_event_cb_t cb) {
         lv_obj_t* r = row(parent, text);
         lv_obj_t* s = lv_slider_create(r);
         lv_obj_set_size(s, 120, 8);
         lv_obj_align(s, LV_ALIGN_RIGHT_MID, -6, 0);
-        lv_slider_set_range(s, 0, 100);
-        lv_slider_set_value(s, value, LV_ANIM_OFF);
+        // Left/Right move a slider one unit: make that 5%, not 1% (20 presses
+        // end to end, not 100). Callbacks multiply by kSliderStep.
+        lv_slider_set_range(s, 0, 100 / kSliderStep);
+        lv_slider_set_value(s, (value + kSliderStep / 2) / kSliderStep, LV_ANIM_OFF);
         lv_obj_set_style_bg_color(s, c(kAccent), LV_PART_INDICATOR);
         lv_obj_set_style_bg_color(s, c(kText), LV_PART_KNOB);
         lv_obj_set_style_pad_all(s, 3, LV_PART_KNOB);

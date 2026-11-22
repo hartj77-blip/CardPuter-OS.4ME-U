@@ -403,8 +403,21 @@ public:
             n.ssid = f[1];
             n.signal = std::atoi(f[2].c_str());
             n.secure = !f[3].empty() && f[3] != "--";
-            v.push_back(n);
+            // One row per network: nmcli lists each access point (a mesh, or
+            // 2.4 and 5 GHz), and joining goes by name anyway.
+            auto same = std::find_if(v.begin(), v.end(), [&](const WifiNetwork& o) { return o.ssid == n.ssid; });
+            if (same == v.end()) {
+                v.push_back(n);
+            } else {
+                same->connected = same->connected || n.connected;
+                same->signal = std::max(same->signal, n.signal);
+            }
         }
+        // nmcli sorts by signal, but merging can raise one: the connected one
+        // first, then strongest.
+        std::stable_sort(v.begin(), v.end(), [](const WifiNetwork& a, const WifiNetwork& b) {
+            return a.connected != b.connected ? a.connected : a.signal > b.signal;
+        });
         return v;
     }
 
