@@ -40,6 +40,10 @@ if [ ! -f "$ZEROOS_IRDB/index.tsv" ]; then
     python3 -I "$ROOT/tools/irdb/build_irdb.py" --fetch --cache "$ROOT/build/irdb-src" --out "$ZEROOS_IRDB"
 fi
 
+# Programs that come with an app (the Grove app's zeroos-grove-ledd) are
+# built next to the modules; a .pkg's payload() takes them from here.
+export ZEROOS_APP_BIN=$MODS
+
 mkdir -p "$OUT"
 rm -f -- "${OUT:?}"/zeroos-app-*.deb "${OUT:?}/zeroos-apps.index"
 # Every module needs a .pkg, and every .pkg a module: nothing gets left out.

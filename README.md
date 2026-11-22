@@ -73,6 +73,7 @@ image, and can be removed like any other app.
 | Camera | Photos, a gallery and a QR code reader that can join Wi-Fi networks. Needs a model with a camera ([guide](docs/CAMERA.md)) |
 | GPS | Position, saved places and track recording. Needs a GPS module ([guide](docs/EXPANSION.md)) |
 | Mesh | Text messages over LoRa with Meshtastic. Needs the Cap LoRa-1262 ([guide](docs/EXPANSION.md)) |
+| Grove | Light a NeoPixel LED strip on the Grove port, with effects ([guide](docs/GROVE.md)) |
 | Car | Music in the car, as a USB stick or over Bluetooth ([guide](docs/CAR.md)) |
 | Compass | Compass and spirit level |
 | Battery | Time left, power use and power profiles ([guide](docs/PERFORMANCE.md)) |
@@ -164,6 +165,7 @@ For a full report on memory, CPU and battery use, run `zeroos-measure`. See
 - [Camera](docs/CAMERA.md): photos and QR codes
 - [Dock](docs/DOCK.md): the desktop on a monitor
 - [GPS and LoRa](docs/EXPANSION.md): expansion modules
+- [Grove](docs/GROVE.md): NeoPixel LED strips on the Grove port
 - [Battery and performance](docs/PERFORMANCE.md): power saving and memory
 
 For developers:

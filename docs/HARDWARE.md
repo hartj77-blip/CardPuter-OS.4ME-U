@@ -24,7 +24,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | Camera* | IMX219 8 MP, CSI | libcamera (RPi fork) | Camera app (M5's CameraApp, started by ZeroShell; QR codes read by ZeroShell through `rpicam-vid`), see CAMERA.md |
 | Video | HDMI 1080p30, H.264 enc/dec | vc4 (card0; fb0 only with a monitor connected), V4L2 M2M | Dock mode (labwc on the HDMI card only; mpv hardware H.264), see DOCK.md |
 | Storage | microSD | | Root filesystem |
-| Expansion | Grove HY2.0 (I2C/UART), 14-pin EXT bus | i2c-dev, spidev, UART | GPS app (gpsd), Mesh app (meshtasticd, Cap LoRa-1262); see EXPANSION.md |
+| Expansion | Grove HY2.0 (I2C/UART), 14-pin EXT bus | i2c-dev, spidev, UART | GPS app (gpsd), Mesh app (meshtasticd, Cap LoRa-1262), Grove app (NeoPixel strip on GPIO 14/15 through SMI + DMA); see EXPANSION.md, GROVE.md |
 
 ## Known issues from early owners, and what the image does
 

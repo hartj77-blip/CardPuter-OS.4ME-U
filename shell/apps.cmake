@@ -19,6 +19,7 @@ zs_app(mesh     "Mesh"      ZS_ICON_CHAT         0x12a182 make_mesh_app     SOUR
 zs_app(compass  "Compass"   ZS_ICON_COMPASS      0xb04a8f make_compass_app  SOURCES src/apps/compass.cpp)
 zs_app(battery  "Battery"   LV_SYMBOL_BATTERY_3  0x3aa655 make_battery_app  SOURCES src/apps/battery.cpp)
 zs_app(clock    "Clock"     ZS_ICON_CLOCK        0x4a5bd6 make_clock_app    SOURCES src/apps/clock.cpp)
+zs_app(grove    "Grove"     LV_SYMBOL_CHARGE     0xd4a017 make_grove_app    SOURCES src/apps/grove.cpp)
 zs_app(dock     "Dock"      ZS_ICON_DESKTOP      0x1c71d8 make_dock_app     SOURCES src/apps/dock.cpp)
 zs_app(sysmon   "System"    ZS_ICON_GAUGE        0x5e6c7b make_sysmon_app   SOURCES src/apps/sysmon.cpp)
 zs_app(settings "Settings"  LV_SYMBOL_SETTINGS   0x77767b make_settings_app SOURCES src/apps/settings.cpp BASE)

@@ -104,11 +104,27 @@ if(ZS_APP_MODULES)
   install(TARGETS ${ZS_APP_MODULES} LIBRARY DESTINATION lib/zeroos/apps)
 endif()
 
-# Unit tests for code that needs no screen (IR codes): ctest, or run ir_test.
+# The Grove app's LED strip service (docs/GROVE.md): a root daemon that drives
+# a NeoPixel strip on the Grove port. Built next to the app modules, and
+# packaged with the Grove app (image/apps/grove.pkg).
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ZS_BACKEND STREQUAL "web")
+  add_executable(zeroos-grove-ledd ledd/main.cpp ledd/smi_ws2812.cpp)
+  target_include_directories(zeroos-grove-ledd PRIVATE src)
+  target_compile_options(zeroos-grove-ledd PRIVATE -Wall -Wextra)
+  set_target_properties(zeroos-grove-ledd PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/apps)
+endif()
+
+# Unit tests for code that needs no screen (IR codes, LED effects): ctest, or
+# run ir_test / leds_test.
 if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   enable_testing()
   add_executable(ir_test tests/ir_test.cpp src/ir/ir.cpp src/ir/db.cpp)
   target_include_directories(ir_test PRIVATE src)
   target_compile_options(ir_test PRIVATE -Wall -Wextra)
   add_test(NAME ir_test COMMAND ir_test)
+  add_executable(leds_test tests/leds_test.cpp)
+  target_include_directories(leds_test PRIVATE src)
+  target_compile_options(leds_test PRIVATE -Wall -Wextra)
+  add_test(NAME leds_test COMMAND leds_test)
+  add_test(NAME ledd_test COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/ledd-test.sh $<TARGET_FILE:zeroos-grove-ledd>)
 endif()

@@ -1,0 +1,15 @@
+# Grove (docs/GROVE.md): use things on the Grove port. For now a NeoPixel
+# (WS2812 / SK6812) LED strip, lit by zeroos-grove-ledd through SMI and DMA.
+NAME="Grove"
+SUMMARY="Light a NeoPixel LED strip on the Grove port, with effects"
+# Started by its socket when the app (or a script) connects.
+ENABLE="zeroos-grove-ledd.socket"
+STOP_ON_REMOVE="zeroos-grove-ledd.service"
+payload() {
+    # Built with the app modules (shell/CMakeLists.txt); image/apps/build.sh sets ZEROOS_APP_BIN.
+    local bin=${ZEROOS_APP_BIN:-}/zeroos-grove-ledd
+    [ -f "$bin" ] || { echo "error: no zeroos-grove-ledd at $bin" >&2; exit 1; }
+    install -D -m 0755 "$bin" "$D/usr/lib/zeroos/zeroos-grove-ledd"
+    install -D -m 0644 "$F/grove/zeroos-grove-ledd.socket" "$D/etc/systemd/system/zeroos-grove-ledd.socket"
+    install -D -m 0644 "$F/grove/zeroos-grove-ledd.service" "$D/etc/systemd/system/zeroos-grove-ledd.service"
+}

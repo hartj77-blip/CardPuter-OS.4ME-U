@@ -92,5 +92,8 @@ STEPS+=",down,down,down,down,enter,wait:300,shot:71-apps-details.ppm"
 STEPS+=",enter,wait:3500,shot:72-apps-installing.ppm,wait:3000"
 STEPS+=",esc,key:s,wait:300,shot:73-apps-sources.ppm"
 STEPS+=",down,down,enter,wait:300,type:someone/cardputer-apps,shot:74-apps-add-source.ppm,esc,esc"
+STEPS+=",open:grove,wait:300,shot:75-grove.ppm"
+STEPS+=",enter,wait:300,key: ,wait:700,shot:76-grove-strip.ppm"
+STEPS+=",right,wait:700,shot:77-grove-chase.ppm,key: "
 (cd "$OUT" && HOME="$DEMO" TZ=UTC "$BIN" --script "$STEPS")
 python3 "$HERE/ppm2png.py" "$OUT"

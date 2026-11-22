@@ -1,0 +1,11 @@
+# Grove app (docs/GROVE.md): lights a NeoPixel strip on the Grove port. Root,
+# for /dev/mem and /dev/vcio (SMI, DMA and VideoCore memory). It exits a
+# minute after the strip goes off with no one connected.
+[Unit]
+Description=ZeroOS Grove LED strip
+Requires=zeroos-grove-ledd.socket
+
+[Service]
+ExecStart=/usr/lib/zeroos/zeroos-grove-ledd
+Restart=on-failure
+RestartSec=2

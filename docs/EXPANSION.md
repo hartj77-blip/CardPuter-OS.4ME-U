@@ -9,6 +9,8 @@ back and the 4-pin **Grove** port. ZeroOS supports:
   internet.
 - **Any NMEA GPS** on the Grove port (in its default UART mode), or a USB GPS
   dongle.
+- **A NeoPixel LED strip** on the Grove port, with the Grove app. See
+  [GROVE.md](GROVE.md).
 
 Power the Cardputer off before plugging in a module; the ports aren't hot-swap.
 

@@ -1,0 +1,12 @@
+# Grove app (docs/GROVE.md): the LED strip service starts when ZeroShell or a
+# script connects. Group gpio: ZeroShell's user (pi) is in it.
+[Unit]
+Description=ZeroOS Grove LED strip socket
+
+[Socket]
+ListenStream=/run/zeroos-grove-ledd.sock
+SocketMode=0660
+SocketGroup=gpio
+
+[Install]
+WantedBy=sockets.target
