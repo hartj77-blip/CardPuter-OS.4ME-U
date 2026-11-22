@@ -114,7 +114,7 @@ const MockApp kMockApps[] = {
     {"dev", "Dev Tools", "Projects with one-key run, micro editor, REPLs, Git and a serial monitor",
      "git, micro, make, gcc, libc6-dev, python3, lua5.4, bc, sqlite3", 180, nullptr},
     {"games", "Games", "Play NES, Game Boy and GBA games (more consoles with downloadable cores)",
-     "libretro-nestopia, libretro-gambatte, libretro-mgba, alsa-utils, curl, unzip", 140, nullptr},
+     "libretro-nestopia, libretro-gambatte, libretro-mgba, curl, unzip", 140, nullptr},
 };
 
 void mock_init() {
