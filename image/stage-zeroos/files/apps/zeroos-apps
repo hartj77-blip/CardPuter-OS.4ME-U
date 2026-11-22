@@ -265,6 +265,24 @@ apt_put_on() {
     apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2
 }
 
+# Extras installed before they were recorded (install_debs) were marked auto,
+# and an autoremove would take them off. Record them and mark them manual.
+# The package is the first part of the extra's file name (pkg_ver_arch.deb).
+keep_extras() {
+    local id xfile xpkg
+    for id in $(dpkg-query -W -f '${db:Status-Abbrev} ${Package}\n' 'zeroos-app-*' 2>/dev/null |
+                awk '$1 == "ii" {sub(/^zeroos-app-/, "", $2); print $2}'); do
+        [ -e "$STATE_DIR/extras/$id" ] && continue
+        xfile=$(field "$id" extra-file)
+        [ -n "$xfile" ] || continue
+        xpkg=$(echo "${xfile%%_*}" | tr 'A-Z' 'a-z')
+        dpkg-query -W -f '${db:Status-Abbrev}' "$xpkg" 2>/dev/null | grep -q '^ii' || continue
+        mkdir -p "$STATE_DIR/extras"
+        echo "$xpkg" > "$STATE_DIR/extras/$id"
+        apt-mark manual "$xpkg" >&2
+    done
+}
+
 # install_debs <id> <app.deb> [extra.deb]
 install_debs() {
     local id=$1 deb=$2 extra=${3:-} pkg arch ver xpkg
@@ -284,8 +302,14 @@ install_debs() {
         case $extra in */*) ;; *) extra=./$extra ;; esac
         xpkg=$(dpkg-deb -f "$extra" Package 2>/dev/null)
         apt_put_on "$extra" "$deb" || fail "Could not install $id. Nothing else changed"
-        # The extra goes when the app goes (apt autoremove).
-        [ -n "$xpkg" ] && apt-mark auto "$xpkg" >&2
+        # The extra goes when the app goes (remove_app). Nothing depends on
+        # it, so it must not be marked auto: any autoremove (another app
+        # removed, Update all) would take it off while the app is still here.
+        if [ -n "$xpkg" ]; then
+            mkdir -p "$STATE_DIR/extras"
+            echo "$xpkg" > "$STATE_DIR/extras/$id"
+            apt-mark manual "$xpkg" >&2
+        fi
     else
         apt_put_on "$deb" || fail "Could not install $id. Nothing else changed"
     fi
@@ -342,7 +366,15 @@ remove_app() {
     status removing 100
     dpkg --configure -a >&2 || true
     apt-get purge -y "zeroos-app-$id" >&2 || fail "Could not remove $id"
+    # Its own extra (install_debs), unless another app brought the same one.
+    local xpkg=""
+    [ -r "$STATE_DIR/extras/$id" ] && xpkg=$(cat "$STATE_DIR/extras/$id")
+    rm -f -- "$STATE_DIR/extras/$id"
+    if [[ $xpkg =~ ^[a-z0-9][a-z0-9+.-]*$ ]] && ! grep -qxF -- "$xpkg" "$STATE_DIR"/extras/* 2>/dev/null; then
+        apt-get purge -y "$xpkg" >&2 || log "could not remove $xpkg"
+    fi
     # What it brought along (Tailscale, Syncthing...), unless another app needs it.
+    keep_extras
     apt-get autoremove --purge -y >&2 || log "autoremove failed; extras may be left"
     status done 100 "$id removed"
 }
@@ -378,6 +410,7 @@ upgrade_all() {
         # What the old builds brought along and nothing needs now (extras of
         # apps that no longer exist): give the space back. Everything a
         # restored app needs is still depended on, so it stays.
+        keep_extras
         apt-get autoremove --purge -y >&2 || log "autoremove failed; old extras may be left"
     fi
     app=""
