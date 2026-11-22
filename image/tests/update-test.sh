@@ -95,7 +95,13 @@ grep -qx "3 1" "$T/con2fb.log" && ok "console-on-lcd: follows /dev/fb_lcd" || ba
 rm -f "$FB/dev/fb_lcd" "$T/con2fb.log"
 PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3 x 1
 [ "$(tr '\n' ',' < "$T/con2fb.log")" = "3 1,1 1," ] && ok "console-on-lcd: finds the panel with no /dev/fb_lcd" || bad "console-on-lcd, no link: $(cat "$T/con2fb.log" 2>&1)"
-rm -rf "$FB/sys/class/graphics/fb1" "$T/con2fb.log"
+mkdir -p "$FB/sys/class/vtconsole/vtcon0" "$FB/sys/class/vtconsole/vtcon1"
+echo "(S) dummy device" > "$FB/sys/class/vtconsole/vtcon0/name"; echo 1 > "$FB/sys/class/vtconsole/vtcon0/bind"
+echo "(M) frame buffer device" > "$FB/sys/class/vtconsole/vtcon1/name"; echo 0 > "$FB/sys/class/vtconsole/vtcon1/bind"
+PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3
+[ "$(cat "$FB/sys/class/vtconsole/vtcon1/bind")" = 1 ] && [ "$(cat "$FB/sys/class/vtconsole/vtcon0/bind")" = 1 ] &&
+    ok "console-on-lcd: binds the framebuffer console" || bad "console-on-lcd: framebuffer console not bound"
+rm -rf "$FB/sys/class/graphics/fb1" "$FB/sys/class/vtconsole" "$T/con2fb.log"
 PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3 2>/dev/null
 [ $? = 0 ] && [ ! -e "$T/con2fb.log" ] && ok "console-on-lcd: no LCD found is not an error" || bad "console-on-lcd: no LCD"
 grep -q '^ExecStartPre=-+/usr/lib/zeroos/console-on-lcd 3$' "$ROOT/image/stage-zeroos/files/remote/zeroos-terminal.service" &&
