@@ -27,6 +27,11 @@ constexpr uint32_t kKeyPlayPause = 0xE000, kKeyPrevTrack = 0xE001, kKeyNextTrack
                    kKeyBrightnessDown = 0xE006, kKeyBrightnessUp = 0xE007, kKeyPageUp = 0xE008,
                    kKeyPageDown = 0xE009, kKeyF1 = 0xE011;   // F1..F12 = kKeyF1 + 0..11
 constexpr bool is_shell_key(uint32_t key) { return key >= kKeyPlayPause && key < kKeyF1 + 12; }
+// Ctrl + a letter or Space: kKeyCtrl + 'a'..'z' or kKeyCtrl + ' ' (docs/UX.md).
+// Never text: the shell keeps them from text boxes.
+constexpr uint32_t kKeyCtrl = 0xE100;
+constexpr uint32_t ctrl_key(char c) { return kKeyCtrl + uint32_t((unsigned char)c); }
+constexpr bool is_ctrl_key(uint32_t key) { return key >= kKeyCtrl + ' ' && key <= kKeyCtrl + 'z'; }
 
 // The key the built-in keyboard's Fn layer puts on a letter (M5's
 // cardputerzero overlay, keymap2), for screens that use the Fn layer without

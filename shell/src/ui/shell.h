@@ -18,6 +18,8 @@ public:
     void open_app(const std::string& id, const std::string& arg);
     std::string take_app_arg();
     void go_home();
+    // Esc held down (keypad hook): close the panel and go home now.
+    void hold_home();
     void toast(const std::string& msg);
     void add_focus(lv_obj_t* obj);
 

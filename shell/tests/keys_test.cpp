@@ -106,7 +106,12 @@ int main() {
         check("rollover", typed(t, {{30, 1}, {31, 1}, {30, 0}, {32, 1}, {31, 0}, {32, 0}}), "asd");
         // Kernel repeat events are ignored.
         check("repeat", typed(t, {{30, 1}, {30, 2}, {30, 2}, {30, 0}}), "a");
-        check("ctrl", typed(t, {{CTRL, 1}, {46, 1}, {46, 0}, {CTRL, 0}, {46, 1}, {46, 0}}), "c");
+        // Ctrl + a letter or Space is a command key, never text (docs/UX.md).
+        auto k = [](uint32_t key) { return "<" + std::to_string(key) + ">"; };
+        check("ctrl letter", typed(t, {{CTRL, 1}, {46, 1}, {46, 0}, {CTRL, 0}, {46, 1}, {46, 0}}),
+              k(ctrl_key('c')) + "c");
+        check("ctrl space", typed(t, {{CTRL, 1}, {57, 1}, {57, 0}, {CTRL, 0}}), k(ctrl_key(' ')));
+        check("ctrl digit", typed(t, {{CTRL, 1}, {2, 1}, {2, 0}, {CTRL, 0}}), "");
     }
     {
         // A held key is released once, and only by its own release.

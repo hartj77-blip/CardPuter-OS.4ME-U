@@ -8,6 +8,7 @@ If something freezes or crashes, connect over SSH and run `journalctl -u zeroshe
 
 - [ ] **Home screen**: arrow keys move, and so do F, Z, X and C without Fn. Shift + a letter jumps to an app, Enter opens, Esc comes back, 3 to 9 open the dock's apps, 0 shows their numbers. Type fast in Notes later to check no keys are dropped.
 - [ ] **Keys** ([KEYS.md](KEYS.md)): on the home screen S/D change the volume and U/I the brightness (a message says the new level); in any app Fn+S/D and Fn+U/I do the same, and Fn+Q plays or pauses music. 2 opens the taskbar panel, and 3 there turns Wi-Fi off and on. In Settings, 0 shows numbers and 4 switches Bluetooth. 1 goes home from anywhere. In Notes, numbers still type.
+- [ ] **New keys** ([UX.md](UX.md)): in Notes, type something, then Ctrl + Space opens the taskbar panel and nothing extra is typed; Ctrl + Space again closes it. In Wi-Fi, open a network's password box and hold Esc for a second: you land on the home screen. A quick Esc there only goes back to the list.
 - [ ] **Wi-Fi**: the list of networks shows; the password shows as you type it; Enter joins.
 - [ ] **Settings**: brightness and volume change, Bluetooth toggles.
 - [ ] **Files**: browse ~, open a .txt (opens in Notes once Notes is installed), Esc goes up a folder.

@@ -5,6 +5,12 @@ The \` key works as Esc too.
 
 The keys are being redesigned: [UX.md](UX.md) is the plan (hold Esc for home, Ctrl + Space for the
 taskbar panel, 1 to 9 pick items, Tab for a menu). This page describes the keys as they are today.
+The first two are already here:
+
+| Key | What it does |
+| --- | --- |
+| Hold Esc | Go to the home screen from anywhere, even from a text box. A quick press is still Back |
+| Ctrl + Space | Open or close the taskbar panel from anywhere, even while typing |
 
 ## Number keys
 

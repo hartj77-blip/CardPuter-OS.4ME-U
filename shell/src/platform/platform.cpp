@@ -484,9 +484,16 @@ void flush_cb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
     lv_display_flush_ready(d);
 }
 
+uint32_t g_now = 0;
+// "hold:<ms>" holds the next key down that long (hold Esc goes home).
+uint32_t g_next_hold = 0, g_release_at = 0;
+
 // Each queued key becomes one press read followed by one release read.
 void read_cb(lv_indev_t*, lv_indev_data_t* data) {
-    if (g_pressed) {
+    if (g_pressed && g_now < g_release_at) {
+        data->key = g_cur;
+        data->state = LV_INDEV_STATE_PRESSED;
+    } else if (g_pressed) {
         data->key = g_cur;
         data->state = LV_INDEV_STATE_RELEASED;
         g_pressed = false;
@@ -496,6 +503,8 @@ void read_cb(lv_indev_t*, lv_indev_data_t* data) {
         data->key = g_cur;
         data->state = LV_INDEV_STATE_PRESSED;
         g_pressed = true;
+        g_release_at = g_now + g_next_hold;
+        g_next_hold = 0;
     } else {
         data->key = g_cur;
         data->state = LV_INDEV_STATE_RELEASED;
@@ -503,7 +512,6 @@ void read_cb(lv_indev_t*, lv_indev_data_t* data) {
     data->continue_reading = false;
 }
 
-uint32_t g_now = 0;
 uint32_t tick_cb() { return g_now; }
 
 void run_for(uint32_t ms) {
@@ -575,6 +583,8 @@ int platform_run_script(const std::string& script) {
         else if (cmd == "esc") g_keys.push_back(LV_KEY_ESC);
         else if (cmd == "bksp") g_keys.push_back(LV_KEY_BACKSPACE);
         else if (cmd == "tab") g_keys.push_back(9);
+        else if (cmd == "ctrl" && !arg.empty()) g_keys.push_back(ctrl_key(arg == "space" ? ' ' : arg[0]));
+        else if (cmd == "hold") g_next_hold = uint32_t(std::atoi(arg.c_str()));
         else if (cmd == "type") for (char ch : arg) g_keys.push_back(uint32_t((unsigned char)ch));
         else if (cmd == "key" && !arg.empty()) g_keys.push_back(uint32_t((unsigned char)arg[0]));
         else if (cmd == "open") { drain_keys(); shell_open_app(arg); run_for(100); }

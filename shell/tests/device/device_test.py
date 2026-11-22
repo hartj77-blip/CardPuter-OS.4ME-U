@@ -17,7 +17,7 @@ import time
 
 W, H = 320, 170
 EV_SYN, EV_KEY = 0, 1
-KEY = dict(esc=1, enter=28, space=57, shift=42, sym=0x17f, fn=0x185, right=106, left=105, up=103, down=108,
+KEY = dict(esc=1, enter=28, space=57, shift=42, ctrl=29, sym=0x17f, fn=0x185, right=106, left=105, up=103, down=108,
            backspace=14)
 ROWS = {16: "qwertyuiop", 30: "asdfghjkl", 44: "zxcvbnm", 2: "1234567890"}
 CHAR = {c: base + i for base, row in ROWS.items() for i, c in enumerate(row)}
@@ -165,9 +165,22 @@ def main():
         check("typing changes the screen", d.frame() != before)
         d.burst("fastrollover")
         d.shot("3-notes-typed")
-        d.nav("esc")   # leaving Notes saves
+        # Ctrl + Space opens the taskbar panel, even from a text box, and
+        # types nothing into it (docs/UX.md).
+        typed_frame = d.frame()
+        d.key(KEY["ctrl"], 1)
+        d.tap(KEY["space"])
+        d.key(KEY["ctrl"], 0)
+        time.sleep(0.4)
+        check("ctrl+space opens the taskbar panel", d.frame() != typed_frame)
+        d.shot("4-panel")
+        # Esc held down goes home (and leaving Notes saves). A tap would only
+        # close the panel.
+        log_before = len(d.read_log())
+        d.tap(KEY["esc"], hold=1.0)
         time.sleep(0.6)
-        d.shot("4-home-again")
+        check("held esc goes home", "zeroshell: open home" in d.read_log()[log_before:], d.read_log()[log_before:])
+        d.shot("5-home-again")
         note = os.path.join(d.dir, "Notes", "notes.txt")
         saved = open(note).read() if os.path.exists(note) else ""
         want = text + "fastrollover"

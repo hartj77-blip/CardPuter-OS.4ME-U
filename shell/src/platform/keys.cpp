@@ -108,8 +108,14 @@ uint32_t fn_layer_key(uint32_t ch) {
 
 uint32_t KeyTranslator::translate(uint16_t code) const {
     if (uint32_t nav = navigation(code)) return nav;
-    // Ctrl and Alt combinations are not text.
-    if (ctrl_l_ || ctrl_r_ || alt_l_ || alt_r_) return 0;
+    // Ctrl + a letter or Space is a command key (kKeyCtrl). Other Ctrl and
+    // Alt combinations are not text, and nothing uses them.
+    if (alt_l_ || alt_r_) return 0;
+    if (ctrl_l_ || ctrl_r_) {
+        if (char c = letter(code)) return ctrl_key(c);
+        if (code == K_SPACE) return ctrl_key(' ');
+        return 0;
+    }
     bool shift = shift_l_ || shift_r_;
     if (char c = letter(code)) return uint32_t((shift != caps_) ? c - 'a' + 'A' : c);
     if (code >= K_1 && code <= K_0) return uint32_t(shift ? kDigitsShift[code - K_1] : kDigits[code - K_1]);
