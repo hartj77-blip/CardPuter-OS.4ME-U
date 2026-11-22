@@ -11,6 +11,12 @@ and press **U** (which that update needs anyway, for the new app ABI). Their sys
 in ZeroOS: the desktop on the monitor (`zeroos-dock`), which Files, Camera, Mesh and Remote also
 use, and the console service behind Terminal. Remote's SSH and mosh need the Terminal app.
 
+Apps installed under 0.1.x were built for the old app ABI and can't run on a newer ZeroOS. The
+first install or **U** after the update takes those old builds off (your files and settings stay)
+and **U** installs the new builds. Before ZeroOS 0.3.1 the old builds were left on and every
+install failed with "Could not install"; if you see that, update ZeroOS first, or run
+`sudo apt-get -f install -y` over SSH once.
+
 Each app brings its own extras with it, so the base image doesn't carry them: Remote brings
 Tailscale, Sync brings Syncthing, Camera brings libcamera and M5Stack's camera program, Mesh brings
 meshtasticd, GPS brings gpsd. Removing an app takes its extras away again, unless another app still
