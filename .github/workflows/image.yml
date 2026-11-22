@@ -2,7 +2,7 @@ name: Build image
 
 # Builds the flashable ZeroOS .img.xz. It runs on GitHub's arm64 runner (free
 # for public repositories), so pi-gen builds the arm64 system natively instead
-# of under qemu (estimated 35-45 minutes, was 1.5-3 hours). It runs on pull
+# of under qemu: about 10 minutes (it was 1.5-3 hours). It runs on pull
 # requests that change the image, by hand from the Actions tab, and from the
 # Release workflow for every tag, which attaches the image to that release (so
 # .../releases/latest/download/zeroos-cardputerzero-arm64.img.xz is always the

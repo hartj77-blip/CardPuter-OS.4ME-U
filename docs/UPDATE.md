@@ -69,7 +69,7 @@ publishes a GitHub release with two files: `zeroos_0.2.0_arm64.deb` and
 the next time someone opens **Update**. The tag is the version.
 
 The SD card image follows: once the release exists, the same workflow builds
-the full image (about 40 minutes on the arm64 runner) and attaches it to the release as
+the full image (about 10 minutes on the arm64 runner) and attaches it to the release as
 `zeroos-cardputerzero-arm64.img.xz` with a `.sha256`, so the README's download
 link always gives new users the newest version. To attach an image to a
 release by hand (or replace one), run **Build image** from the Actions tab with
