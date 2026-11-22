@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "hal/jellyfin.h"
+#include "hal/mpv_video.h"
 #include "ir/ir.h"
 
 namespace zs {
@@ -412,12 +413,27 @@ public:
     virtual void stop() = 0;
     virtual PlaybackState playback() = 0;
 
-    // Music from a Jellyfin server (hal/jellyfin.h). These wait on the
+    // Music and video from a Jellyfin server (hal/jellyfin.h). These wait on the
     // network, up to about 12 seconds.
     virtual bool jellyfin_login(const std::string& server, const std::string& user, const std::string& password,
                                 const std::string& device_id, JfSession& out, std::string& error) = 0;
     virtual bool jellyfin_list(const JfSession& s, JfView view, const std::string& arg, std::vector<JfItem>& out,
                                std::string& error) = 0;
+    // Tells the server what is playing (returns at once; see jf::report).
+    virtual void jellyfin_report(const JfSession& s, JfReport what, const std::string& item_id,
+                                 const std::string& play_session, int pos_s, bool paused) = 0;
+
+    // Video on the built-in screen (hal/mpv_video.h): a Jellyfin movie or
+    // episode, sound through the speaker or Bluetooth. The app draws the
+    // pictures: video_frame() fills a w x h RGB565 buffer when there is a
+    // new one. Opening a video stops any music.
+    virtual bool video_open(const std::string& url, const std::string& auth, int start_s, int w, int h,
+                            std::string& error) = 0;
+    virtual bool video_frame(uint16_t* rgb565) = 0;
+    virtual VideoState video() = 0;
+    virtual void video_pause(bool paused) = 0;
+    virtual void video_seek(int seconds, bool absolute) = 0;   // relative unless absolute
+    virtual void video_close() = 0;
 
     // Bluetooth audio out. bt_scan and bt_connect wait: about 8 and up to
     // 40 seconds. Connecting pairs first if needed; sound then follows.

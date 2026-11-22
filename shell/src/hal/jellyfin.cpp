@@ -1,5 +1,9 @@
 #include "hal/jellyfin.h"
 
+#include <spawn.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cctype>
@@ -215,26 +219,35 @@ struct Reply {
     std::string body;
 };
 
+// The curl command for a request (without the address), and the
+// temporary file holding the body, if any. False if the file can't be made.
+bool curl_command(const std::string& auth, const std::string* body, std::string& cmd, std::string& tmp_path) {
+    // --post30x: a 301/302/303 redirect (http -> https) keeps the POST,
+    // instead of curl turning the sign-in into a GET.
+    cmd = "curl -sS -L --post301 --post302 --post303 --max-time " + std::to_string(kTimeoutS) +
+          " --connect-timeout 4" + " -H 'Accept: application/json' -H " + shell_quote("Authorization: " + auth);
+    tmp_path.clear();
+    if (!body) return true;
+    char tmp[] = "/tmp/zeroos-jf-XXXXXX";
+    int fd = mkstemp(tmp);   // created 0600
+    if (fd < 0) return false;
+    bool ok = write(fd, body->data(), body->size()) == ssize_t(body->size());
+    close(fd);
+    if (!ok) {
+        unlink(tmp);
+        return false;
+    }
+    tmp_path = tmp;
+    cmd += " -H 'Content-Type: application/json' --data-binary @" + tmp_path;
+    return true;
+}
+
 // GET, or POST when body is set. The body travels in a private temporary
 // file so a password never shows in the process list.
 Reply http(const std::string& url, const std::string& auth, const std::string* body) {
     Reply r;
-    // --post30x: a 301/302/303 redirect (http -> https) keeps the POST,
-    // instead of curl turning the sign-in into a GET.
-    std::string cmd = "curl -sS -L --post301 --post302 --post303 --max-time " + std::to_string(kTimeoutS) +
-                      " --connect-timeout 4" +
-                      " -H 'Accept: application/json' -H " + shell_quote("Authorization: " + auth);
-    char tmp[] = "/tmp/zeroos-jf-XXXXXX";
-    bool have_tmp = false;
-    if (body) {
-        int fd = mkstemp(tmp);   // created 0600
-        if (fd < 0) return r;
-        have_tmp = true;
-        bool ok = write(fd, body->data(), body->size()) == ssize_t(body->size());
-        close(fd);
-        if (!ok) { unlink(tmp); return r; }
-        cmd += " -H 'Content-Type: application/json' --data-binary @" + std::string(tmp);
-    }
+    std::string cmd, tmp;
+    if (!curl_command(auth, body, cmd, tmp)) return r;
     cmd += " -w '\\n%{http_code}' " + shell_quote(url) + " 2>/dev/null";
     if (FILE* p = popen(cmd.c_str(), "r")) {
         char buf[4096];
@@ -242,7 +255,7 @@ Reply http(const std::string& url, const std::string& auth, const std::string* b
         while ((n = fread(buf, 1, sizeof buf, p)) > 0) r.body.append(buf, n);
         pclose(p);
     }
-    if (have_tmp) unlink(tmp);
+    if (!tmp.empty()) unlink(tmp.c_str());
     auto nl = r.body.rfind('\n');
     if (nl != std::string::npos) {
         r.status = std::atoi(r.body.c_str() + nl + 1);
@@ -265,6 +278,13 @@ std::string artist_of(const Json& it) {
     if (a.type == Json::Array && !a.items.empty()) return a.items[0].text();
     return "";
 }
+
+int ticks_to_s(const Json& v) {
+    // RunTimeTicks and positions: 10 000 000 to the second.
+    return v.type == Json::Number ? int(v.num / 1e7 + 0.5) : -1;
+}
+
+int int_of(const Json& v) { return v.type == Json::Number ? int(v.num) : -1; }
 
 }  // namespace
 
@@ -300,6 +320,20 @@ std::string stream_url(const JfSession& s, const std::string& item_id) {
            "&audioCodec=mp3&maxStreamingBitrate=320000";
 }
 
+std::string video_url(const JfSession& s, const std::string& item_id, const std::string& play_session,
+                      int max_w, int max_h, int kbps) {
+    if (!safe_id(item_id)) return "";
+    // H.264 and AAC in MPEG-TS segments: what the Cardputer decodes cheaply
+    // (and the Dock's mpv in hardware). The server copies streams that
+    // already fit and transcodes the rest.
+    return s.server + "/Videos/" + item_id + "/master.m3u8?MediaSourceId=" + item_id +
+           "&DeviceId=" + url_encode(s.device_id) + "&PlaySessionId=" + url_encode(play_session) +
+           "&VideoCodec=h264&AudioCodec=aac&SegmentContainer=ts&BreakOnNonKeyFrames=true"
+           "&MaxWidth=" + std::to_string(max_w) + "&MaxHeight=" + std::to_string(max_h) +
+           "&VideoBitrate=" + std::to_string(kbps * 1000) + "&AudioBitrate=128000"
+           "&MaxAudioChannels=2&TranscodingMaxAudioChannels=2&RequireAvc=false";
+}
+
 std::string list_path(const JfSession& s, JfView view, const std::string& arg) {
     const std::string user = "userId=" + url_encode(s.user_id);
     const std::string limit = "&limit=" + std::to_string(kPage);
@@ -312,7 +346,8 @@ std::string list_path(const JfSession& s, JfView view, const std::string& arg) {
         case JfView::Playlists:
             return "/Items?" + user + "&includeItemTypes=Playlist&recursive=true&sortBy=SortName" + limit;
         case JfView::Search:
-            return "/Items?" + user + "&includeItemTypes=Audio,MusicAlbum,MusicArtist&recursive=true&limit=60"
+            return "/Items?" + user +
+                   "&includeItemTypes=Audio,MusicAlbum,MusicArtist,Movie,Series,Episode&recursive=true&limit=60"
                    "&searchTerm=" + url_encode(arg);
         case JfView::AlbumTracks:
             if (!safe_id(arg)) return "";
@@ -324,6 +359,22 @@ std::string list_path(const JfSession& s, JfView view, const std::string& arg) {
         case JfView::PlaylistTracks:
             if (!safe_id(arg)) return "";
             return "/Playlists/" + arg + "/Items?" + user + limit;
+        case JfView::Resume:
+            return "/UserItems/Resume?" + user + "&mediaTypes=Video&enableUserData=true&limit=40";
+        case JfView::Movies:
+            return "/Items?" + user + "&includeItemTypes=Movie&recursive=true&sortBy=SortName" + limit;
+        case JfView::Shows:
+            return "/Items?" + user + "&includeItemTypes=Series&recursive=true&sortBy=SortName" + limit;
+        case JfView::Seasons:
+            if (!safe_id(arg)) return "";
+            return "/Shows/" + arg + "/Seasons?" + user;
+        case JfView::SeasonEpisodes: {
+            auto colon = arg.find(':');
+            if (colon == std::string::npos) return "";
+            std::string series = arg.substr(0, colon), season = arg.substr(colon + 1);
+            if (!safe_id(series) || !safe_id(season)) return "";
+            return "/Shows/" + series + "/Episodes?" + user + "&seasonId=" + season + limit;
+        }
     }
     return "";
 }
@@ -349,13 +400,27 @@ bool parse_items(const std::string& json, std::vector<JfItem>& out) {
         else if (type == "MusicArtist") x.kind = JfItem::Artist;
         else if (type == "Playlist") x.kind = JfItem::Playlist;
         else if (type == "Audio") x.kind = JfItem::Track;
+        else if (type == "Movie") x.kind = JfItem::Movie;
+        else if (type == "Series") x.kind = JfItem::Series;
+        else if (type == "Season") x.kind = JfItem::Season;
+        else if (type == "Episode") x.kind = JfItem::Episode;
+        else if (type == "Video" || type == "MusicVideo") x.kind = JfItem::Video;
         else continue;
         x.id = it["Id"].text();
         x.name = it["Name"].text();
         if (!safe_id(x.id) || x.name.empty()) continue;
         if (x.kind == JfItem::Album || x.kind == JfItem::Track) x.detail = artist_of(it);
-        // RunTimeTicks: 10 000 000 to the second.
-        if (it["RunTimeTicks"].type == Json::Number) x.duration_s = int(it["RunTimeTicks"].num / 1e7 + 0.5);
+        if (x.kind == JfItem::Season || x.kind == JfItem::Episode) {
+            x.detail = it["SeriesName"].text();
+            x.series_id = it["SeriesId"].text();
+            if (!safe_id(x.series_id)) x.series_id.clear();
+        }
+        x.duration_s = ticks_to_s(it["RunTimeTicks"]);
+        x.number = int_of(it["IndexNumber"]);
+        x.season = int_of(it["ParentIndexNumber"]);
+        x.year = int_of(it["ProductionYear"]);
+        int resume = ticks_to_s(it["UserData"]["PlaybackPositionTicks"]);
+        if (resume > 0) x.resume_s = resume;
         out.push_back(std::move(x));
     }
     return true;
@@ -399,6 +464,12 @@ bool list(const JfSession& s, JfView view, const std::string& arg, std::vector<J
     Reply r = http(s.server + path, auth_header(s), nullptr);
     std::vector<JfItem> got;
     bool ok = r.status == 200 && parse_items(r.body, got);
+    if (view == JfView::Resume && !ok && safe_id(s.user_id)) {
+        // Servers before 10.9 only have the per-user path.
+        got.clear();
+        r = http(s.server + "/Users/" + s.user_id + "/Items/Resume?mediaTypes=Video&limit=40", auth_header(s), nullptr);
+        ok = r.status == 200 && parse_items(r.body, got);
+    }
     if (view == JfView::Artists && (!ok || got.empty())) {
         // Servers differ on whether artists come from /Items; this is the
         // older, dedicated list.
@@ -414,6 +485,60 @@ bool list(const JfSession& s, JfView view, const std::string& arg, std::vector<J
     }
     out = std::move(got);
     return true;
+}
+
+std::string report_body(const std::string& item_id, const std::string& play_session, int pos_s, bool paused) {
+    return "{\"ItemId\":\"" + json_escape(item_id) + "\",\"MediaSourceId\":\"" + json_escape(item_id) +
+           "\",\"PlaySessionId\":\"" + json_escape(play_session) +
+           "\",\"PositionTicks\":" + std::to_string((long long)(pos_s < 0 ? 0 : pos_s) * 10000000LL) +
+           ",\"IsPaused\":" + (paused ? "true" : "false") +
+           ",\"CanSeek\":true,\"PlayMethod\":\"Transcode\"}";
+}
+
+void report(const JfSession& s, JfReport what, const std::string& item_id, const std::string& play_session,
+            int pos_s, bool paused) {
+#ifdef __EMSCRIPTEN__
+    return;   // the browser simulator has no processes (and no server)
+#else
+    if (!s.signed_in() || !safe_id(item_id)) return;
+    const char* path = what == JfReport::Start ? "/Sessions/Playing"
+                       : what == JfReport::Progress ? "/Sessions/Playing/Progress"
+                                                    : "/Sessions/Playing/Stopped";
+    std::string body = report_body(item_id, play_session, pos_s, paused), cmd, tmp;
+    if (!curl_command(auth_header(s), &body, cmd, tmp)) return;
+    // The shell backgrounds curl and exits at once, so nothing waits on the
+    // network and no child is left to reap. The body file goes after.
+    std::string script = "(" + cmd + " -o /dev/null " + shell_quote(s.server + path) + "; rm -f " + tmp +
+                         ") </dev/null >/dev/null 2>&1 &";
+    const char* argv[] = {"sh", "-c", script.c_str(), nullptr};
+    pid_t pid;
+    if (posix_spawnp(&pid, "sh", nullptr, nullptr, const_cast<char* const*>(argv), environ) != 0) {
+        unlink(tmp.c_str());
+        return;
+    }
+    int st;
+    waitpid(pid, &st, 0);
+#endif
+}
+
+bool write_dock_options(const JfSession& s, int start_s) {
+    const char* home = std::getenv("HOME");
+    if (!home || !*home) return false;
+    std::string dir = std::string(home) + "/.config/zeroos";
+    mkdir((std::string(home) + "/.config").c_str(), 0755);
+    mkdir(dir.c_str(), 0700);
+    std::string path = dir + "/jellyfin-mpv.conf";
+    std::string header = "Authorization: " + auth_header(s);
+    // %N% quotes a value of N bytes as is: the header is full of commas and
+    // quotes that mpv would otherwise read as list separators.
+    std::string text = "http-header-fields-append=%" + std::to_string(header.size()) + "%" + header + "\n";
+    if (start_s > 0) text += "start=" + std::to_string(start_s) + "\n";
+    std::string tmp = path + ".tmp";
+    int fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) return false;
+    bool ok = write(fd, text.data(), text.size()) == ssize_t(text.size());
+    close(fd);
+    return ok && rename(tmp.c_str(), path.c_str()) == 0;
 }
 
 }  // namespace zs::jf

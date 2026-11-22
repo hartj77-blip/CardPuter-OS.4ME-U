@@ -471,6 +471,7 @@ public:
         };
     }
     bool play(const std::string& path) override {
+        vid_.open = false;
         pb_ = PlaybackState{};
         pb_.path = path;
         pb_.playing = true;
@@ -483,6 +484,7 @@ public:
         return true;
     }
     bool play_stream(const std::string& url, const std::string&, int duration_s) override {
+        vid_.open = false;
         pb_ = PlaybackState{};
         pb_.path = url;
         pb_.playing = true;
@@ -504,36 +506,162 @@ public:
                        std::string&) override {
         using K = JfItem;
         static const std::vector<JfItem> albums = {
-            {K::Album, "a1", "Bench Tapes Vol. 2", "Bench Tapes", -1},
-            {K::Album, "a2", "Chip Sessions", "Various Artists", -1},
-            {K::Album, "a3", "Night Drive", "Synthwave Demos", -1},
-            {K::Album, "a4", "Solder & Flux", "Bench Tapes", -1},
+            mk(K::Album, "a1", "Bench Tapes Vol. 2", "Bench Tapes", -1),
+            mk(K::Album, "a2", "Chip Sessions", "Various Artists", -1),
+            mk(K::Album, "a3", "Night Drive", "Synthwave Demos", -1),
+            mk(K::Album, "a4", "Solder & Flux", "Bench Tapes", -1),
         };
         static const std::vector<JfItem> tracks = {
-            {K::Track, "c1", "Low Battery Blues", "Bench Tapes", 243},
-            {K::Track, "c2", "Pocket Computer", "Bench Tapes", 162},
-            {K::Track, "c3", "Forty-Six Keys", "Bench Tapes", 201},
-            {K::Track, "c4", "Interrupt Request", "Bench Tapes", 199},
-            {K::Track, "c5", "Brownout", "Bench Tapes", 177},
+            mk(K::Track, "c1", "Low Battery Blues", "Bench Tapes", 243),
+            mk(K::Track, "c2", "Pocket Computer", "Bench Tapes", 162),
+            mk(K::Track, "c3", "Forty-Six Keys", "Bench Tapes", 201),
+            mk(K::Track, "c4", "Interrupt Request", "Bench Tapes", 199),
+            mk(K::Track, "c5", "Brownout", "Bench Tapes", 177),
         };
         switch (view) {
             case JfView::Latest:
             case JfView::Albums:
             case JfView::ArtistAlbums: out = albums; break;
             case JfView::Artists:
-                out = {{K::Artist, "b1", "Bench Tapes", "", -1}, {K::Artist, "b2", "Synthwave Demos", "", -1}};
+                out = {mk(K::Artist, "b1", "Bench Tapes", "", -1), mk(K::Artist, "b2", "Synthwave Demos", "", -1)};
                 break;
-            case JfView::Playlists: out = {{K::Playlist, "d1", "Soldering", "", -1}}; break;
+            case JfView::Playlists: out = {mk(K::Playlist, "d1", "Soldering", "", -1)}; break;
             case JfView::Search:
                 out.clear();
-                for (auto& t : tracks)
-                    if (lower(t.name).find(lower(arg)) != std::string::npos) out.push_back(t);
+                for (auto* list : {&tracks, &movies()})
+                    for (auto& t : *list)
+                        if (lower(t.name).find(lower(arg)) != std::string::npos) out.push_back(t);
                 break;
             case JfView::AlbumTracks:
             case JfView::PlaylistTracks: out = tracks; break;
+            case JfView::Movies: out = movies(); break;
+            case JfView::Shows: {
+                JfItem show = mk(K::Series, "e1", "Bench Talk", "", -1);
+                out = {show};
+                break;
+            }
+            case JfView::Seasons:
+                out = {season(1), season(2)};
+                break;
+            case JfView::SeasonEpisodes:
+                out = episodes(arg.substr(arg.find(':') + 1) == "f2" ? 2 : 1);
+                break;
+            case JfView::Resume: {
+                JfItem ep = episodes(2)[1];
+                ep.resume_s = 754;
+                JfItem mv = movies()[1];
+                mv.resume_s = 2210;
+                out = {ep, mv};
+                break;
+            }
         }
         return true;
     }
+    static JfItem mk(JfItem::Kind k, std::string id, std::string name, std::string detail, int dur) {
+        JfItem x;
+        x.kind = k;
+        x.id = std::move(id);
+        x.name = std::move(name);
+        x.detail = std::move(detail);
+        x.duration_s = dur;
+        return x;
+    }
+    static const std::vector<JfItem>& movies() {
+        static const std::vector<JfItem> v = [] {
+            std::vector<JfItem> m = {mk(JfItem::Movie, "7a1", "Big Buck Bunny", "", 596),
+                                     mk(JfItem::Movie, "7a2", "Sintel", "", 888),
+                                     mk(JfItem::Movie, "7a3", "Tears of Steel", "", 734)};
+            int years[] = {2008, 2010, 2012};
+            for (int i = 0; i < 3; ++i) m[size_t(i)].year = years[i];
+            return m;
+        }();
+        return v;
+    }
+    static JfItem season(int n) {
+        JfItem x = mk(JfItem::Season, n == 1 ? "f1" : "f2", "Season " + std::to_string(n), "Bench Talk", -1);
+        x.number = n;
+        x.series_id = "e1";
+        return x;
+    }
+    static std::vector<JfItem> episodes(int s) {
+        static const char* const names[] = {"The Soldering Iron", "Reading Schematics", "Batteries",
+                                            "Logic Analysers"};
+        std::vector<JfItem> v;
+        for (int i = 0; i < 4; ++i) {
+            JfItem x = mk(JfItem::Episode, "9" + std::to_string(s) + std::to_string(i), names[i], "Bench Talk", 1320 + 60 * i);
+            x.season = s;
+            x.number = i + 1;
+            x.series_id = "e1";
+            v.push_back(x);
+        }
+        return v;
+    }
+    void jellyfin_report(const JfSession&, JfReport, const std::string&, const std::string&, int, bool) override {}
+
+    // A pretend video: moving colour bars, at the speed of the real clock.
+    bool video_open(const std::string& url, const std::string&, int start_s, int w, int h,
+                    std::string& error) override {
+        stop();
+        if (url.empty()) {
+            error = "Not a video address";
+            return false;
+        }
+        vid_ = VideoState{};
+        vid_.open = true;
+        vid_.dur_ms = std::max(600, start_s + 600) * 1000;   // always 10 minutes left
+        vid_w_ = w;
+        vid_h_ = h;
+        vid_offset_ms_ = start_s * 1000;
+        vid_clock_.start();
+        vid_last_ = -1;
+        return true;
+    }
+    bool video_frame(uint16_t* px) override {
+        if (!vid_.open) return false;
+        long t = vid_offset_ms_ + vid_clock_.ms();
+        long f = t / 40;   // 25 pictures a second
+        if (f == vid_last_) return false;
+        vid_last_ = f;
+        static const uint16_t bars[] = {0xFFFF, 0xFFE0, 0x07FF, 0x07E0, 0xF81F, 0xF800, 0x001F, 0x0000};
+        // 16:9 inside the buffer, black bars round it, as mpv would draw.
+        int vw = vid_w_, vh = vid_w_ * 9 / 16;
+        if (vh > vid_h_) { vh = vid_h_; vw = vid_h_ * 16 / 9; }
+        int x0 = (vid_w_ - vw) / 2, y0 = (vid_h_ - vh) / 2;
+        int sweep = int(f * 3 % vw);
+        for (int y = 0; y < vid_h_; ++y)
+            for (int x = 0; x < vid_w_; ++x) {
+                uint16_t c = 0;
+                int vx = x - x0, vy = y - y0;
+                if (vx >= 0 && vx < vw && vy >= 0 && vy < vh) {
+                    c = vy < vh * 3 / 4 ? bars[vx * 8 / vw] : uint16_t((vx * 31 / vw) * 0x0841);
+                    if (vx >= sweep && vx < sweep + 6) c = 0xFD20;
+                }
+                px[size_t(y) * size_t(vid_w_) + size_t(x)] = c;
+            }
+        return true;
+    }
+    VideoState video() override {
+        if (vid_.open) {
+            vid_.pos_ms = int(vid_offset_ms_ + vid_clock_.ms());
+            if (vid_.pos_ms >= vid_.dur_ms) {
+                vid_ = VideoState{};
+                vid_.finished = true;
+            }
+        }
+        return vid_;
+    }
+    void video_pause(bool p) override {
+        if (!vid_.open) return;
+        vid_.paused = p;
+        if (p) vid_clock_.pause(); else vid_clock_.resume();
+    }
+    void video_seek(int seconds, bool absolute) override {
+        if (!vid_.open) return;
+        long now = vid_offset_ms_ + vid_clock_.ms();
+        long to = absolute ? seconds * 1000L : now + seconds * 1000L;
+        vid_offset_ms_ += std::max(0L, to) - now;
+    }
+    void video_close() override { vid_.open = false; }
     static std::string lower(std::string s) {
         for (auto& ch : s) ch = char(std::tolower((unsigned char)ch));
         return s;
@@ -696,6 +824,10 @@ public:
     void beep(int, int) override {}
 
 private:
+    VideoState vid_;
+    PlayClock vid_clock_;
+    long vid_offset_ms_ = 0, vid_last_ = -1;
+    int vid_w_ = 0, vid_h_ = 0;
     std::vector<BtDevice> bt_ = {
         {"F4:4E:FD:12:9A:0C", "Car Multimedia", true, false},
         {"AC:12:2F:5B:E0:41", "Headphones", true, false},
