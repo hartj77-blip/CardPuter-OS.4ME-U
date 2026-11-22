@@ -36,6 +36,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | LCD blanks when console-setup runs | Drop-in that unblanks the framebuffers afterwards |
 | LCD stays on M5's logo or blank: `fb_load --keep-open` holds the LCD until M5's launcher starts, which ZeroOS doesn't ship | `fb_load.service` masked |
 | LCD black until ZeroShell starts (M5 boots with `quiet fbcon=map:off` behind a logo) | Console left on: boot text shows on the LCD. A udev rule runs `con2fbmap` to move it there when a monitor took fb0 |
+| Terminal app shows nothing: its console (tty3) was on another framebuffer (HDMI at boot, or a card from an older image that boots with `fbcon=map:1`) | `console-on-lcd` moves tty3 to the LCD each time the Terminal opens. With no tmux on the card it opens a plain shell |
 | ZeroShell started before the LCD driver, or with no LCD, and ran on drawing nowhere | The service waits up to 30 s for the LCD; with no display ZeroShell exits so systemd restarts it; the reason is in the journal |
 | First boot can stop forever in `rpi-setup-loop@var-swap`, or come up without swap: `rpi-resize.service` reloads systemd while the swap file's loop device is being set up (QEMU first boots; M5's image doesn't resize on first boot) | The loop setup starts after `rpi-resize.service` and has a 30 s start timeout |
 | `adbd` enabled by its package: USB gadget and a root shell with no pairing at every boot | Disabled, as on M5's image |

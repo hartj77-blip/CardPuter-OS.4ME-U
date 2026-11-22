@@ -137,6 +137,9 @@ If Update says "Up to date" on version 0.1.x, the device is still looking at the
 address. [Updates](docs/UPDATE.md#it-says-up-to-date-but-a-newer-release-exists) has the one-line
 fix.
 
+If apps won't install or the Terminal app opens nothing after coming from 0.1.x, open Update and
+install the newest version (0.3.2 or later), then open Apps and press U.
+
 ## Speed and memory
 
 ZeroOS is tuned for the Cardputer Zero's 512 MB of RAM and small battery.

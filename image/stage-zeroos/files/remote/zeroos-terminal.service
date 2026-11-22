@@ -19,6 +19,8 @@ StandardOutput=tty
 StandardError=journal
 UtmpIdentifier=tty3
 UtmpMode=user
+# The console must be on the LCD, not on HDMI or a framebuffer that isn't there.
+ExecStartPre=-+/usr/lib/zeroos/console-on-lcd 3
 ExecStartPre=+/bin/chvt 3
 ExecStart=/usr/lib/zeroos/terminal-session
 ExecStopPost=+/bin/chvt 1

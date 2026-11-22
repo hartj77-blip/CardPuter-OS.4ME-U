@@ -36,6 +36,7 @@ install -m 0644 "$F/dock/zeroos-dock.service"  "$D/etc/systemd/system/"
 # Terminal app: tmux on tty3 (docs/REMOTE.md).
 install -m 0644 "$F/remote/zeroos-terminal.service" "$D/etc/systemd/system/"
 install -m 0755 "$F/remote/terminal-session"   "$D/usr/lib/zeroos/terminal-session"
+install -m 0755 "$F/remote/console-on-lcd"     "$D/usr/lib/zeroos/console-on-lcd"
 install -m 0644 "$F/remote/tmux.conf"          "$D/etc/zeroos/tmux.conf"
 # Everything else (Remote, Sync, Car, GPS, Mesh, Tether...) is an installable
 # app now, with its own files: image/apps/<id>.pkg (docs/APPS.md).

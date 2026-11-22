@@ -15,6 +15,14 @@ cmdfile="$HOME/.cache/zeroos/terminal-cmd"
 cmd=$(cat "$cmdfile" 2>/dev/null); rm -f "$cmdfile"
 cmd=$(printf '%s' "$cmd" | sed 's/^ *//; s/ *$//')
 conf=/etc/zeroos/tmux.conf
+# No tmux on this card (flashed from an image that didn't have it): a plain
+# shell is better than a terminal that closes at once. "exit" goes back.
+if ! command -v tmux >/dev/null 2>&1; then
+    echo "tmux is not installed, so this is a plain shell: nothing keeps running"
+    echo "after you leave. Type exit to go back. To get tmux: sudo apt install tmux"
+    [ -n "$cmd" ] && exec "${SHELL:-/bin/bash}" -lc "$cmd; echo; printf 'Press Enter to close'; read _"
+    exec "${SHELL:-/bin/bash}" -l
+fi
 set --
 if [ -n "$cmd" ]; then
     # Keep the window open after ssh ends, so errors stay readable.
@@ -30,4 +38,7 @@ else
         tmux -f "$conf" new-session -d -s main "$@" 2>/dev/null \
         || tmux -f "$conf" new-session -d -s main "$@"
 fi
-exec tmux -f "$conf" attach-session -t main
+tmux -f "$conf" attach-session -t main && exit 0
+# tmux would not attach: say so and give a plain shell, not a blank screen.
+echo "tmux could not start, so this is a plain shell. Type exit to go back."
+exec "${SHELL:-/bin/bash}" -l
