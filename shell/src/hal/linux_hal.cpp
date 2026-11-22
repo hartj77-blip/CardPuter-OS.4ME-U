@@ -45,6 +45,10 @@
 #include <iomanip>
 #include <map>
 #include <sstream>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include "hal/hal.h"
 #include "hal/lcd_fb.h"
@@ -260,6 +264,7 @@ std::string find_power_supply() {
 class LinuxHal : public Hal {
 public:
     ~LinuxHal() override {
+        net_thread_stop();
         scan_stop();
         tether_end();
         gps_stop();
@@ -282,6 +287,9 @@ public:
             if (mesh_wanted_) mesh_log_checks_ = 0;   // look for "no radio" as if it just started
         }
         find_ext5v();
+#ifndef __EMSCRIPTEN__
+        net_thread_ = std::thread([this] { net_thread_main(); });
+#endif
     }
 
     // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
@@ -306,19 +314,44 @@ public:
         // Battery and IMU are cheap sysfs reads; cache them per poll.
         bat_cache_ = read_battery();
         imu_cache_ = read_imu();
-        if (++net_ticks_ % 20 == 0) net_cache_ = read_net();  // every ~2 s
+        {
+            std::lock_guard<std::mutex> lock(net_mu_);
+            if (net_new_) net_cache_ = net_shared_;
+            net_new_ = false;
+        }
     }
 
     BatteryInfo battery() override { return bat_cache_; }
     ImuSample imu() override { return imu_cache_; }
-    NetStatus net() override {
-        // Before poll()'s first 2 s refresh: read it now, but at most once a
-        // second (read_net forks ~7 times; the status bar asks every frame).
-        if (net_ticks_ < 20 && net_cache_.ip.empty() && time(nullptr) != net_early_at_) {
-            net_early_at_ = time(nullptr);
-            net_cache_ = read_net();
+    NetStatus net() override { return net_cache_; }
+
+    // read_net() runs nmcli, bluetoothctl and others (about 7 programs, up
+    // to a second or more together on this CPU). On the UI thread that froze
+    // the screen and the keyboard every 2 s, so it has its own thread;
+    // poll() picks up the result.
+    void net_thread_main() {
+        for (;;) {
+            NetStatus n = read_net();
+            std::unique_lock<std::mutex> lock(net_mu_);
+            net_shared_ = n;
+            net_new_ = true;
+            net_cv_.wait_for(lock, std::chrono::seconds(2), [this] { return net_stop_ || net_now_; });
+            if (net_stop_) return;
+            net_now_ = false;
         }
-        return net_cache_;
+    }
+    void net_refresh_soon() {
+        std::lock_guard<std::mutex> lock(net_mu_);
+        net_now_ = true;
+        net_cv_.notify_one();
+    }
+    void net_thread_stop() {
+        {
+            std::lock_guard<std::mutex> lock(net_mu_);
+            net_stop_ = true;
+            net_cv_.notify_one();
+        }
+        if (net_thread_.joinable()) net_thread_.join();
     }
 
     SystemInfo system() override {
@@ -381,7 +414,10 @@ public:
         // --wait bounds the attempt (default 90 s): this runs on the UI thread.
         std::string cmd = "nmcli --wait 20 dev wifi connect " + id;
         if (!psk.empty()) cmd += " password " + shell_quote(psk);
-        if (run(cmd + " && echo OK").find("OK") != std::string::npos) return true;
+        if (run(cmd + " && echo OK").find("OK") != std::string::npos) {
+            net_refresh_soon();
+            return true;
+        }
         if (psk.empty()) return false;
         // A failed attempt with a typed password must not leave that password
         // saved: NetworkManager would keep retrying it and the next connect
@@ -395,7 +431,10 @@ public:
         while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
         return s;
     }
-    void set_wifi_enabled(bool on) override { run(std::string("nmcli radio wifi ") + (on ? "on" : "off")); }
+    void set_wifi_enabled(bool on) override {
+        run(std::string("nmcli radio wifi ") + (on ? "on" : "off"));
+        net_refresh_soon();
+    }
     void set_bt_enabled(bool on) override { run(std::string("rfkill ") + (on ? "unblock" : "block") + " bluetooth"); }
 
     int brightness() override {
@@ -1127,7 +1166,7 @@ private:
                 tether_.busy.clear();
                 tether_.busy_mac.clear();
                 tether_.passkey.clear();
-                net_ticks_ = 19;   // the status bar's network icons: look again now
+                net_refresh_soon();   // the status bar's network icons: look again now
             }
         }
     }
@@ -1710,7 +1749,8 @@ private:
         return s;
     }
 
-    NetStatus read_net() {
+    // Runs on the network thread: must not touch any member.
+    static NetStatus read_net() {
         NetStatus n;
         n.wifi_enabled = run("nmcli radio wifi").find("enabled") != std::string::npos;
         std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi"));
@@ -1805,9 +1845,12 @@ private:
     std::string bat_, accel_, magn_, backlight_;
     BatteryInfo bat_cache_;
     ImuSample imu_cache_;
-    NetStatus net_cache_;
-    time_t net_early_at_ = 0;
-    long net_ticks_ = 0;
+    NetStatus net_cache_;          // UI thread's copy
+    NetStatus net_shared_;         // from the network thread, under net_mu_
+    bool net_new_ = false, net_stop_ = false, net_now_ = false;
+    std::mutex net_mu_;
+    std::condition_variable net_cv_;
+    std::thread net_thread_;
 };
 
 }  // namespace

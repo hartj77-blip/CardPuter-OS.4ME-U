@@ -28,6 +28,29 @@ jobs:
           name: screenshots
           path: build/screenshots
 
+  device-test:
+    name: Device build, run with a fake screen and keyboard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ python3-pil
+      - name: Key translation tests
+        run: shell/tests/run.sh
+      # The same code the Cardputer runs (framebuffer + evdev keyboard),
+      # built for this machine: start it, press keys, check what was typed.
+      - name: Build device backend (native)
+        run: cmake -S shell -B build/device-native -DZS_BACKEND=device && cmake --build build/device-native -j"$(nproc)"
+      - name: Start, navigate and type
+        run: |
+          gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
+          python3 shell/tests/device/device_test.py build/device-native/zeroshell build/fakedev.so build/device-screens
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-test-screens
+          path: build/device-screens
+
   web:
     name: Browser simulator (WebAssembly)
     runs-on: ubuntu-24.04
