@@ -36,6 +36,11 @@ class Device:
             f.write(bytes(W * H * 2))
         os.mkfifo(self.kb)
         env = dict(os.environ, LD_PRELOAD=shim, ZS_FRAMEBUFFER=self.fb, ZS_KEYBOARD=self.kb, HOME=self.dir)
+        # A device build makes the installable apps (Notes among them) as modules
+        # next to the binary; load them from there, as if they were installed.
+        apps = os.path.join(os.path.dirname(os.path.abspath(binary)), "apps")
+        if os.path.isdir(apps):
+            env["ZS_APP_DIR"] = apps
         self.log = open(os.path.join(self.dir, "log"), "w")
         self.proc = subprocess.Popen([binary, "--mock"], env=env, stdin=subprocess.DEVNULL,
                                      stdout=self.log, stderr=subprocess.STDOUT)
