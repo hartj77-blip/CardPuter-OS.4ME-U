@@ -77,7 +77,28 @@ int main() {
                                      {106, 1}, {106, 0}, {111, 1}, {111, 0}, {102, 1}, {102, 0}, {107, 1},
                                      {107, 0}, {FN, 0}}),
               "<17><20><18><19><127><2><3>");
-        check("fn keys we don't use", typed(t, taps({59, 113, 114, 115, 224, 225})), "");
+        auto k = [](uint32_t key) { return "<" + std::to_string(key) + ">"; };
+        check("fn media volume brightness", typed(t, taps({164, 165, 163, 113, 114, 115, 224, 225})),
+              k(kKeyPlayPause) + k(kKeyPrevTrack) + k(kKeyNextTrack) + k(kKeyMute) + k(kKeyVolumeDown) +
+                  k(kKeyVolumeUp) + k(kKeyBrightnessDown) + k(kKeyBrightnessUp));
+        check("fn page and F keys", typed(t, taps({104, 109, 59, 68, 87, 88})),
+              k(kKeyPageUp) + k(kKeyPageDown) + k(kKeyF1) + k(kKeyF1 + 9) + k(kKeyF1 + 10) + k(kKeyF1 + 11));
+        check("fn keys we don't use", typed(t, taps({110, 138, 99})), "");
+    }
+    {
+        // The Fn layer without Fn held (home screen): each letter gives what
+        // M5's keymap2 puts on it, the same codes as Fn + that letter.
+        KeyTranslator t;
+        const char* letters = "qweuiopasdfklzxcnm";
+        const uint16_t fn_codes[] = {164, 165, 163, 224, 225, 87, 88, 113, 114, 115,
+                                     103, 102, 104, 105, 108, 106, 107, 109};
+        for (int i = 0; letters[i]; ++i) {
+            std::string want = typed(t, taps({fn_codes[i]}));
+            std::string got = "<" + std::to_string(fn_layer_key(uint32_t(letters[i]))) + ">";
+            std::string what = std::string("fn layer ") + letters[i];
+            check(what.c_str(), got, want);
+        }
+        for (char ch : std::string("rtyghjvb1 A")) check("not on the fn layer", std::to_string(fn_layer_key(uint32_t(ch))), "0");
     }
     {
         // Fast typing: the next key goes down before the last one is up.

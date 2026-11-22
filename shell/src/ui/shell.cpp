@@ -1,12 +1,17 @@
 #include "ui/shell.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <ctime>
 
 #include "hal/hal.h"
+#include "platform/keys.h"
 #include "platform/platform.h"
+#include "ui/numkeys.h"
 #include "ui/player.h"
 #include "ui/power.h"
+#include "ui/quick_panel.h"
 #include "ui/remote.h"
 #include "ui/sync.h"
 #include "ui/theme.h"
@@ -23,6 +28,7 @@ lv_indev_state_t g_last_state = LV_INDEV_STATE_RELEASED;
 bool g_consumed = false;      // the held key belongs to the shell, not LVGL
 bool g_swallowed = false;     // the held key woke the screen; nothing else sees it
 bool g_repeat = false;        // ...and it's a key worth repeating while held
+bool g_as_enter = false;      // a number key that picked an item: LVGL sees Enter
 uint32_t g_press_ms = 0, g_repeat_ms = 0, g_press_app = 0;
 lv_obj_t* g_enter_box = nullptr;   // text box that had focus when Enter went down
 constexpr uint32_t kRepeatDelay = 400, kRepeatEvery = 80;
@@ -31,7 +37,8 @@ constexpr uint32_t kRepeatDelay = 400, kRepeatEvery = 80;
 // (install, record, save a waypoint): holding one must not do it 10 times.
 bool repeats(uint32_t key) {
     return key == LV_KEY_UP || key == LV_KEY_DOWN || key == LV_KEY_LEFT || key == LV_KEY_RIGHT ||
-           key == LV_KEY_BACKSPACE || key == LV_KEY_DEL;
+           key == LV_KEY_BACKSPACE || key == LV_KEY_DEL || key == kKeyVolumeUp || key == kKeyVolumeDown ||
+           key == kKeyBrightnessUp || key == kKeyBrightnessDown || key == kKeyPageUp || key == kKeyPageDown;
 }
 
 // Wraps the keypad driver: on each new press, offer the key to the shell first.
@@ -50,7 +57,8 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         g_press_ms = g_repeat_ms = lv_tick_get();
         g_press_app = Shell::get().app_generation();
         g_consumed = Shell::get().handle_key(data->key);
-        g_repeat = g_consumed && repeats(data->key);
+        g_as_enter = Shell::get().take_press_as_enter();
+        g_repeat = g_consumed && repeats(Shell::get().last_key());
     } else if (pressed && g_repeat && lv_tick_elaps(g_press_ms) > kRepeatDelay &&
                lv_tick_elaps(g_repeat_ms) > kRepeatEvery) {
         // The press opened or closed an app: the rest of it isn't for the new
@@ -60,12 +68,17 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         } else {
             g_repeat_ms = lv_tick_get();
             Shell::get().handle_key(data->key);
+            Shell::get().take_press_as_enter();
         }
     } else if (!pressed) {
         g_consumed = false;
         g_swallowed = false;
         g_repeat = false;
+        g_as_enter = false;
     }
+    // 3..9 picked an item and focused it: the rest of the press is an Enter
+    // on it, so it opens just as if Enter had been pressed there.
+    if (g_as_enter && pressed) data->key = LV_KEY_ENTER;
     // Enter in a one-line text box fires READY on the press, and the app
     // usually closes the box then. LVGL sends the release (a click) to
     // whatever has focus by then: a list row behind the box, which would
@@ -136,6 +149,8 @@ void Shell::start(lv_indev_t* keypad) {
     lv_obj_set_style_max_width(toast_, kScreenW - 16, 0);
     lv_obj_align(toast_, LV_ALIGN_TOP_MID, 0, kStatusH + 4);
     lv_obj_add_flag(toast_, LV_OBJ_FLAG_HIDDEN);
+
+    quick_panel_build(screen_);
 
     // Simulator stand-in for the backlight: a black layer over everything.
     blank_ = lv_obj_create(lv_layer_top());
@@ -296,6 +311,8 @@ void Shell::tick_cb(lv_timer_t* t) {
     // Screen off or terminal: the timer runs every 500 ms and nothing is drawn.
     if (!power().screen_off() && !s->handoff_ && ++n % 10 == 0) s->update_statusbar();
     if (s->app_) s->app_->tick();
+    number_hints_tick();
+    if (n % 10 == 0) quick_panel_refresh();
     s->apply_pending();
     if (s->toast_shown_ && lv_tick_elaps(s->toast_since_) > 2000) {   // wrap-safe
         lv_obj_add_flag(s->toast_, LV_OBJ_FLAG_HIDDEN);
@@ -305,6 +322,9 @@ void Shell::tick_cb(lv_timer_t* t) {
 
 void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     ++app_generation_;
+    fn_layer_ = false;
+    number_hints_hide();
+    quick_panel_close();
     // Destroy the old app while its widgets still exist: destructors read
     // them (Notes saves its text), then the widgets and group go away.
     app_.reset();
@@ -402,14 +422,34 @@ void Shell::add_focus(lv_obj_t* obj) {
 
 bool Shell::handle_key(uint32_t key) {
     bool used = false;
+    press_as_enter_ = false;
     lv_obj_t* focused = group_ ? lv_group_get_focused(group_) : nullptr;
     bool in_text = focused && lv_obj_check_type(focused, &lv_textarea_class);
+    bool panel = quick_panel_is_open();
     // Esc (top-left) is Back. ` doubles as Back for keyboards without an
     // Esc key. In a text box it types a `, unless the box is empty: then it's
     // Back too, so there's always a way out of a password or search box.
-    if (key == '`' && (!in_text || lv_textarea_get_text(focused)[0] == '\0')) key = LV_KEY_ESC;
-    if (app_ && app_->on_key(key)) {
+    if (key == '`' && (panel || !in_text || lv_textarea_get_text(focused)[0] == '\0')) key = LV_KEY_ESC;
+    // Screens that need no typing (the home screen, the taskbar panel) get
+    // the Fn layer without Fn held: f/z/x/c are arrows, a/s/d volume, and so
+    // on (keys.h). Shift + a letter is still the letter.
+    if ((panel || (fn_layer_ && !in_text)) && key < 128 && std::islower(int(key))) {
+        key = fn_layer_key(key);
+        if (!key) return true;   // nothing on the Fn layer there
+    }
+    last_key_ = key;
+    // Whatever was asked for, the number badges have done their job (0
+    // itself shows or hides them).
+    if (key != '0') number_hints_hide();
+    if (panel && quick_panel_key(key)) {
         used = true;
+    } else if (!panel && app_ && app_->on_key(key)) {
+        used = true;
+    } else if (is_shell_key(key)) {
+        system_key(key);
+        used = true;   // never to a widget: a text box would type it
+    } else if (!panel && !in_text && key >= '0' && key <= '9') {
+        used = number_key(key);
     } else if ((key == LV_KEY_UP || key == LV_KEY_DOWN) && group_) {
         // Up/Down move focus between widgets, but never out of a text box:
         // a pop-up box would stay on screen with typing going to the list
@@ -429,6 +469,71 @@ bool Shell::handle_key(uint32_t key) {
     }
     apply_pending();
     return used;
+}
+
+void Shell::system_key(uint32_t key) {
+    char buf[32];
+    bool panel = quick_panel_is_open();
+    switch (key) {
+        case kKeyVolumeUp:
+        case kKeyVolumeDown:
+            std::snprintf(buf, sizeof buf, "Volume %d%%", step_volume(key == kKeyVolumeUp ? +1 : -1));
+            if (!panel) toast(buf);
+            break;
+        case kKeyMute:
+            hal().set_muted(!hal().muted());
+            if (!panel) toast(hal().muted() ? "Sound off" : "Sound on");
+            break;
+        case kKeyBrightnessUp:
+        case kKeyBrightnessDown:
+            std::snprintf(buf, sizeof buf, "Brightness %d%%", step_brightness(key == kKeyBrightnessUp ? +1 : -1));
+            if (!panel) toast(buf);
+            break;
+        case kKeyPlayPause: player_media_key(MediaKey::PlayPause); break;
+        case kKeyNextTrack: player_media_key(MediaKey::Next); break;
+        case kKeyPrevTrack: player_media_key(MediaKey::Previous); break;
+        case kKeyPageUp:
+        case kKeyPageDown: {
+            // Five items at a time, stopping at the ends.
+            if (!group_ || panel) break;
+            int n = int(lv_group_get_obj_count(group_));
+            lv_obj_t* f = lv_group_get_focused(group_);
+            int at = 0;
+            while (at < n && lv_group_get_obj_by_index(group_, uint32_t(at)) != f) ++at;
+            if (at == n) at = 0;
+            int to = std::clamp(at + (key == kKeyPageDown ? 5 : -5), 0, n - 1);
+            if (n > 0) lv_group_focus_obj(lv_group_get_obj_by_index(group_, uint32_t(to)));
+            break;
+        }
+        default: break;   // F1..F12: nothing yet
+    }
+    quick_panel_refresh();
+    update_statusbar();
+}
+
+bool Shell::number_key(uint32_t key) {
+    switch (key) {
+        case '1':
+            if (app_id_ != "home") go_home();
+            return true;
+        case '2':
+            quick_panel_open();
+            return true;
+        case '0':
+            if (number_hints_shown()) number_hints_hide();
+            else if (number_hints_show(number_targets(group_)) == 0) toast("Nothing to pick here");
+            return true;
+        default: {
+            auto targets = number_targets(group_);
+            size_t i = key - '3';
+            if (i >= targets.size()) return true;
+            lv_group_focus_obj(targets[i]);
+            lv_obj_scroll_to_view(targets[i], LV_ANIM_OFF);
+            // Not consumed: the keypad hook passes the press on as Enter.
+            press_as_enter_ = true;
+            return false;
+        }
+    }
 }
 
 bool Shell::open_terminal(const std::string& command) {
@@ -493,5 +598,6 @@ void shell_screen_changed() { Shell::get().screen_changed(); }
 void shell_prepare_power_off() { Shell::get().prepare_power_off(); }
 bool shell_open_terminal(const std::string& command) { return Shell::get().open_terminal(command); }
 bool shell_open_camera() { return Shell::get().open_camera(); }
+void shell_set_fn_layer(bool on) { Shell::get().set_fn_layer(on); }
 
 }  // namespace zs

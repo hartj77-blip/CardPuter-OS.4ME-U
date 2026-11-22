@@ -18,6 +18,22 @@ constexpr uint32_t kKeyUp = 17, kKeyDown = 18, kKeyRight = 19, kKeyLeft = 20, kK
                    kKeyDel = 127, kKeyBackspace = 8, kKeyEnter = 10, kKeyNext = 9, kKeyPrev = 11,
                    kKeyHome = 2, kKeyEnd = 3;
 
+// Keys LVGL has no name for: the Fn layer's media, volume and brightness
+// keys, Page Up/Down and F1-F12. Unicode private use values, so they can't be
+// mistaken for a character. The shell consumes them all (a text box would
+// otherwise type them).
+constexpr uint32_t kKeyPlayPause = 0xE000, kKeyPrevTrack = 0xE001, kKeyNextTrack = 0xE002,
+                   kKeyMute = 0xE003, kKeyVolumeDown = 0xE004, kKeyVolumeUp = 0xE005,
+                   kKeyBrightnessDown = 0xE006, kKeyBrightnessUp = 0xE007, kKeyPageUp = 0xE008,
+                   kKeyPageDown = 0xE009, kKeyF1 = 0xE011;   // F1..F12 = kKeyF1 + 0..11
+constexpr bool is_shell_key(uint32_t key) { return key >= kKeyPlayPause && key < kKeyF1 + 12; }
+
+// The key the built-in keyboard's Fn layer puts on a letter (M5's
+// cardputerzero overlay, keymap2), for screens that use the Fn layer without
+// Fn held: f/z/x/c are arrows, q/w/e media, a/s/d mute and volume, u/i
+// brightness, k/n Home/End, l/m Page Up/Down, o/p F11/F12. 0 = nothing there.
+uint32_t fn_layer_key(uint32_t ch);
+
 enum class KeyLayout {
     // The built-in keyboard, with M5's tca8418_keypad_m5stack driver. The
     // driver handles Sym and Fn itself and sends a different key code for

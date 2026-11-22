@@ -23,6 +23,13 @@ public:
 
     // Called by the indev hook on each key press. True = consumed.
     bool handle_key(uint32_t key);
+    // After handle_key: true if the press picked an item (3..9) and should
+    // reach LVGL as Enter. Reading it clears it.
+    bool take_press_as_enter() { bool b = press_as_enter_; press_as_enter_ = false; return b; }
+    // The key handle_key acted on (after the Fn layer).
+    uint32_t last_key() const { return last_key_; }
+    // The open app needs no typing: plain letters are their Fn keys.
+    void set_fn_layer(bool on) { fn_layer_ = on; }
 
     static Shell& get();
 
@@ -43,6 +50,8 @@ public:
 
 private:
     void apply_pending();
+    void system_key(uint32_t key);
+    bool number_key(uint32_t key);
     void build_statusbar();
     void update_statusbar();
     void switch_to(std::unique_ptr<App> app, const std::string& title);
@@ -63,6 +72,9 @@ private:
     uint32_t toast_since_ = 0;
     bool toast_shown_ = false;
     uint32_t app_generation_ = 0;
+    uint32_t last_key_ = 0;
+    bool press_as_enter_ = false;
+    bool fn_layer_ = false;     // reset at each app switch
     lv_indev_t* keypad_ = nullptr;
     std::unique_ptr<App> app_;
     std::string app_id_;

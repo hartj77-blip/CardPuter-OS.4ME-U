@@ -29,8 +29,12 @@ The [roadmap](docs/ROADMAP.md) lists what is done and what is next.
 
 ## Features
 
-- Keyboard navigation. Use the arrow keys and Enter for everything. Press a letter to jump to an
-  app, and Esc to go back.
+- Keyboard navigation. Use the arrow keys and Enter for everything, and Esc to go back. See
+  [Keys](docs/KEYS.md).
+  - Number keys as buttons: 1 goes home, 2 opens the taskbar panel (Wi-Fi, Bluetooth, volume,
+    brightness and more), 3 to 9 pick the items on screen, and 0 shows which number is which.
+  - On the home screen you don't need to hold Fn: F, Z, X and C are the arrows, A, S and D are mute
+    and volume, and so on. Shift and a letter jumps to an app, and 3 to 9 open the dock's apps.
 - Install only what you need. Four apps are part of ZeroOS. Every other app is installed, updated
   and removed in the Apps app. See the [Apps guide](docs/APPS.md). The apps have their own
   repository, [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U).
@@ -171,6 +175,7 @@ For a full report on memory, CPU and battery use, run `zeroos-measure`. See
 
 ## Guides
 
+- [Keys](docs/KEYS.md): the number keys, the taskbar panel and the Fn keys
 - [Apps](docs/APPS.md): installing apps, where they come from, and the app level
 - [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): the apps' own repository, for changing an app or making one
 - [Updates](docs/UPDATE.md): updating over the network

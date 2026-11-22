@@ -85,5 +85,9 @@ void shell_prepare_power_off();         // power manager: close the app and GPS 
 bool shell_open_terminal(const std::string& command);
 // Hand the screen to the camera app until it exits. False if it can't start.
 bool shell_open_camera();
+// For a screen that needs no typing: plain letters act as their Fn keys
+// (f/z/x/c arrows, a/s/d volume, ...; platform/keys.h), Shift + letter is
+// still the letter. Off again at each app switch; call it from build().
+void shell_set_fn_layer(bool on);
 
 }  // namespace zs
