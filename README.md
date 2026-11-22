@@ -88,10 +88,10 @@ image, and can be removed like any other app.
    file directly, so there is no need to unzip it first.
 3. Put the card in the Cardputer Zero and switch it on. The first start takes a few minutes.
 
-The image for a new release is built after the release is published and takes a few hours to
-appear. If the download link gives a "not found" page, pick the image from an earlier release on
-the [releases page](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases) and then use the
-Update app.
+The image for a new release is built right after the release is published and appears about
+10 minutes later. If the download link gives a "not found" page, try again shortly, or pick the
+image from an earlier release on the [releases page](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases)
+and then use the Update app.
 
 ### Wi-Fi
 
