@@ -277,12 +277,17 @@ void Shell::tick_cb(lv_timer_t* t) {
         mesh_seen = seq;
     }
     static int n = 0;
-    // Terminal closed (exit, or tmux detach with Alt+`) or camera app closed:
+    // Terminal closed (exit, or tmux detach with Ctrl+Q) or camera app closed:
     // take the screen back.
     if (s->handoff_ && lv_tick_elaps(s->handoff_since_) > 1500) {
         // Nobody is looking: don't leave the sensor running with the screen off.
         if (s->handoff_camera_ && power().screen_off()) hal().camera_close();
         if (!(s->handoff_camera_ ? hal().camera_active() : hal().terminal_active())) {
+            if (!s->handoff_camera_) {
+                platform_console_handoff(false);
+                // The Terminal app has nothing to show on the device: go home.
+                if (s->app_id_ == "terminal") s->go_home();
+            }
             s->handoff_ = s->handoff_camera_ = false;
             power().set_handoff(false);
             s->screen_changed();
@@ -427,7 +432,11 @@ bool Shell::handle_key(uint32_t key) {
 }
 
 bool Shell::open_terminal(const std::string& command) {
-    if (!hal().terminal_open(command)) return false;
+    platform_console_handoff(true);
+    if (!hal().terminal_open(command)) {
+        platform_console_handoff(false);
+        return false;
+    }
     handoff_ = true;
     handoff_since_ = lv_tick_get();
     power().set_handoff(true);

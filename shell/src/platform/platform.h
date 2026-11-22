@@ -16,6 +16,12 @@ int platform_run();
 // sleeps until a key arrives. No-op elsewhere.
 void platform_set_low_power(bool on);
 
+// Terminal handoff: let the kernel switch away from our console. A console in
+// graphics mode with automatic VT switching refuses every switch (chvt waits
+// forever), so it goes back to text mode while the Terminal has the screen.
+// No-op except on the device.
+void platform_console_handoff(bool away);
+
 // Headless only: run a scripted session (see main.cpp). Returns exit code.
 int platform_run_script(const std::string& script);
 

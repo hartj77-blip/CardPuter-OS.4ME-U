@@ -1462,7 +1462,8 @@ private:
         std::string dir = std::string(std::getenv("HOME") ? std::getenv("HOME") : "/home/pi") + "/.cache/zeroos";
         run("mkdir -p '" + dir + "'");
         write_str(dir + "/terminal-cmd", command);
-        run("systemctl start zeroos-terminal.service");
+        // --no-block: starting waits for the console switch; don't freeze the UI.
+        run("systemctl start --no-block zeroos-terminal.service");
         term_at_ = 0;
         return true;
     }

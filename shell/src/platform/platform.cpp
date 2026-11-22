@@ -56,6 +56,7 @@ int platform_run_script(const std::string&) {
 }
 
 void platform_set_low_power(bool) {}
+void platform_console_handoff(bool) {}
 
 #elif ZS_BACKEND_DEVICE
 namespace {
@@ -224,6 +225,17 @@ lv_indev_t* platform_init(int, int, int) {
     // stock-image problem); the image masks getty@tty1 to prevent that.
     g_keypad = in;
     return in;
+}
+
+void platform_console_handoff(bool away) {
+    tty_graphics(!away);
+    // In text mode the console would show tty1's text (the boot log) for a
+    // moment when the Terminal hands the screen back: clear it, hide the cursor.
+    if (away && isatty(0)) {
+        static const char kClear[] = "\033[H\033[2J\033[?25l";
+        ssize_t n = write(0, kClear, sizeof kClear - 1);
+        (void)n;
+    }
 }
 
 void platform_set_low_power(bool on) {
@@ -396,6 +408,7 @@ int platform_run() {
 
 int platform_run_script(const std::string&) { return 2; }
 void platform_set_low_power(bool) {}
+void platform_console_handoff(bool) {}
 
 #else
 // ---------------------------------------------------------------- headless
@@ -533,6 +546,7 @@ int platform_run_script(const std::string& script) {
     return failures ? 1 : 0;
 }
 void platform_set_low_power(bool) {}
+void platform_console_handoff(bool) {}
 
 #endif
 

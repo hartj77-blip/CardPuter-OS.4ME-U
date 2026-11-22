@@ -32,7 +32,7 @@ In **Remote**:
 | Turn off Tailscale / Sign out | |
 
 **Terminal** (its own app, from **Apps**; SSH and mosh from Remote need it) is a real Linux console on the built-in
-screen: 53 x 14 characters, running tmux. Alt+` goes back to ZeroShell and
+screen: 53 x 14 characters, running tmux. Ctrl+Q goes back to ZeroShell and
 leaves everything running (SSH included); open Terminal again to pick up
 where you were. Alt+Left/Right switch tmux windows, Alt+N opens a new one,
 and each SSH connection opens in its own window.

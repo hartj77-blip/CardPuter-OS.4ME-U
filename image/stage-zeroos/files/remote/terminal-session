@@ -38,7 +38,16 @@ else
         tmux -f "$conf" new-session -d -s main "$@" 2>/dev/null \
         || tmux -f "$conf" new-session -d -s main "$@"
 fi
-tmux -f "$conf" attach-session -t main && exit 0
+# Clear the console on the way out: tmux's "[detached ...]" line would
+# otherwise flash on the screen the next time the Terminal opens.
+tmux -f "$conf" attach-session -t main && { printf '\033[H\033[2J'; exit 0; }
+# The client can lose its connection while the server keeps running (seen as
+# "[server exited unexpectedly]" on the first detach from a new server). The
+# sessions are fine: go back to ZeroShell, as a detach would.
+if tmux -f "$conf" has-session -t main 2>/dev/null; then
+    printf '\033[H\033[2J'
+    exit 0
+fi
 # tmux would not attach: say so and give a plain shell, not a blank screen.
 echo "tmux could not start, so this is a plain shell. Type exit to go back."
 exec "${SHELL:-/bin/bash}" -l

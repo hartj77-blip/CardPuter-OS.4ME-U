@@ -1,5 +1,5 @@
 // Terminal: a real Linux console on the built-in screen, running tmux, so
-// sessions (and SSH connections) keep running when you go back. Alt+` (tmux
+// sessions (and SSH connections) keep running when you go back. Ctrl+Q (tmux
 // detach) or `exit` returns to ZeroShell. In the simulator, a stand-in shows
 // what would run.
 //
@@ -16,6 +16,13 @@ class TerminalApp : public App {
 public:
     void build(lv_obj_t* root) override {
         root_ = root;
+        // On the device, opening the app opens the terminal; nothing is drawn
+        // first (it would flash before the console takes the screen), and
+        // closing it (Ctrl+Q or exit) goes back to the home screen.
+        std::string cmd = shell_app_arg();
+        if (cmd == "shell") cmd.clear();
+        if (shell_open_terminal(cmd)) return;
+        // Simulator: a page with help and a button, and a stand-in console.
         lv_obj_t* panel = lv_obj_create(root);
         style_panel(panel);
         lv_obj_set_pos(panel, 6, 4);
@@ -26,7 +33,7 @@ public:
         label(panel, LV_SYMBOL_KEYBOARD "  Terminal", &zs_font_16, kAccent);
         lv_obj_t* help = label(panel,
                                "Enter opens a terminal on this screen (53 x 14).\n"
-                               "Alt+`  or  exit  comes back here. Sessions keep\n"
+                               "Ctrl+Q  or  exit  comes back here. Sessions keep\n"
                                "running in tmux; open it again to pick up.\n"
                                "Remote has your devices, for one-key SSH.",
                                &zs_font_12, kMuted);
@@ -44,8 +51,7 @@ public:
         }, LV_EVENT_CLICKED, this);
         shell_add_focus(b);
 
-        std::string cmd = shell_app_arg();
-        if (!cmd.empty()) open(cmd == "shell" ? "" : cmd);
+        show_fake(cmd);
     }
 
     bool on_back() override {
@@ -84,7 +90,7 @@ private:
         label(prompt, ("$ " + cmd + (cmd.empty() ? "_" : "")).c_str(), &zs_font_12, 0xffffff);
         lv_obj_t* l = label(fake_,
                             "[simulator] On the Cardputer this is a real\n"
-                            "Linux terminal running tmux. Alt+` or exit\n"
+                            "Linux terminal running tmux. Ctrl+Q or exit\n"
                             "comes back. Esc closes this preview.",
                             &zs_font_12, 0xffffff);
         lv_obj_set_pos(l, 0, 30);

@@ -10,7 +10,7 @@ If something freezes or crashes, connect over SSH and run `journalctl -u zeroshe
 - [ ] **Wi-Fi**: the list of networks shows; the password shows as you type it; Enter joins.
 - [ ] **Settings**: brightness and volume change, Bluetooth toggles.
 - [ ] **Files**: browse ~, open a .txt (opens in Notes once Notes is installed), Esc goes up a folder.
-- [ ] **Terminal**: Enter opens a console; type `ls`; Alt+` or `exit` comes back to the home screen.
+- [ ] **Terminal**: Enter opens a console; type `ls`; Ctrl+Q or `exit` comes back to the home screen.
 - [ ] **Update**: says you're on the newest version.
 - [ ] **Dock**: with an HDMI monitor plugged in, Start Dock mode shows the desktop; without one it says No monitor.
 - [ ] **Apps**: R refreshes the list; you see the installable apps listed.

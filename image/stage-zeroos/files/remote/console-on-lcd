@@ -24,17 +24,41 @@ case $n in
         done ;;
 esac
 [ -n "$n" ] || { echo "zeroos: console-on-lcd: can't find the LCD's framebuffer" >&2; exit 0; }
-for tty; do
-    case $tty in ''|*[!0-9]*) continue ;; esac
-    if command -v con2fbmap >/dev/null 2>&1; then
-        con2fbmap "$tty" "$n" && continue
-    fi
-    # No con2fbmap (the fbset package) on this card: the same request by hand.
-    python3 - "$tty" "$n" "$R/dev/fb$n" <<'PY' ||
+# The framebuffer console lets go of every console when the framebuffer it
+# started on goes away (HDMI's, when nothing is plugged in at boot): it is
+# then unbound, consoles draw on the dummy driver, and the LCD shows nothing
+# however they are mapped. Bind it again.
+for v in "$R"/sys/class/vtconsole/vtcon*; do
+    grep -qs "frame buffer" "$v/name" || continue
+    [ "$(cat "$v/bind" 2>/dev/null)" = 1 ] || echo 1 > "$v/bind" ||
+        echo "zeroos: console-on-lcd: could not bind the framebuffer console" >&2
+done
+# The console font (Terminus 6x12: 53 x 14) is set at boot, which was too
+# early if the framebuffer console wasn't bound then. Set it on each console.
+font=""
+if [ -r "$R/etc/default/console-setup" ]; then
+    face=$(sed -n 's/^FONTFACE="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$R/etc/default/console-setup")
+    size=$(sed -n 's/^FONTSIZE="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "$R/etc/default/console-setup")
+    # console-setup writes 6x12 for a font file named 12x6.
+    [ -n "$face" ] && [ -n "$size" ] && font="$R/usr/share/consolefonts/Uni2-$face${size#*x}x${size%x*}.psf.gz"
+fi
+[ -r "$font" ] || font="$R/usr/share/consolefonts/Uni2-Terminus12x6.psf.gz"
+# con2fbmap (the fbset package) opens /dev/fb0, which is missing when the
+# LCD is fb1 and HDMI is gone; the same request by hand works on any card.
+map_to_lcd() {
+    if command -v con2fbmap >/dev/null 2>&1 && con2fbmap "$1" "$n" 2>/dev/null; then return 0; fi
+    python3 - "$1" "$n" "$R/dev/fb$n" <<'PY'
 import fcntl, struct, sys
 with open(sys.argv[3], "rb") as f:
     fcntl.ioctl(f, 0x4610, struct.pack("II", int(sys.argv[1]), int(sys.argv[2])))   # FBIOPUT_CON2FBMAP
 PY
-        echo "zeroos: console-on-lcd: could not move tty$tty to fb$n" >&2
+}
+for tty; do
+    case $tty in ''|*[!0-9]*) continue ;; esac
+    map_to_lcd "$tty" || echo "zeroos: console-on-lcd: could not move tty$tty to fb$n" >&2
+    if [ -r "$font" ] && command -v setfont >/dev/null 2>&1; then
+        setfont -C "$R/dev/tty$tty" "$font" ||
+            echo "zeroos: console-on-lcd: could not set the font on tty$tty" >&2
+    fi
 done
 exit 0
