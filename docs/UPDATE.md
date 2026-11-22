@@ -52,16 +52,11 @@ addresses). Not tried on the real unit yet.
 
 ## Publishing an update
 
-On GitHub, open **Actions**, choose
-[Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml),
-press **Run workflow**, type the version (such as `0.3.0`) and press the green button. It
-releases the newest commit on `main` and tags it `v0.3.0`.
-
-Pushing a tag does the same:
+Push a tag:
 
 ```sh
-git tag v0.3.0
-git push origin v0.3.0
+git tag v0.2.0
+git push origin v0.2.0
 ```
 
 The **Release** workflow builds ZeroShell for arm64, makes the package and
