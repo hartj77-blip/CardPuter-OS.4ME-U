@@ -520,6 +520,12 @@ int platform_run_script(const std::string& script) {
         else if (cmd == "hdmi") { mock_set_hdmi(arg == "1"); run_for(100); }
         else if (cmd == "pose") { mock_set_pose(std::atoi(arg.c_str())); run_for(100); }
         else if (cmd == "wait") run_for(uint32_t(std::atoi(arg.c_str())));
+        else if (cmd == "live") {   // wait in real time: for real child work (--real-hal video)
+            for (int t = 0; t < std::atoi(arg.c_str()); t += 5) {
+                usleep(5000);
+                run_for(5);
+            }
+        }
         else if (cmd == "shot") { drain_keys(); run_for(400); if (!save_ppm(arg)) ++failures; }
         else { std::fprintf(stderr, "unknown script step: %s\n", step.c_str()); ++failures; }
         drain_keys();

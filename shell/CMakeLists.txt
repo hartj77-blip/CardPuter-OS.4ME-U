@@ -104,11 +104,15 @@ if(ZS_APP_MODULES)
   install(TARGETS ${ZS_APP_MODULES} LIBRARY DESTINATION lib/zeroos/apps)
 endif()
 
-# Unit tests for code that needs no screen (IR codes): ctest, or run ir_test.
+# Unit tests for code that needs no screen (IR codes, the Jellyfin client): ctest, or run ir_test.
 if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   enable_testing()
   add_executable(ir_test tests/ir_test.cpp src/ir/ir.cpp src/ir/db.cpp)
   target_include_directories(ir_test PRIVATE src)
   target_compile_options(ir_test PRIVATE -Wall -Wextra)
   add_test(NAME ir_test COMMAND ir_test)
+  add_executable(jellyfin_test tests/jellyfin_test.cpp src/hal/jellyfin.cpp)
+  target_include_directories(jellyfin_test PRIVATE src)
+  target_compile_options(jellyfin_test PRIVATE -Wall -Wextra)
+  add_test(NAME jellyfin_test COMMAND jellyfin_test)
 endif()

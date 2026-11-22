@@ -27,7 +27,7 @@ Terminal	Linux terminal on the Cardputer's built-in display
 Files	Browse files stored on the device
 Dock	Desktop environment for HDMI displays, with a browser, video player, terminal and file manager
 IR Remote	Control TVs, projectors, audio equipment, air conditioners and lights. Includes around 2,000 remote profiles and the ability to learn buttons from your own remotes
-Media	Music player, Jellyfin streaming and voice recordings
+Media	Music player, Jellyfin music and video streaming, and voice recordings
 Notes	Simple text notes
 Remote	Tailscale support for connecting to other devices, SSH, remote desktop and file sharing
 Sync	Sync notes, documents and recordings with your PC or phone using Syncthing

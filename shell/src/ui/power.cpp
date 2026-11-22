@@ -202,6 +202,12 @@ bool Power::on_key(uint32_t now_ms) {
     return was_off || handoff_;   // the key that wakes the screen does nothing else
 }
 
+void Power::stay_awake(uint32_t now_ms) {
+    if (docked_ || state_ == State::Off) return;
+    last_input_ = now_ms;
+    if (state_ == State::Dim) set_state(State::On, now_ms);
+}
+
 void Power::update_estimate(const BatteryInfo& b, uint32_t now_ms) {
     if (b.external_power != was_external_) {   // plugged or unplugged: start over
         was_external_ = b.external_power;
