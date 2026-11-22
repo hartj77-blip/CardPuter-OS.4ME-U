@@ -19,6 +19,9 @@ expect() {   # expect <name> <key> <value>: a line of the status file
 # --- the package ---------------------------------------------------------
 printf '#!/bin/sh\necho fake zeroshell\n' > "$T/zeroshell"
 chmod +x "$T/zeroshell"
+# A small IR code database stands in for the full one (docs/IR.md).
+python3 -I "$ROOT/tools/irdb/build_irdb.py" --src "$ROOT/tools/irdb/sample" --out "$T/irdb" >/dev/null
+export ZEROOS_IRDB=$T/irdb
 build() { ZEROOS_ARCH=$ARCH "$ROOT/image/stage-zeroos/package.sh" "$T/zeroshell" "$T/server-$1" "$1" >/dev/null; }
 build 1.0.0; build 1.1.0
 DEB=$T/server-1.1.0/zeroos_1.1.0_$ARCH.deb
@@ -26,7 +29,8 @@ DEB=$T/server-1.1.0/zeroos_1.1.0_$ARCH.deb
 dpkg-deb -x "$DEB" "$T/x"
 for f in usr/bin/zeroshell usr/bin/zeroos-update etc/systemd/system/zeroshell.service \
          etc/systemd/system/zeroos-update.service etc/zeroos/update.conf etc/zeroos-release \
-         usr/share/zeroos/overrides/etc/default/gpsd; do
+         usr/share/zeroos/overrides/etc/default/gpsd usr/share/zeroos/ir/index.tsv \
+         usr/share/zeroos/ir/universal/TVs.ir usr/share/zeroos/ir/TVs/LG/LG_TV.ir; do
     [ -e "$T/x/$f" ] && ok "package has /$f" || bad "package is missing /$f"
 done
 # Files other Debian packages own must not be in ours (dpkg would refuse).

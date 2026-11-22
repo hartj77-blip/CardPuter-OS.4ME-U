@@ -80,3 +80,12 @@ if(ZS_BACKEND STREQUAL "web")
 endif()
 
 install(TARGETS zeroshell RUNTIME DESTINATION bin)
+
+# Unit tests for code that needs no screen (IR codes): ctest, or run ir_test.
+if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
+  enable_testing()
+  add_executable(ir_test tests/ir_test.cpp src/ir/ir.cpp src/ir/db.cpp)
+  target_include_directories(ir_test PRIVATE src)
+  target_compile_options(ir_test PRIVATE -Wall -Wextra)
+  add_test(NAME ir_test COMMAND ir_test)
+endif()

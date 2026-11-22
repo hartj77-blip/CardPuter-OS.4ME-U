@@ -99,6 +99,18 @@ install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-pan
 # switch it off; held open, nothing ZeroShell draws reaches the screen.
 ln -sf /dev/null "$D/etc/systemd/system/fb_load.service"
 
+# IR Remote's code database: Flipper-IRDB, built by tools/irdb/build_irdb.py
+# (docs/IR.md). image/package.sh and image/build.sh build it; the image's
+# copy travels in files/irdb.
+IRDB=${ZEROOS_IRDB:-$F/irdb}
+if [ -f "$IRDB/index.tsv" ]; then
+    install -d "$D/usr/share/zeroos/ir"
+    cp -r "$IRDB/." "$D/usr/share/zeroos/ir/"
+    find "$D/usr/share/zeroos/ir" -type d -exec chmod 0755 {} + -o -type f -exec chmod 0644 {} +
+else
+    echo "warning: no IR code database at $IRDB; the IR Remote app will only have learned remotes" >&2
+fi
+
 # Overrides: settings files that belong to another Debian package, so ours
 # can't ship them in place. The package's postinst copies this tree over /.
 #   earlyoom: what to kill first when memory runs out (docs/PERFORMANCE.md)

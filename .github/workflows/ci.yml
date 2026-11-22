@@ -19,6 +19,8 @@ jobs:
         run: cmake -S shell -B build/sim -DZS_BACKEND=sim && cmake --build build/sim -j"$(nproc)"
       - name: Build headless
         run: cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/headless -j"$(nproc)"
+      - name: Unit tests
+        run: ctest --test-dir build/headless --output-on-failure
       - name: Render every screen (fails if any app crashes)
         run: shell/tools/screenshots.sh build/headless/zeroshell build/screenshots
       - uses: actions/upload-artifact@v4
