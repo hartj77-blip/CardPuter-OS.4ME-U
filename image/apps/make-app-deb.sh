@@ -25,7 +25,7 @@ case "$VERSION" in [0-9]*) ;; *) echo "error: version '$VERSION' must start with
 [ $# -gt 0 ] || { echo "error: no module for $ID" >&2; exit 1; }
 
 # What a .pkg sets (it is a bash fragment from this repository).
-NAME="" SUMMARY="" DEPENDS="" NEEDS="" ENABLE="" STOP_ON_REMOVE="" DISABLE_DEPS=""
+NAME="" SUMMARY="" DEPENDS="" NEEDS="" ENABLE="" STOP_ON_REMOVE="" DISABLE_DEPS="" HOMEPAGE=""
 EXTRA_FILE="" EXTRA_URL="" EXTRA_SHA256=""
 payload() { :; }
 # shellcheck disable=SC1090
@@ -58,7 +58,7 @@ Section: misc
 Priority: optional
 Depends: $deps
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
-Homepage: https://github.com/hartj77-blip/cardputer-zero
+Homepage: ${HOMEPAGE:-https://github.com/hartj77-blip/cardputer-zero}
 Description: $NAME for ZeroOS
  $SUMMARY
  Installed by the Apps app (zeroos-apps).
