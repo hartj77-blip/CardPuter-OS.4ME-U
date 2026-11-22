@@ -26,6 +26,7 @@ App	Description
 IR Remote	Control TVs, projectors, audio equipment, air conditioners and lights. Includes around 2,000 remote profiles and the ability to learn buttons from your own remotes
 Media	Music player, Jellyfin streaming and voice recordings
 Notes	Simple text notes
+ZClaw	AI assistant in your pocket. Chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key
 Remote	Tailscale support for connecting to other devices, SSH, remote desktop and file sharing
 Sync	Sync notes, documents and recordings with your PC or phone using Syncthing
 Tether	Connect to the internet through your phone using Wi-Fi, USB or Bluetooth
@@ -78,6 +79,7 @@ Remote – Tailscale, SSH and file sharing
 Sync – Syncing notes and files
 Tether – Connecting through your phone
 Media and Jellyfin – Playing music from a Jellyfin server
+ZClaw – The AI assistant: providers, API keys and local models
 Car – Using ZeroOS for music in the car
 Camera – Photos and QR codes
 Dock – Using the desktop on an external monitor
