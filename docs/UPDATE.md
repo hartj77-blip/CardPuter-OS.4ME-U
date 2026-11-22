@@ -5,10 +5,6 @@ matter how the Cardputer is online: Wi-Fi, the built-in Ethernet port, a
 tethered phone or Tailscale. A PC on the same network can also push a build
 straight to it.
 
-![Update found](screenshots/56-update-available.png)
-![Downloading](screenshots/57-update-downloading.png)
-![Done](screenshots/58-update-done.png)
-
 ## On the device
 
 Open **Update** (or **Settings > Software update**). It looks for a newer

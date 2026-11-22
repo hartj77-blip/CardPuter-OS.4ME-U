@@ -10,9 +10,6 @@ Tailscale, Sync brings Syncthing, Camera brings libcamera and M5Stack's camera p
 meshtasticd, GPS brings gpsd. Removing an app takes its extras away again, unless another app still
 needs them.
 
-![The Apps app](screenshots/70-apps.png) ![An app](screenshots/71-apps-details.png)
-![Installing](screenshots/72-apps-installing.png) ![Sources](screenshots/73-apps-sources.png)
-
 ## Using it
 
 Open **Apps** (it's in the dock). It looks for new apps when its list is more than 6 hours old.

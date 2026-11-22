@@ -4,8 +4,6 @@ The Cardputer Zero has an IR LED and an IR receiver. The **IR Remote** app turns
 universal remote for TVs, projectors, sound bars, air conditioners, fans and LED lights, using the
 codes of about 2,000 real remotes from [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB).
 
-![Universal remote](screenshots/59-ir-universal.png) ![Stopped on a code](screenshots/61-ir-universal-stopped.png)
-
 ## Using it
 
 The app opens on three lists.
