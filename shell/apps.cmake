@@ -25,3 +25,23 @@ zs_app(sysmon   "System"    ZS_ICON_GAUGE        0x5e6c7b make_sysmon_app   SOUR
 zs_app(settings "Settings"  LV_SYMBOL_SETTINGS   0x77767b make_settings_app SOURCES src/apps/settings.cpp BASE)
 zs_app(update   "Update"    LV_SYMBOL_DOWNLOAD   0xc66a00 make_update_app   SOURCES src/apps/update.cpp BASE)
 zs_app(apps     "Apps"      ZS_ICON_GRID         0x9141ac make_store_app    SOURCES src/apps/store.cpp BASE)
+
+# Dev Tools: one installable pack (module "dev", docs/DEV.md). Write, run and
+# ship code from the keyboard: projects, REPLs, Git and a serial monitor.
+# The shared plumbing (apps/kit, apps/dev/dev.cpp) is listed once, on the
+# first app. Order 300..330: after the base apps and Net Tools.
+zs_app(code     "Code"      LV_SYMBOL_EDIT     0x2a7bde make_code_app     MODULE dev ORDER 300
+       SOURCES src/apps/dev/code.cpp src/apps/dev/dev.cpp
+               src/apps/kit/run.cpp src/apps/kit/ui.cpp)
+zs_app(repl     "REPL"      LV_SYMBOL_KEYBOARD 0x3a8f5c make_repl_app     MODULE dev ORDER 310
+       SOURCES src/apps/dev/repl.cpp)
+zs_app(git      "Git"       LV_SYMBOL_SHUFFLE  0xf05033 make_git_app      MODULE dev ORDER 320
+       SOURCES src/apps/dev/git.cpp)
+zs_app(serial   "Serial"    LV_SYMBOL_USB      0x8a5cd6 make_serial_app   MODULE dev ORDER 330
+       SOURCES src/apps/dev/serial.cpp)
+
+# Games: one installable app (module "games", docs/GAMES.md) that plays games
+# for classic consoles with libretro cores, on the built-in screen.
+zs_app(games    "Games"     LV_SYMBOL_PLAY     0xd9480f make_games_app    ORDER 400
+       SOURCES src/apps/games/games.cpp src/apps/games/emu.cpp src/apps/games/pad.cpp
+               src/apps/games/systems.cpp src/apps/kit/run.cpp src/apps/kit/ui.cpp)

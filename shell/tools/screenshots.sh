@@ -19,6 +19,15 @@ python3 -I "$ROOT/tools/irdb/build_irdb.py" --src "$ROOT/tools/irdb/sample" --ou
 mkdir -p "$DEMO/IR"
 cp "$DEMO/irdb/TVs/Samsung/Samsung_TV.ir" "$DEMO/IR/Living room TV.ir"
 export ZEROOS_IR_DB="$DEMO/irdb"
+# Dev Tools: a project that is a Git repository. Games: the test-pattern
+# core built next to the binary (tests/games/testcore.c), a game for it, and
+# a game for a console with no core yet.
+mkdir -p "$DEMO/Code/weather-station/.git" "$DEMO/Games/test" "$DEMO/Games/gba"
+printf 'import time\nprint("Hello from the weather station")\n' > "$DEMO/Code/weather-station/main.py"
+echo "# Weather station" > "$DEMO/Code/weather-station/README.md"
+echo test > "$DEMO/Games/test/Test pattern.zstest"
+echo homebrew > "$DEMO/Games/gba/Homebrew demo.gba"
+export ZS_GAMES_CORES="$(dirname "$BIN")/test-cores"
 # ZClaw answers without a network or an API key.
 export ZEROOS_ZCLAW_FAKE="Four. Two plus two is 4 in every number base above 4."
 
@@ -96,5 +105,20 @@ STEPS+=",esc,key:s,wait:300,shot:73-apps-sources.ppm"
 STEPS+=",down,down,enter,wait:300,type:someone/cardputer-apps,shot:74-apps-add-source.ppm,esc,esc"
 STEPS+=",open:zclaw,wait:300,shot:75-zclaw-settings.ppm,enter,wait:300,shot:76-zclaw-providers.ppm"
 STEPS+=",esc,wait:200,tab,wait:300,type:What is 2+2?,enter,wait:800,shot:77-zclaw-chat.ppm"
+STEPS+=",open:code,wait:300,shot:80-code-projects.ppm"
+STEPS+=",enter,wait:300,shot:81-code-files.ppm"
+STEPS+=",home,open:code,key:n,wait:200,type:blink,enter,wait:300,shot:82-code-templates.ppm"
+STEPS+=",down,enter,wait:300,shot:83-code-new-c.ppm"
+STEPS+=",open:repl,wait:300,shot:84-repl.ppm"
+STEPS+=",open:git,wait:300,shot:85-git.ppm"
+STEPS+=",down,enter,wait:1000,shot:86-git-status.ppm"
+STEPS+=",key:l,wait:1000,shot:87-git-log.ppm"
+STEPS+=",open:serial,wait:300,shot:88-serial-ports.ppm"
+STEPS+=",enter,wait:4500,shot:89-serial-monitor.ppm,esc"
+STEPS+=",open:games,wait:300,shot:90-games.ppm"
+STEPS+=",down,enter,wait:300,shot:91-games-list.ppm"
+STEPS+=",enter,wait:1000,key:d,key:d,wait:300,shot:92-games-playing.ppm"
+STEPS+=",esc,wait:300,shot:93-games-menu.ppm"
+STEPS+=",down,down,down,down,enter,wait:500,key:c,wait:300,shot:94-games-cores.ppm,esc,esc"
 (cd "$OUT" && HOME="$DEMO" TZ=UTC "$BIN" --script "$STEPS")
 python3 "$HERE/ppm2png.py" "$OUT"

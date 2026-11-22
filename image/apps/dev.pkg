@@ -1,0 +1,9 @@
+# Dev Tools (docs/DEV.md): one pack, four apps — Code, REPL, Git and Serial —
+# for writing, running and shipping code from the keyboard.
+NAME="Dev Tools"
+SUMMARY="Projects with one-key run, micro editor, REPLs, Git and a serial monitor"
+# git (Git, new projects), micro (the editor Code opens files in), make + gcc +
+# libc6-dev (C projects), lua5.4, bc, sqlite3 (REPL). python3 is in the base
+# image; naming it keeps the pack self-contained. Node.js, Go and Rust are
+# big: REPL and Code say how to add them (apt) when a project needs one.
+DEPENDS="git, micro, make, gcc, libc6-dev, python3, lua5.4, bc, sqlite3"

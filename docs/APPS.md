@@ -3,7 +3,8 @@
 ZeroOS itself is small: it comes with **Apps**, **Settings**, **Update** and **Wi-Fi**, which are
 what a device needs to get online, update itself and install apps. Everything else is an app you
 install from the **Apps** app, downloaded from GitHub: Battery, Camera, Car, Clock, Compass, Dock,
-Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal, Tether and ZClaw.
+Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal, Tether and ZClaw, the
+[Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Games](GAMES.md).
 
 Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
 with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**

@@ -116,4 +116,10 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(zclaw_test PRIVATE src)
   target_compile_options(zclaw_test PRIVATE -Wall -Wextra)
   add_test(NAME zclaw_test COMMAND zclaw_test)
+  # A test-pattern libretro core for the Games app (tests/games/testcore.c):
+  # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
+  add_library(zstest_libretro MODULE tests/games/testcore.c)
+  set_target_properties(zstest_libretro PROPERTIES PREFIX "" C_VISIBILITY_PRESET hidden
+                        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test-cores")
+  target_link_libraries(zstest_libretro PRIVATE m)
 endif()
