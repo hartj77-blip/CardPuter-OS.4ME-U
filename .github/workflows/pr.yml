@@ -1,0 +1,13 @@
+name: Pull request
+
+# Runs all of CI on every pull request. It calls ci.yml from a job named "ci"
+# so the checks are reported as "ci / <job name>", the same names a release
+# uses. The rule on main requires those names before a pull request can merge,
+# so do not rename this job or the jobs in ci.yml without updating the rule
+# (Settings > Rules > Rulesets).
+on:
+  pull_request:
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
