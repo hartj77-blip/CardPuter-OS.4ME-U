@@ -83,7 +83,7 @@ struct MockJob {
 MockJob g_job;
 Status g_mock_status;
 std::map<std::string, std::string> g_mock_installed;   // id -> version
-std::vector<std::string> g_mock_sources = {"hartj77-blip/CardPuter-OS.4ME-U", "hartj77-blip/cardputer-zero-rf"};
+std::vector<std::string> g_mock_sources = {"hartj77-blip/CardPuter-OS.4ME-U"};
 bool g_mock_init = false;
 uint32_t g_mock_refreshed = 0;
 
@@ -111,8 +111,6 @@ const MockApp kMockApps[] = {
     {"battery", "Battery", "Time left, power draw and power profile", "", 40, nullptr},
     {"clock", "Clock", "Clock and stopwatch", "", 30, nullptr},
     {"sysmon", "System", "CPU, memory and what uses it", "", 50, nullptr},
-    {"rf", "RF Tools", "Spectrum, Scanner, Aircraft, APRS, FT8 and more for an RTL-SDR dongle",
-     "rtl-sdr, multimon-ng", 1450, "hartj77-blip/cardputer-zero-rf"},
 };
 
 void mock_init() {

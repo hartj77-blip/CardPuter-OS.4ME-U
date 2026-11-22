@@ -19,9 +19,11 @@ python3 -I "$ROOT/tools/irdb/build_irdb.py" --src "$ROOT/tools/irdb/sample" --ou
 mkdir -p "$DEMO/IR"
 cp "$DEMO/irdb/TVs/Samsung/Samsung_TV.ir" "$DEMO/IR/Living room TV.ir"
 export ZEROOS_IR_DB="$DEMO/irdb"
+# ZClaw answers without a network or an API key.
+export ZEROOS_ZCLAW_FAKE="Four. Two plus two is 4 in every number base above 4."
 
 STEPS="shot:01-home.ppm"
-STEPS+=",right,right,right,right,right,right,right,right,right,right,right,right,right,shot:02-home-navigate.ppm"
+STEPS+=",right,right,right,right,right,right,right,right,right,right,right,right,right,right,shot:02-home-navigate.ppm"
 STEPS+=",enter,wait:300,shot:03-compass.ppm"
 STEPS+=",open:battery,shot:04-battery.ppm"
 STEPS+=",open:wifi,shot:05-wifi.ppm"
@@ -99,5 +101,7 @@ STEPS+=",down,down,down,down,enter,wait:300,shot:71-apps-details.ppm"
 STEPS+=",enter,wait:3500,shot:72-apps-installing.ppm,wait:3000"
 STEPS+=",esc,key:s,wait:300,shot:73-apps-sources.ppm"
 STEPS+=",down,down,enter,wait:300,type:someone/cardputer-apps,shot:74-apps-add-source.ppm,esc,esc"
+STEPS+=",open:zclaw,wait:300,shot:75-zclaw-settings.ppm,enter,wait:300,shot:76-zclaw-providers.ppm"
+STEPS+=",esc,wait:200,tab,wait:300,type:What is 2+2?,enter,wait:800,shot:77-zclaw-chat.ppm"
 (cd "$OUT" && HOME="$DEMO" TZ=UTC "$BIN" --script "$STEPS")
 python3 "$HERE/ppm2png.py" "$OUT"

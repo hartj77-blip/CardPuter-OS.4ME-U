@@ -180,7 +180,9 @@ installed_version() {
     dpkg-query -W -f '${db:Status-Abbrev} ${Version}\n' "zeroos-app-$1" 2>/dev/null | awk '$1 == "ii" {print $2}'
 }
 
-# download <url> <out> <size> <sha256>
+# download <url> <out> <size> <sha256>: 0 when the file is here and checks
+# out; 1 (and a message in dl_error) when it couldn't be fetched or was damaged.
+dl_error=""
 download() {
     local url=$1 out=$2 size=$3 sha=$4 pid got pct free
     free=$(df -Pk "$CACHE" | awk 'NR==2 {print $4}')
@@ -197,8 +199,12 @@ download() {
         status downloading "$pct"
         sleep 1
     done 2>/dev/null
-    wait "$pid" || { rm -f -- "${out:?}"; fail "The download stopped. Try again"; }
-    [ "$(sha256sum "$out" | cut -d' ' -f1)" = "$sha" ] || { rm -f -- "${out:?}"; fail "The download was damaged. Try again"; }
+    if ! wait "$pid"; then
+        rm -f -- "${out:?}"; dl_error="The download stopped. Try again"; return 1
+    fi
+    if [ "$(sha256sum "$out" | cut -d' ' -f1)" != "$sha" ]; then
+        rm -f -- "${out:?}"; dl_error="The download was damaged. Try again"; return 1
+    fi
 }
 
 # Some apps need a Debian repository of their own (Remote: Tailscale; Mesh:
@@ -258,14 +264,24 @@ install_debs() {
 }
 
 install_app() {
-    local id=$1 ver file sha size xfile xurl xsha base
+    local id=$1
     [[ $id =~ ^[a-z0-9][a-z0-9-]*$ ]] || fail "No such app: $id"
     [ -s "$CATALOG" ] || refresh || exit 1
+    [ -n "$(field "$id" version)" ] || refresh || exit 1
+    fetch_and_install "$id" && return 0
+    # A source's files live in its newest release, so a saved list from
+    # before that release names files that are gone (a 404). Fetch the
+    # lists again and try once more before giving up.
+    log "$dl_error; fetching the app lists again"
+    refresh || exit 1
+    fetch_and_install "$id" || fail "$dl_error"
+}
+
+# fetch_and_install <id>: download the app the catalog names and install it.
+# 1 if a download failed (dl_error says why); any other failure exits.
+fetch_and_install() {
+    local id=$1 ver file sha size xfile xurl xsha base
     ver=$(field "$id" version)
-    if [ -z "$ver" ]; then
-        refresh || exit 1
-        ver=$(field "$id" version)
-    fi
     [ -n "$ver" ] || fail "No source offers $id"
     file=$(field "$id" file)
     sha=$(field "$id" sha256)
@@ -273,12 +289,12 @@ install_app() {
     base=$(source_url "$(field "$id" source)")
     [ -n "$base" ] || fail "No source offers $id"
     status downloading 0
-    download "$base/$file" "$CACHE/$file" "$size" "$sha"
+    download "$base/$file" "$CACHE/$file" "$size" "$sha" || return 1
     xfile=$(field "$id" extra-file)
     xurl=$(field "$id" extra-url)
     xsha=$(field "$id" extra-sha256)
     if [ -n "$xfile" ]; then
-        download "$xurl" "$CACHE/$xfile" 0 "$xsha"
+        download "$xurl" "$CACHE/$xfile" 0 "$xsha" || { rm -f -- "${CACHE:?}/${file:?}"; return 1; }
         install_debs "$id" "$CACHE/$file" "$CACHE/$xfile"
         rm -f -- "${CACHE:?}/${xfile:?}"
     else
