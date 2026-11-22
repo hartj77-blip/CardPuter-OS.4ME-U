@@ -15,6 +15,8 @@ public:
     void start(lv_indev_t* keypad);
 
     void open_app(const std::string& id);
+    void open_app(const std::string& id, const std::string& arg);
+    std::string take_app_arg();
     void go_home();
     void toast(const std::string& msg);
     void add_focus(lv_obj_t* obj);
@@ -65,6 +67,7 @@ private:
     std::unique_ptr<App> app_;
     std::string app_id_;
     std::string pending_;
+    std::string app_arg_;   // shell_open_app(id, arg): read once by the app
     lv_group_t* group_ = nullptr;
 };
 

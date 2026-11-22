@@ -1,0 +1,3 @@
+NAME="IR Remote"
+SUMMARY="Send and learn infrared remote control codes"
+DEPENDS="v4l-utils, ir-keytable"

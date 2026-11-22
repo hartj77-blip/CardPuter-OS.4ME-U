@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.24)
 project(zeroshell VERSION 0.1.0 LANGUAGES C CXX)
 
 # Backends:
@@ -58,14 +58,34 @@ if(ZS_SDL)
   target_link_libraries(lvgl PUBLIC ${SDL2_LIBRARIES})
 endif()
 
+# Apps: the base OS's own are compiled in; the rest become installable app
+# modules on the device (docs/APPS.md). The simulator, screenshots and the
+# browser build compile every app in.
+if(ZS_BACKEND STREQUAL "device")
+  set(_zs_modules_default ON)
+else()
+  set(_zs_modules_default OFF)
+endif()
+option(ZS_APPS_AS_MODULES "Build the non-base apps as installable modules" ${_zs_modules_default})
+include(cmake/ZeroShellApps.cmake)
+include(apps.cmake)
+
+# The shell itself: everything in src/ except the apps listed in apps.cmake.
 file(GLOB_RECURSE ZS_SOURCES CONFIGURE_DEPENDS src/*.cpp src/fonts/*.c)
+get_property(_zs_ids GLOBAL PROPERTY ZS_APP_IDS)
+foreach(_id ${_zs_ids})
+  get_property(_srcs GLOBAL PROPERTY ZS_APP_${_id}_SOURCES)
+  list(REMOVE_ITEM ZS_SOURCES ${_srcs})
+endforeach()
 add_executable(zeroshell ${ZS_SOURCES})
 target_include_directories(zeroshell PRIVATE src)
 target_compile_definitions(zeroshell PRIVATE
   ZS_VERSION="${PROJECT_VERSION}"
   ZS_BACKEND_NAME="${ZS_BACKEND}")
 target_compile_options(zeroshell PRIVATE -Wall -Wextra -Wno-unused-parameter)
-target_link_libraries(zeroshell PRIVATE lvgl quirc pthread m)
+zs_link_lvgl(zeroshell)
+target_link_libraries(zeroshell PRIVATE quirc pthread m)
+zs_apps_build(zeroshell ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 if(ZS_BACKEND STREQUAL "web")
   if(NOT EMSCRIPTEN)
@@ -80,3 +100,6 @@ if(ZS_BACKEND STREQUAL "web")
 endif()
 
 install(TARGETS zeroshell RUNTIME DESTINATION bin)
+if(ZS_APP_MODULES)
+  install(TARGETS ${ZS_APP_MODULES} LIBRARY DESTINATION lib/zeroos/apps)
+endif()

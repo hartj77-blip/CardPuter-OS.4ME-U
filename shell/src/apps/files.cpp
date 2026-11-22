@@ -17,7 +17,6 @@
 
 namespace zs {
 
-void notes_set_pending_file(const std::string& path);
 
 namespace {
 using namespace theme;
@@ -165,8 +164,11 @@ private:
                 shell_toast("Not a text file");
                 return;
             }
-            notes_set_pending_file(full);
-            shell_open_app("notes");
+            if (!app_find("notes")) {
+                shell_toast("Install Notes from Apps to open text files");
+                return;
+            }
+            shell_open_app("notes", full);
         } else {
             shell_toast("Too large to open (" + human(e.size) + ")");
         }

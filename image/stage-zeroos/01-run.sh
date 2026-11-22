@@ -61,12 +61,10 @@ if [ -f "${ROOTFS_DIR}${KMAP}" ]; then
     echo "KMAP=\"${KMAP}\"" >> "${ROOTFS_DIR}/etc/default/keyboard"
 fi
 
-# Camera: M5Stack's CameraApp (MIT), the one their own image ships, pinned by
-# version and checksum. ZeroShell's Camera app starts it (docs/CAMERA.md).
-CAMERA_DEB_URL=https://github.com/CardputerZero/CameraApp/releases/download/v1.0.4/Camera_1.0.4_m5stack1_arm64.deb
-CAMERA_DEB_SHA256=9fab11fb9a01a481e301bbe4213ef59bcd53386047ef9208683b1d57cab6b280
-curl -fsSL --retry 3 -o "${ROOTFS_DIR}/tmp/camera.deb" "$CAMERA_DEB_URL"
-echo "${CAMERA_DEB_SHA256}  ${ROOTFS_DIR}/tmp/camera.deb" | sha256sum -c -
+# Apps to ship ready-installed (image/build.sh, ZEROOS_APPS): the same
+# packages the Apps app downloads (docs/APPS.md).
+install -d "${ROOTFS_DIR}/tmp/zeroos-apps"
+cp files/apps-preinstall/*.deb "${ROOTFS_DIR}/tmp/zeroos-apps/" 2>/dev/null || true
 
 on_chroot << 'CHROOT'
 set -e
@@ -74,72 +72,15 @@ set -e
 dpkg -i /tmp/zeroos-pkg/zeroos_*.deb
 rm -rf /tmp/zeroos-pkg
 echo "zeroos: package installed: $(dpkg-query -W -f '${Version}' zeroos)"
-# Tailscale from its own repository (not in Debian). Installed but off at
-# boot: ZeroShell starts it when needed (Settings > Tailscale).
-curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
-    -o /usr/share/keyrings/tailscale-archive-keyring.gpg
-curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list \
-    -o /etc/apt/sources.list.d/tailscale.list
-apt-get update -o Acquire::Retries=3
-apt-get install -y -o Acquire::Retries=3 tailscale || { sleep 30; apt-get update; apt-get install -y -o Acquire::Retries=3 tailscale; }
-sed -i 's/^FLAGS=.*/FLAGS="--no-logs-no-support"/' /etc/default/tailscaled
-systemctl disable tailscaled.service
-systemctl enable zeroos-taildrop.service
-# Meshtastic for the Cap LoRa-1262 (docs/EXPANSION.md), also off at boot.
-# The signing key is checked against the fingerprint pinned in build.sh.
-curl -fsSL https://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/Release.key \
-    -o /usr/share/keyrings/meshtastic.asc
-command -v gpg >/dev/null || apt-get install -y -o Acquire::Retries=3 gpg
-mt_fpr=$(gpg --show-keys --with-colons /usr/share/keyrings/meshtastic.asc | awk -F: '$1 == "fpr" {print $10; exit}')
-if [ "$mt_fpr" != "@MESHTASTIC_KEY_FPR@" ]; then
-    echo "zeroos: ERROR: Meshtastic repository key is $mt_fpr, expected @MESHTASTIC_KEY_FPR@" >&2
-    exit 1
-fi
-echo 'deb [signed-by=/usr/share/keyrings/meshtastic.asc] http://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/ /' \
-    > /etc/apt/sources.list.d/meshtastic.list
-# The tested build (pinned in build.sh). The repository keeps only its newest
-# build, so when that has moved on take the newest and say so.
-# openSUSE's mirrors are sometimes mid-sync and serve a truncated .deb
-# ("File has unexpected size"), which failed a whole image build once: retry.
-# Still failing stops the build (Mesh would say it comes with the image)
-# unless ZEROOS_ALLOW_NO_MESH=1.
-meshtastic_ok=
-for try in 1 2 3; do
-    apt-get update -o Acquire::Retries=3 || true
-    mt_want=meshtasticd=@MESHTASTICD_VERSION@
-    if ! apt-cache madison meshtasticd | awk '{print $3}' | grep -qxF '@MESHTASTICD_VERSION@'; then
-        echo "zeroos: WARNING: meshtasticd @MESHTASTICD_VERSION@ is gone from the repository; taking the newest (bump MESHTASTICD_VERSION in build.sh)"
-        mt_want=meshtasticd
-    fi
-    if apt-get install -y -o Acquire::Retries=3 "$mt_want"; then meshtastic_ok=1; break; fi
-    echo "zeroos: meshtasticd install failed (try $try), retrying in 30 s"
-    apt-get clean
-    sleep 30
+# Apps (docs/APPS.md): everything but the base apps is installed from the
+# Apps app. The few chosen for this image (ZEROOS_APPS) go on here, with
+# what they depend on, exactly as zeroos-apps would put them on.
+for deb in /tmp/zeroos-apps/*.deb; do
+    [ -e "$deb" ] || continue
+    ZEROOS_APPS_ZEROSHELL=/usr/bin/zeroshell zeroos-apps install-file "$deb"
+    echo "zeroos: app installed: $(dpkg-deb -f "$deb" Package) $(dpkg-deb -f "$deb" Version)"
 done
-if [ -n "$meshtastic_ok" ]; then
-    systemctl disable meshtasticd.service
-    # Beta channel: don't let "apt upgrade" swap in an untested build.
-    apt-mark hold meshtasticd
-    echo "zeroos: meshtasticd installed (held): $(dpkg-query -W -f '${Version}' meshtasticd)"
-elif [ "@ZEROOS_ALLOW_NO_MESH@" = 1 ]; then
-    echo "zeroos: WARNING: meshtasticd NOT installed (ZEROOS_ALLOW_NO_MESH=1; Mesh app needs: sudo apt install meshtasticd)"
-else
-    echo "zeroos: ERROR: meshtasticd could not be installed after 3 tries (set ZEROOS_ALLOW_NO_MESH=1 to build without it)" >&2
-    exit 1
-fi
-# The camera app and the libraries it names (libcamera, libfmt, cJSON...).
-# If it can't be installed the image is still built: ZeroShell's Camera app
-# then says the camera app is missing.
-if apt-get install -y --no-install-recommends /tmp/camera.deb; then
-    echo "zeroos: camera app installed: $(dpkg-query -W -f '${Version}' camera)"
-else
-    echo "zeroos: WARNING: camera app NOT installed"
-fi
-rm -f /tmp/camera.deb
-# GPS: gpsd starts when a client connects (gpsd.socket) and only reads the
-# receiver while someone watches.
-systemctl enable gpsd.socket
-systemctl disable gpsd.service 2>/dev/null || true
+rm -rf /tmp/zeroos-apps
 # arm64 only: M5 enables armhf too, which doubles apt indexes (owner report).
 dpkg --remove-architecture armhf 2>/dev/null || true
 # nexmon shadows the onboard Wi-Fi driver and has no BCM43439 support.

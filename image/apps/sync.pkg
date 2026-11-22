@@ -1,0 +1,9 @@
+# Sync (docs/SYNC.md): Syncthing for Notes, Documents and Recordings.
+NAME="Sync"
+SUMMARY="Keep Notes, Documents and Recordings the same on your PC and phone"
+DEPENDS="syncthing, python3"
+STOP_ON_REMOVE="syncthing@pi.service"
+payload() {
+    install -D -m 0755 "$F/sync/zeroos-sync" "$D/usr/bin/zeroos-sync"
+    install -D -m 0644 "$F/sync/syncthing-zeroos.conf" "$D/etc/systemd/system/syncthing@.service.d/zeroos.conf"
+}

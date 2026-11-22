@@ -13,11 +13,6 @@
 namespace zs {
 
 namespace {
-std::string g_pending_file;
-}
-void notes_set_pending_file(const std::string& path) { g_pending_file = path; }
-
-namespace {
 using namespace theme;
 
 class NotesApp : public App {
@@ -34,8 +29,9 @@ public:
     }
 
     void build(lv_obj_t* root) override {
-        path_ = g_pending_file.empty() ? default_path() : g_pending_file;
-        g_pending_file.clear();
+        // Files opens a text file here by passing its path.
+        std::string pending = shell_app_arg();
+        path_ = pending.empty() ? default_path() : pending;
 
         std::string name = path_.substr(path_.find_last_of('/') + 1);
         lv_obj_t* t = label(root, name.c_str(), &zs_font_12, kAccent);

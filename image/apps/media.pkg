@@ -1,0 +1,6 @@
+# Media (docs/JELLYFIN.md): music player (mpv, part of ZeroOS for Dock),
+# music from Jellyfin, voice notes (sox records them).
+NAME="Media"
+SUMMARY="Music player, music from a Jellyfin server, voice notes"
+DEPENDS="mpv, sox, libsox-fmt-all"
+NEEDS="sox"

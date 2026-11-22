@@ -27,15 +27,6 @@
 namespace zs {
 
 namespace {
-bool g_scan_first = false;
-}
-// Another app (Tether) asks for the reader, not the viewfinder.
-void camera_open_scanner() {
-    g_scan_first = true;
-    shell_open_app("camera");
-}
-
-namespace {
 using namespace theme;
 
 constexpr int kViewW = 200, kViewH = 150;   // the picture; the rest is the side panel
@@ -143,8 +134,8 @@ public:
             lv_async_call(start_scan_cb, lv_event_get_user_data(e));
         });
 
-        if (g_scan_first) {
-            g_scan_first = false;
+        // Another app (Tether) asks for the reader, not the viewfinder.
+        if (shell_app_arg() == "scan") {
             start_scan();
         } else if (st.installed && st.present) {
             // Picking Camera on the home screen goes straight to the viewfinder.

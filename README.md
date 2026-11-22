@@ -16,19 +16,28 @@ radios, audio, camera, real-time clock, key LEDs and the expansion ports.
 
 | Part | Status |
 | --- | --- |
-| `shell/` ZeroShell: status bar, launcher, 20 apps, toasts, keyboard navigation | Working in the simulator |
+| `shell/` ZeroShell: status bar, launcher, 21 apps (7 built in, the rest installable), toasts, keyboard navigation | Working in the simulator |
+| `image/apps/` installable apps: one package each, and the index the Apps app reads | Built and tested in CI; never run on a device |
 | `shell/src/hal/` hardware layer: simulated (PC) and Linux (device) | Linux side written, not yet tested on hardware |
 | `image/` image builder on M5's open pi-gen, pinned kernel and drivers | Built in CI on every image change |
 | `.github/workflows/` CI: simulator, screenshots, arm64 build, browser build, full SD image | Ready |
 
-Apps: **Terminal** (a real console on the built-in screen, with tmux), **Remote** (Tailscale sign-in by QR
-code, your devices, one-key SSH, remote desktop on a monitor, Taildrop), **Sync** (Notes, Documents and
-Recordings kept the same on your PC and phone with Syncthing), **GPS** (position, saved spots, track recording to GPX) and **Mesh** (Meshtastic
-text messaging over LoRa with the Cap LoRa-1262), **Car** (USB stick mode for a car stereo; Bluetooth audio with the car's play and skip buttons), **Camera** (M5's camera app: viewfinder, photos, gallery; plus a QR code reader that joins Wi-Fi networks; full model only), **Tether** (online through your phone over Wi-Fi, USB or Bluetooth), **Files**, **Notes**, **Media** (music player, music from a Jellyfin server, voice notes), **Wi-Fi**, **IR Remote** (send + learn), **Compass** (with spirit level),
-**Battery** (time left, power draw, power profile), **Clock** (with stopwatch), **Dock** (desktop with web
-browser, video, terminal and files on an HDMI monitor), **System** monitor (CPU and
-where the memory goes), **Settings** (Wi-Fi, Bluetooth, brightness, volume, mute, power profile, screen dimming
-and screen-off, Bluetooth auto-off, restart, shut down), **Update** (a newer ZeroOS over Wi-Fi or Ethernet, no re-flash).
+ZeroOS comes with seven apps: **Apps** (install more, downloaded from GitHub), **Dock** (desktop with web
+browser, video, terminal and files on an HDMI monitor), **Files**, **Settings** (Wi-Fi, Bluetooth, brightness,
+volume, mute, power profile, screen dimming and screen-off, Bluetooth auto-off, restart, shut down),
+**Terminal** (a real console on the built-in screen, with tmux), **Update** (a newer ZeroOS over Wi-Fi or
+Ethernet, no re-flash) and **Wi-Fi**. Everything else is an app you install from **Apps**, and only then
+takes up space ([docs/APPS.md](docs/APPS.md)):
+
+**Remote** (Tailscale sign-in by QR code, your devices, one-key SSH, remote desktop on a monitor, Taildrop),
+**Sync** (Notes, Documents and Recordings kept the same on your PC and phone with Syncthing), **GPS** (position,
+saved spots, track recording to GPX), **Mesh** (Meshtastic text messaging over LoRa with the Cap LoRa-1262),
+**Car** (USB stick mode for a car stereo; Bluetooth audio with the car's play and skip buttons), **Camera**
+(M5's camera app: viewfinder, photos, gallery; plus a QR code reader that joins Wi-Fi networks; full model
+only), **Tether** (online through your phone over Wi-Fi, USB or Bluetooth), **Notes**, **Media** (music player,
+music from a Jellyfin server, voice notes), **IR Remote** (send + learn), **Compass** (with spirit level),
+**Battery** (time left, power draw, power profile), **Clock** (with stopwatch), **System** monitor (CPU and
+where the memory goes), and the radio apps from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
 
 The screen dims after 30 s idle and turns off after 1 minute on battery; the first key only wakes it.
 Placing it face down turns the screen off at once; picking it up turns it back on.
@@ -65,8 +74,9 @@ shell/tools/screenshots.sh build/headless/zeroshell build/screenshots
 ```sh
 sudo apt install g++-aarch64-linux-gnu
 cmake -S shell -B build/device -DZS_BACKEND=device -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/aarch64-linux-gnu.cmake
-cmake --build build/device -j
-image/build.sh build/device/zeroshell        # needs Docker; 1-2 hours
+cmake --build build/device -j                # zeroshell, plus build/device/apps/*.so
+image/apps/build.sh build/device/apps        # the app packages and zeroos-apps.index, in build/apps
+image/build.sh build/device/zeroshell        # needs Docker; 1-2 hours. ZEROOS_APPS="notes media" preinstalls apps
 ```
 
 After the first flash, new versions go on over the network: open **Update** on the device, or push
@@ -80,6 +90,7 @@ first, copy `build/device/zeroshell` over, stop the stock launcher
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the layers fit together
 - [docs/HARDWARE.md](docs/HARDWARE.md): every chip, how Linux exposes it, known issues and our fixes
+- [docs/APPS.md](docs/APPS.md): the Apps app, where apps come from, making an app
 - [docs/UPDATE.md](docs/UPDATE.md): updates over Wi-Fi or Ethernet, pushing a build from a PC, publishing a release
 - [docs/ROADMAP.md](docs/ROADMAP.md): phases and what's next
 - [docs/REMOTE.md](docs/REMOTE.md): Remote mode, Tailscale, Terminal and Taildrop

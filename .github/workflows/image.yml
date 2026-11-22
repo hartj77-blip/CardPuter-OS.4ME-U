@@ -16,6 +16,10 @@ on:
         description: Wi-Fi country code (regulatory domain)
         default: US
         required: true
+      apps:
+        description: Apps to preinstall, space-separated (e.g. "notes media"); empty for the bare OS
+        default: ''
+        required: false
 
 concurrency:
   group: image-${{ github.ref }}
@@ -49,6 +53,8 @@ jobs:
         # package list before the hour-long base build starts.
         run: |
           pkgs=$(grep -v '^#' image/stage-zeroos/*-packages | tr '\n' ' ')
+          # And what each installable app depends on (image/apps/*.pkg).
+          pkgs="$pkgs $(sed -n 's/^DEPENDS="\(.*\)"/\1/p' image/apps/*.pkg | tr ',' '\n' | sed 's/([^)]*)//; s/ //g' | sort -u | tr '\n' ' ')"
           # The same Raspberry Pi archive key pi-gen installs (the old .gpg.key
           # on the archive is SHA-1 signed and rejected by trixie's apt).
           curl -fsSL -o /tmp/rpi.pgp https://raw.githubusercontent.com/CardputerZero/pi-gen/e3b4e323782a59a426b92356248f5bc09a098be1/stage0/00-configure-apt/files/raspberrypi-archive-keyring.pgp
@@ -60,7 +66,7 @@ jobs:
             curl -fsSL https://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/Release.key -o /usr/share/keyrings/meshtastic.asc
             echo 'deb [signed-by=/usr/share/keyrings/meshtastic.asc] http://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/ /' > /etc/apt/sources.list.d/meshtastic.list
             apt-get update -qq
-            apt-get install -s $pkgs tailscale meshtasticd > /tmp/plan.txt
+            apt-get install -s $pkgs > /tmp/plan.txt
             grep -c '^Inst' /tmp/plan.txt"
       - name: Build ZeroShell (arm64)
         run: |
@@ -68,9 +74,13 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/aarch64-linux-gnu.cmake
           cmake --build build/device -j"$(nproc)"
           aarch64-linux-gnu-strip build/device/zeroshell
+          aarch64-linux-gnu-strip --strip-unneeded build/device/apps/*.so
+      - name: Build apps
+        run: image/apps/build.sh build/device/apps build/apps
       - name: Build image
         env:
           WIFI_COUNTRY: ${{ inputs.wifi_country || 'US' }}
+          ZEROOS_APPS: ${{ inputs.apps }}
           PIGEN_NATIVE: 1
         run: image/build.sh build/device/zeroshell
       - name: Image contents check

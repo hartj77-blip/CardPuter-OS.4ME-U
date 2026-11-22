@@ -32,14 +32,49 @@ struct AppInfo {
     const char* symbol;       // LV_SYMBOL_* or ZS_ICON_*
     uint32_t color;           // icon background, 0xRRGGBB
     std::function<std::unique_ptr<App>()> make;
+    int order = 1000;         // place in the app grid (lower first); ties go by name
+    bool builtin = true;      // false: loaded from an installed app module
+    bool base = false;        // part of ZeroOS itself, can't be removed
 };
 
-// Registry, populated by apps/registry.cpp.
+// The apps on this device, in launcher order: the ones built into ZeroShell
+// plus every installed app module (apps/registry.cpp, docs/APPS.md).
 const std::vector<AppInfo>& app_registry();
+// Look for installed or removed app modules again (after the Apps store
+// installs or removes one). Never call it while a module's app is open.
+void app_registry_reload();
+// The entry for an app id, or nullptr if it isn't on this device.
+const AppInfo* app_find(const std::string& id);
+// True if the open app came from a module that has since been replaced
+// on disk (an upgrade): ZeroShell must restart to run the new code.
+bool app_modules_stale();
+
+// ---- App modules --------------------------------------------------------
+// An installable app is a shared library, /usr/lib/zeroos/apps/<id>.so,
+// built against these headers (shell/cmake/ZeroShellApps.cmake does it).
+// It exports zs_app_module(). ZeroShell loads a module only if its abi
+// matches ZS_APP_ABI. Bump ZS_APP_ABI whenever a header an app includes
+// (ui/, hal/, apps/common.h, LVGL or lv_conf.h) changes in a way that
+// breaks already-built modules: the store then offers only matching builds.
+#define ZS_APP_ABI 1
+
+struct AppModule {
+    int abi;                  // ZS_APP_ABI the module was built with
+    const char* id;
+    const char* name;
+    const char* symbol;
+    uint32_t color;
+    int order;
+    std::unique_ptr<App> (*make)();
+};
 
 // Shell services available to apps.
 void shell_toast(const std::string& msg);
 void shell_open_app(const std::string& id);
+// Open an app and hand it a word (for example "scan" opens Camera's QR
+// reader). The app reads it once with shell_app_arg() in build().
+void shell_open_app(const std::string& id, const std::string& arg);
+std::string shell_app_arg();
 void shell_go_home();
 void shell_add_focus(lv_obj_t* obj);   // add widget to the current app's focus group
 void shell_screen_changed();            // power manager: screen dimmed, off or on

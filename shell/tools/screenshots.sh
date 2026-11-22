@@ -72,5 +72,10 @@ STEPS+=",open:gps,wait:7000,key:r,wait:45000,key:x,wait:300,shot:55-gps-track.pp
 STEPS+=",open:update,wait:2500,shot:56-update-available.ppm"
 STEPS+=",enter,wait:4000,shot:57-update-downloading.ppm"
 STEPS+=",wait:8000,shot:58-update-done.ppm"
+STEPS+=",open:apps,wait:600,shot:70-apps.ppm"
+STEPS+=",down,down,down,down,enter,wait:300,shot:71-apps-details.ppm"
+STEPS+=",enter,wait:3500,shot:72-apps-installing.ppm,wait:3000"
+STEPS+=",esc,key:s,wait:300,shot:73-apps-sources.ppm"
+STEPS+=",down,down,enter,wait:300,type:someone/cardputer-apps,shot:74-apps-add-source.ppm,esc,esc"
 (cd "$OUT" && HOME="$DEMO" TZ=UTC "$BIN" --script "$STEPS")
 python3 "$HERE/ppm2png.py" "$OUT"
