@@ -411,7 +411,9 @@ upgrade_all() {
         # apps that no longer exist): give the space back. Everything a
         # restored app needs is still depended on, so it stays.
         keep_extras
-        apt-get autoremove --purge -y >&2 || log "autoremove failed; old extras may be left"
+        # No --purge: nobody asked for this, and purging wipes what the
+        # extras keep (Tailscale's login: the device would leave the tailnet).
+        apt-get autoremove -y >&2 || log "autoremove failed; old extras may be left"
     fi
     app=""
     status done 100 "$n app(s) updated"
