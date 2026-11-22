@@ -277,7 +277,7 @@ void Shell::tick_cb(lv_timer_t* t) {
         mesh_seen = seq;
     }
     static int n = 0;
-    // Terminal closed (exit, or tmux detach with Alt+`) or camera app closed:
+    // Terminal closed (exit, or tmux detach with Ctrl+Q) or camera app closed:
     // take the screen back.
     if (s->handoff_ && lv_tick_elaps(s->handoff_since_) > 1500) {
         // Nobody is looking: don't leave the sensor running with the screen off.

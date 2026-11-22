@@ -1,5 +1,5 @@
 # The Terminal app: tmux on the Linux console (tty3), on the built-in screen.
-# ZeroShell starts this and steps aside; when tmux detaches (Alt+`) or the
+# ZeroShell starts this and steps aside; when tmux detaches (Ctrl+Q) or the
 # last shell exits, we switch back to ZeroShell on tty1. terminal-session
 # starts the tmux server in pi's user manager (pi lingers), outside this
 # service, so sessions and SSH connections survive the service stopping.
