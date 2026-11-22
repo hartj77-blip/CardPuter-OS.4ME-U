@@ -12,8 +12,6 @@ sensors, IR, radios, audio, camera, clock, key lights and the expansion ports).
 >
 > ZeroOS is an unofficial community project. It is not made, endorsed or supported by M5Stack.
 
-![All screens](docs/screenshots/contact-sheet.png)
-
 ## Features
 
 - **Keyboard first.** Arrow keys and Enter for everything, letters jump to apps, Esc goes back.
