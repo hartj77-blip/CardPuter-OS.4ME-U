@@ -200,9 +200,15 @@ std::vector<Entry> mock_catalog() {
 
 std::map<std::string, std::string> installed_packages() {
     std::map<std::string, std::string> out;
-    std::istringstream in(run("dpkg-query -W -f='${Package} ${Version} ${db:Status-Abbrev}\\n' 'zeroos-app-*'"));
-    std::string pkg, ver, st;
-    while (in >> pkg >> ver >> st) {
+    // One line each, status first: a package dpkg only knows the name of
+    // (the zeroos-app-abi-N that zeroos provides) has no version, so reading
+    // word by word would shift every field after it.
+    std::istringstream in(run("dpkg-query -W -f='${db:Status-Abbrev} ${Package} ${Version}\\n' 'zeroos-app-*'"));
+    std::string line;
+    while (std::getline(in, line)) {
+        std::istringstream l(line);
+        std::string st, pkg, ver;
+        if (!(l >> st >> pkg >> ver)) continue;
         // "ii" = installed; anything else (rc: removed, config left) isn't.
         if (st.size() >= 2 && st[1] == 'i' && pkg.rfind("zeroos-app-", 0) == 0) out[pkg.substr(11)] = ver;
     }
