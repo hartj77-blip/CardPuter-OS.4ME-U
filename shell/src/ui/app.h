@@ -50,9 +50,10 @@ const AppInfo* app_find(const std::string& id);
 bool app_modules_stale();
 
 // ---- App modules --------------------------------------------------------
-// An installable app is a shared library, /usr/lib/zeroos/apps/<id>.so,
+// An installable app is a shared library, /usr/lib/zeroos/apps/<name>.so,
 // built against these headers (shell/cmake/ZeroShellApps.cmake does it).
-// It exports zs_app_module(). ZeroShell loads a module only if its abi
+// It exports zs_app_module(), which returns its apps (one or more), ended
+// by an entry whose id is nullptr. ZeroShell loads an app only if its abi
 // matches ZS_APP_ABI. Bump ZS_APP_ABI whenever a header an app includes
 // (ui/, hal/, apps/common.h, LVGL or lv_conf.h) changes in a way that
 // breaks already-built modules: the store then offers only matching builds.

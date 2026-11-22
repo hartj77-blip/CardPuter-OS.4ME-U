@@ -3,12 +3,14 @@
 # -DZS_APPS_AS_MODULES=ON: ZeroShell starts with no apps installed, then
 # loads every module in <build>/apps and opens each app. Fails if a module
 # won't load (a missing symbol, a wrong ABI) or an app crashes.
-#   shell/tools/modules-test.sh <build-dir>
+#   shell/tools/modules-test.sh <build-dir> [app-id...]
+# Without ids, each module's name is taken as its one app's id.
 set -euo pipefail
 B=$(realpath "$1")
 T=$(mktemp -d)
 trap 'rm -rf -- "${T:?}"' EXIT
-ids=$(cd "$B/apps" && ls ./*.so | sed 's|^\./||; s|\.so$||')
+shift
+ids=${*:-$(cd "$B/apps" && ls ./*.so | sed 's|^\./||; s|\.so$||')}
 [ -n "$ids" ] || { echo "FAIL no modules in $B/apps"; exit 1; }
 mkdir -p "$T/empty" "$T/home"
 cd "$T"

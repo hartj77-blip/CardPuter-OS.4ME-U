@@ -3,7 +3,7 @@
 #
 #   include(path/to/shell/cmake/ZeroShellApps.cmake)
 #   zs_app(<id> <name> <icon> <color> <make-function>
-#          SOURCES <file.cpp>... [LIBS <lib>...] [BASE] [ORDER <n>])
+#          SOURCES <file.cpp>... [LIBS <lib>...] [BASE] [ORDER <n>] [MODULE <name>])
 #   ...
 #   zs_apps_build(<zeroshell-target> <shell-src-dir>)
 #   zs_link_lvgl(<zeroshell-target>)
@@ -15,13 +15,18 @@
 # screenshots, the browser build) every app is compiled in.
 # Apps are listed on the home screen in the order zs_app() was called,
 # unless ORDER says otherwise (this repository's apps use 10, 20, 30...).
+# MODULE puts several apps in one module (<name>.so; default: the app's id):
+# apps that share state (one radio connection) must share a module.
 # SOURCES are relative to the file that calls zs_app(). LIBS are linked into
 # the app (static libraries must be built with -fPIC for a module).
 
 set(ZS_SHELL_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 function(zs_app id name icon color make)
-  cmake_parse_arguments(A "BASE" "ORDER" "SOURCES;LIBS" ${ARGN})
+  cmake_parse_arguments(A "BASE" "ORDER;MODULE" "SOURCES;LIBS" ${ARGN})
+  if(NOT A_MODULE)
+    set(A_MODULE "${id}")
+  endif()
   if(NOT id MATCHES "^[a-z0-9][a-z0-9-]*$")
     message(FATAL_ERROR "zs_app: id '${id}' must be lower-case letters, digits and -")
   endif()
@@ -51,6 +56,7 @@ function(zs_app id name icon color make)
   set_property(GLOBAL PROPERTY ZS_APP_${id}_BASE "${A_BASE}")
   set_property(GLOBAL PROPERTY ZS_APP_${id}_SOURCES "${srcs}")
   set_property(GLOBAL PROPERTY ZS_APP_${id}_LIBS "${A_LIBS}")
+  set_property(GLOBAL PROPERTY ZS_APP_${id}_MODULE "${A_MODULE}")
 endfunction()
 
 # Link LVGL into ZeroShell. With app modules, all of it: a module may use a
@@ -96,32 +102,46 @@ function(zs_apps_build target shell_src)
                             "        a.order = ${order};\n        a.base = ${is_base};\n"
                             "        out.push_back(std::move(a));\n    }\n")
     else()
-      set(ZS_ID "${id}")
-      set(ZS_NAME "${name}")
-      set(ZS_ICON "${icon}")
-      set(ZS_COLOR "${color}")
-      set(ZS_MAKE "${make}")
-      set(ZS_ORDER "${order}")
-      configure_file("${ZS_SHELL_CMAKE_DIR}/app_module.cpp.in" "${gen}/module_${id}.cpp" @ONLY)
-      add_library(zsapp_${id} MODULE "${gen}/module_${id}.cpp" ${srcs})
-      set_target_properties(zsapp_${id} PROPERTIES
-        PREFIX "" OUTPUT_NAME "${id}"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/apps")
-      # Everything the module uses (LVGL, the hardware layer, shell services)
-      # comes from the zeroshell binary at load time: compile against the
-      # same headers and settings, link nothing.
-      target_include_directories(zsapp_${id} PRIVATE "${shell_src}"
-        $<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>
-        $<TARGET_PROPERTY:lvgl,INTERFACE_INCLUDE_DIRECTORIES>)
-      target_compile_definitions(zsapp_${id} PRIVATE
-        $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>
-        $<TARGET_PROPERTY:lvgl,INTERFACE_COMPILE_DEFINITIONS>)
-      target_compile_options(zsapp_${id} PRIVATE $<TARGET_PROPERTY:${target},COMPILE_OPTIONS>)
-      if(libs)
-        target_link_libraries(zsapp_${id} PRIVATE ${libs})
+      get_property(mod GLOBAL PROPERTY ZS_APP_${id}_MODULE)
+      if(NOT mod IN_LIST modules)
+        list(APPEND modules ${mod})
+        set(mod_${mod}_decls "")
+        set(mod_${mod}_entries "")
+        set(mod_${mod}_srcs "")
+        set(mod_${mod}_libs "")
       endif()
-      list(APPEND modules zsapp_${id})
+      string(APPEND mod_${mod}_decls "std::unique_ptr<App> ${make}();\n")
+      string(APPEND mod_${mod}_entries "        {ZS_APP_ABI, \"${id}\", \"${name}\", ${icon}, ${color}, ${order}, zs::${make}},\n")
+      list(APPEND mod_${mod}_srcs ${srcs})
+      list(APPEND mod_${mod}_libs ${libs})
     endif()
+  endforeach()
+  set(targets "")
+  foreach(mod ${modules})
+    set(ZS_MODULE "${mod}")
+    set(ZS_DECLS "${mod_${mod}_decls}")
+    set(ZS_ENTRIES "${mod_${mod}_entries}")
+    configure_file("${ZS_SHELL_CMAKE_DIR}/app_module.cpp.in" "${gen}/module_${mod}.cpp" @ONLY)
+    list(REMOVE_DUPLICATES mod_${mod}_srcs)
+    add_library(zsapp_${mod} MODULE "${gen}/module_${mod}.cpp" ${mod_${mod}_srcs})
+    set_target_properties(zsapp_${mod} PROPERTIES
+      PREFIX "" OUTPUT_NAME "${mod}"
+      LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/apps")
+    # Everything the module uses (LVGL, the hardware layer, shell services)
+    # comes from the zeroshell binary at load time: compile against the
+    # same headers and settings, link nothing else.
+    target_include_directories(zsapp_${mod} PRIVATE "${shell_src}"
+      $<TARGET_PROPERTY:${target},INCLUDE_DIRECTORIES>
+      $<TARGET_PROPERTY:lvgl,INTERFACE_INCLUDE_DIRECTORIES>)
+    target_compile_definitions(zsapp_${mod} PRIVATE
+      $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>
+      $<TARGET_PROPERTY:lvgl,INTERFACE_COMPILE_DEFINITIONS>)
+    target_compile_options(zsapp_${mod} PRIVATE $<TARGET_PROPERTY:${target},COMPILE_OPTIONS>)
+    if(mod_${mod}_libs)
+      list(REMOVE_DUPLICATES mod_${mod}_libs)
+      target_link_libraries(zsapp_${mod} PRIVATE ${mod_${mod}_libs})
+    endif()
+    list(APPEND targets zsapp_${mod})
   endforeach()
   file(CONFIGURE OUTPUT "${gen}/builtin_apps.cpp" CONTENT
 "// Generated by ZeroShellApps.cmake: the apps compiled into this binary.
@@ -142,5 +162,5 @@ ${entries}}
     # Modules find the shell's own functions in the binary: export them.
     set_target_properties(${target} PROPERTIES ENABLE_EXPORTS ON)
   endif()
-  set(ZS_APP_MODULES "${modules}" PARENT_SCOPE)
+  set(ZS_APP_MODULES "${targets}" PARENT_SCOPE)
 endfunction()

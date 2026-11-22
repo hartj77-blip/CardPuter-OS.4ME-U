@@ -1,7 +1,7 @@
 // The apps on this device: the ones built into ZeroShell (listed in
 // shell/apps.cmake) plus every installed app module (docs/APPS.md).
 //
-// A module is /usr/lib/zeroos/apps/<id>.so (ZS_APP_DIR overrides the folder).
+// A module is /usr/lib/zeroos/apps/<name>.so, holding one app or several (ZS_APP_DIR overrides the folder).
 // It is loaded once and never unloaded: an open app's code must stay mapped,
 // and dlopen() of a path that is already loaded returns the old copy. So an
 // upgraded module only takes effect after ZeroShell restarts; the Apps store
@@ -67,21 +67,26 @@ const AppModule* load(const std::string& path, const struct stat& st) {
     using Fn = const AppModule* (*)();
     auto fn = reinterpret_cast<Fn>(dlsym(h, "zs_app_module"));
     const AppModule* m = fn ? fn() : nullptr;
-    if (!m) {
+    if (!m || !m->id) {
         l.error = "not a ZeroShell app (no zs_app_module)";
-    } else if (m->abi != ZS_APP_ABI) {
-        l.error = "built for app ABI " + std::to_string(m->abi) + ", this ZeroShell has " + std::to_string(ZS_APP_ABI);
         m = nullptr;
-    } else if (!m->id || !m->name || !m->symbol || !m->make) {
-        l.error = "incomplete zs_app_module";
-        m = nullptr;
+    }
+    for (const AppModule* a = m; a && a->id; ++a) {
+        if (a->abi != ZS_APP_ABI) {
+            l.error = "built for app ABI " + std::to_string(a->abi) + ", this ZeroShell has " + std::to_string(ZS_APP_ABI);
+            m = nullptr;
+        } else if (!a->name || !a->symbol || !a->make) {
+            l.error = "incomplete zs_app_module";
+            m = nullptr;
+        }
     }
     if (!m) {
         std::fprintf(stderr, "zeroshell: app module %s: %s\n", path.c_str(), l.error.c_str());
         return nullptr;   // the handle stays open; it's harmless and tiny
     }
     l.mod = m;
-    std::fprintf(stderr, "zeroshell: loaded app %s from %s\n", m->id, path.c_str());
+    for (const AppModule* a = m; a->id; ++a)
+        std::fprintf(stderr, "zeroshell: loaded app %s from %s\n", a->id, path.c_str());
     return m;
 }
 
@@ -102,14 +107,15 @@ void scan() {
             struct stat st{};
             if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
             const AppModule* m = load(path, st);
-            if (!m) continue;
-            bool taken = false;   // a built-in app wins over a module with its id
-            for (auto& a : g_apps) taken = taken || a.id == m->id;
-            if (taken) continue;
-            AppInfo info{m->id, m->name, m->symbol, m->color, m->make};
-            info.order = m->order;
-            info.builtin = false;
-            g_apps.push_back(std::move(info));
+            for (; m && m->id; ++m) {
+                bool taken = false;   // a built-in app (or one loaded already) wins
+                for (auto& a : g_apps) taken = taken || a.id == m->id;
+                if (taken) continue;
+                AppInfo info{m->id, m->name, m->symbol, m->color, m->make};
+                info.order = m->order;
+                info.builtin = false;
+                g_apps.push_back(std::move(info));
+            }
         }
     }
     std::stable_sort(g_apps.begin(), g_apps.end(), [](const AppInfo& a, const AppInfo& b) {
