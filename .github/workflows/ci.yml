@@ -3,9 +3,8 @@ name: CI
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
-  workflow_call:   # release.yml runs all of CI before it publishes
+  workflow_call:   # pr.yml runs it on pull requests, release.yml before it publishes
 
 jobs:
   screenshots:
