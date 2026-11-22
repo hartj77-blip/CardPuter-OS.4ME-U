@@ -1,0 +1,40 @@
+#!/bin/sh
+# console-on-lcd <tty-number>...: show these Linux consoles on the built-in
+# screen. Run as root before the Terminal app's console is switched to.
+#
+# A console draws on the framebuffer it is mapped to, and that is not always
+# the LCD: with a monitor connected at boot HDMI is fb0, and a card flashed
+# from an older image still boots with fbcon=map:1 while the LCD is now fb0.
+# The console then opens somewhere nobody is looking and the LCD shows
+# nothing. Ask the kernel to put it on the LCD, whichever number that got.
+#
+# ZEROOS_FB_ROOT is for tests: a folder standing in for /.
+R=${ZEROOS_FB_ROOT:-}
+fb=$(readlink "$R/dev/fb_lcd" 2>/dev/null)
+n=${fb##*fb}
+case $n in
+    ''|*[!0-9]*)
+        n=""
+        for c in "$R"/sys/class/graphics/fb[0-9]*/device/of_node/compatible; do
+            [ -r "$c" ] || continue
+            if tr '\0' '\n' < "$c" | grep -q st7789v; then
+                n=${c#"$R"/sys/class/graphics/fb}; n=${n%%/*}
+                break
+            fi
+        done ;;
+esac
+[ -n "$n" ] || { echo "zeroos: console-on-lcd: can't find the LCD's framebuffer" >&2; exit 0; }
+for tty; do
+    case $tty in ''|*[!0-9]*) continue ;; esac
+    if command -v con2fbmap >/dev/null 2>&1; then
+        con2fbmap "$tty" "$n" && continue
+    fi
+    # No con2fbmap (the fbset package) on this card: the same request by hand.
+    python3 - "$tty" "$n" "$R/dev/fb$n" <<'PY' ||
+import fcntl, struct, sys
+with open(sys.argv[3], "rb") as f:
+    fcntl.ioctl(f, 0x4610, struct.pack("II", int(sys.argv[1]), int(sys.argv[2])))   # FBIOPUT_CON2FBMAP
+PY
+        echo "zeroos: console-on-lcd: could not move tty$tty to fb$n" >&2
+done
+exit 0

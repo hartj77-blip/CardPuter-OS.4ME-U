@@ -79,6 +79,29 @@ rm -f "$A/restore"
 ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.2.0 > /dev/null
 [ ! -e "$A/restore" ] && ok "postinst, next update: not again" || bad "postinst, next update: listed them again"
 
+# --- the Terminal's console goes on the LCD ---------------------------------
+# Whichever framebuffer the LCD is (fb1 with a monitor at boot), and with or
+# without con2fbmap on the card.
+C=$ROOT/image/stage-zeroos/files/remote/console-on-lcd
+FB=$T/fbroot
+mkdir -p "$FB/dev" "$FB/sys/class/graphics/fb0/device/of_node" "$FB/sys/class/graphics/fb1/device/of_node" "$T/fbbin"
+printf 'brcm,bcm2835-hdmi\0' > "$FB/sys/class/graphics/fb0/device/of_node/compatible"
+printf 'sitronix,st7789v\0panel-mipi-dbi-spi\0' > "$FB/sys/class/graphics/fb1/device/of_node/compatible"
+printf '#!/bin/sh\necho "$*" >> "%s/con2fb.log"\n' "$T" > "$T/fbbin/con2fbmap"
+chmod +x "$T/fbbin/con2fbmap"
+ln -s fb1 "$FB/dev/fb_lcd"
+PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3
+grep -qx "3 1" "$T/con2fb.log" && ok "console-on-lcd: follows /dev/fb_lcd" || bad "console-on-lcd: $(cat "$T/con2fb.log" 2>&1)"
+rm -f "$FB/dev/fb_lcd" "$T/con2fb.log"
+PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3 x 1
+[ "$(tr '\n' ',' < "$T/con2fb.log")" = "3 1,1 1," ] && ok "console-on-lcd: finds the panel with no /dev/fb_lcd" || bad "console-on-lcd, no link: $(cat "$T/con2fb.log" 2>&1)"
+rm -rf "$FB/sys/class/graphics/fb1" "$T/con2fb.log"
+PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3 2>/dev/null
+[ $? = 0 ] && [ ! -e "$T/con2fb.log" ] && ok "console-on-lcd: no LCD found is not an error" || bad "console-on-lcd: no LCD"
+grep -q '^ExecStartPre=-+/usr/lib/zeroos/console-on-lcd 3$' "$ROOT/image/stage-zeroos/files/remote/zeroos-terminal.service" &&
+    [ -x "$T/x/usr/lib/zeroos/console-on-lcd" ] &&
+    ok "console-on-lcd: in the package and run before the Terminal" || bad "console-on-lcd: not packaged or not run"
+
 # --- the updater ---------------------------------------------------------
 mkdir -p "$T/bin" "$T/run" "$T/state"
 # dpkg: "install" = note the version (or fail for the version in
