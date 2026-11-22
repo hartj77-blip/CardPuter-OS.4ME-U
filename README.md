@@ -67,6 +67,7 @@ image, and can be removed like any other app.
 | IR Remote | Universal remote for TVs, projectors, audio equipment, air conditioners and lights. About 2,000 remotes, and it can learn buttons from your own ([guide](docs/IR.md)) |
 | Media | Music player, Jellyfin streaming and voice recordings ([guide](docs/JELLYFIN.md)) |
 | Notes | Simple text notes |
+| ZClaw | AI assistant. Chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/ZCLAW.md)) |
 | Remote | Tailscale: reach your other devices, SSH, remote desktop and file sharing ([guide](docs/REMOTE.md)) |
 | Sync | Keep notes, documents and recordings in step with your PC and phone using Syncthing ([guide](docs/SYNC.md)) |
 | Tether | Get online through your phone over Wi-Fi, USB or Bluetooth ([guide](docs/TETHER.md)) |
@@ -240,7 +241,7 @@ tools/push-update.sh cardputer.local
 See [Updates](docs/UPDATE.md) for details.
 
 Every change is built and tested by the [CI](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/ci.yml)
-workflow. Tagged versions are published by the
+workflow. A pull request can only be merged into `main` once all five CI checks pass. Tagged versions are published by the
 [Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml) workflow.
 
 ## Security
