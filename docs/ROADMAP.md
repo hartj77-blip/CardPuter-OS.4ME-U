@@ -60,6 +60,23 @@ show time-left estimates in the status bar.
 - Updates over the network (Wi-Fi, Ethernet, tethered phone), with rollback *(done in software; see [UPDATE.md](UPDATE.md))*.
 - Expansion ports for GPS or LoRa modules, with GPS track recording *(done in software; see [EXPANSION.md](EXPANSION.md))*.
 
+## Apps in their own repository
+
+The installable apps are moving to
+[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U), so this repository
+stays the OS. See [APPS.md](APPS.md#where-apps-come-from).
+
+1. **Apps repository publishes the apps, and devices read it first.** *(done in software)* This
+   repository's releases still carry the apps as a fallback.
+2. **Check on a device:** install and update an app from the apps repository.
+3. **New apps land there:** Net Tools, Router, Grove, and RF Tools from cardputer-zero-rf.
+4. **Remove the apps from this repository:** the app code in `shell/src/apps/`, `image/apps/*.pkg`
+   and their docs. The release then stops building apps, and checks that the apps repository has
+   builds for its app level before it publishes. The SD card image takes its preinstalled apps
+   from the apps repository's release.
+5. **Later:** move the app-only parts of the hardware layer (Jellyfin, Meshtastic, the IR code
+   database reader) out of ZeroShell and into their apps, to make ZeroShell smaller.
+
 ## Order of work
 
 1. **Lean base and memory tuning, with real measurements.** *(done in software; measuring waits for the unit)* Includes device bring-up: display, keyboard, battery, Wi-Fi, audio, RTC, IMU and IR working on the unit.

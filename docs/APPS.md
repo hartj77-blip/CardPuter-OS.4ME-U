@@ -2,9 +2,10 @@
 
 ZeroOS itself is small: it comes with **Apps**, **Settings**, **Update** and **Wi-Fi**, which are
 what a device needs to get online, update itself and install apps. Everything else is an app you
-install from the **Apps** app, downloaded from GitHub: Battery, Camera, Car, Clock, Compass, Dock,
-Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal, Tether and ZClaw, the
-[Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Games](GAMES.md).
+install from the **Apps** app, downloaded from the apps repository,
+[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): Battery, Camera, Car,
+Clock, Compass, Dock, Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal,
+Tether and ZClaw, the [Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Games](GAMES.md).
 
 Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
 with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**
@@ -55,11 +56,21 @@ An SD card image can have apps on it from the start: the **Build image** workflo
 ## Where apps come from
 
 A **source** is a GitHub repository whose newest release holds a file called `zeroos-apps.index`
-and the packages it lists. ZeroOS starts with one: this repository. Its releases publish the
-apps built from the same commit as the OS. Any other repository that
-publishes the same files works too: add it in **Apps > S > Add a GitHub repo**, or add a line to
-`/etc/zeroos/apps.sources` (an `owner/repo`, or any `https://` address that serves the index).
-When two sources offer an app with the same name, the one higher in the list wins.
+and the packages it lists. ZeroOS starts with two, in this order:
+
+| Source | What it is |
+| --- | --- |
+| [`hartj77-blip/CardPuter-Apps.4ME-U`](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U) | The apps' own repository. Each app is developed and released there, with its own version. |
+| `hartj77-blip/CardPuter-OS.4ME-U` | This repository. Its releases still carry the apps built from the same commit as the OS, as a fallback while the move is under way. |
+
+When two sources offer an app with the same name, the one higher in the list wins, so apps come
+from the apps repository whenever it has a build for this ZeroOS. A device updated from ZeroOS
+0.3.4 or older gets the apps repository added to its list by the update. The first **U** after
+that updates every installed app once, to the apps repository's builds.
+
+Any other repository that publishes the same files works too: add it in
+**Apps > S > Add a GitHub repo**, or add a line to `/etc/zeroos/apps.sources` (an `owner/repo`,
+or any `https://` address that serves the index).
 
 **Trust.** An app runs with the same access as the home screen, and installing one runs its
 package's scripts as root. The SHA-256 in the index only proves the download is complete; the
@@ -91,27 +102,33 @@ Apps app (ZeroShell)  --systemctl start-->  zeroos-apps@install:media.service  (
 
 ## Making an app
 
-In this repository:
+Apps are made in the apps repository,
+[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): one folder per app,
+with its code, its package description and its docs. Its README shows how to add or change one.
+It builds against this repository (pinned there as `base/`), using three things from here:
 
-1. Write the app in `shell/src/apps/<id>.cpp` (an `App`, as in [ARCHITECTURE.md](ARCHITECTURE.md),
-   with a `make_<id>_app()` factory).
-2. List it in `shell/apps.cmake`: `zs_app(<id> "Name" <icon> <colour> make_<id>_app SOURCES src/apps/<id>.cpp)`.
-   Leave out `BASE` and it becomes an installable app on the device; the simulator and screenshots
-   still build it in.
-3. Describe its package in `image/apps/<id>.pkg`: `NAME`, `SUMMARY`, `DEPENDS` (Debian packages),
-   units to `ENABLE`, and a `payload()` that copies its files. The other `.pkg` files are examples.
+| From this repository | What it is |
+| --- | --- |
+| `shell/src/` headers, `ZS_APP_ABI` in `shell/src/ui/app.h` | What an app is compiled against, and the app level |
+| `shell/cmake/ZeroShellApps.cmake` | `zs_app()` and `zs_apps_build()`, which turn an app into a module |
+| `image/apps/make-app-deb.sh` | Packs a module into `zeroos-app-<id>.deb` and prints its block for the index |
 
-CI builds every module for arm64, loads each one in a headless ZeroShell
-(`shell/tools/modules-test.sh`), builds the packages (`image/apps/build.sh`) and tests the installer
-(`image/tests/apps-test.sh`). A release publishes the packages and `zeroos-apps.index`.
+New apps go there, not here. The apps still in `shell/src/apps/` and `image/apps/` are the
+fallback copies; they will be removed once a device has installed from the apps repository.
+Don't change an app in both places: change it in the apps repository.
 
-In another repository: add this repository as a submodule, include
-`shell/cmake/ZeroShellApps.cmake`, call `zs_app()` for each app and `zs_apps_build()`, then pack
-the modules with `image/apps/make-app-deb.sh`, which prints the app's block for
-`zeroos-apps.index`. Publish the packages and the index in a GitHub release.
+### The app level
 
-Apps must be rebuilt when ZeroOS bumps `ZS_APP_ABI` (a change to the headers apps use). Until
-they are, ZeroShell skips them and the store doesn't offer them.
+Raise `ZS_APP_ABI` in the same pull request as any change that breaks already-built modules: a
+header an app includes (`ui/`, `hal/`, `apps/common.h`), LVGL or `lv_conf.h`. ZeroShell skips
+modules built for another level and the store doesn't offer them.
+
+The apps repository watches this one. It builds every app for the level of the newest ZeroOS
+release, and for the level on `main` when that is different, so the apps for the next ZeroOS are
+published before it is released. Before releasing a ZeroOS that raises the level, check that the
+apps repository's [newest release](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U/releases/latest)
+lists builds for it (its notes say which levels it was built for). If it doesn't yet, run its
+Release workflow by hand.
 
 ## What's not done yet
 

@@ -32,7 +32,8 @@ The [roadmap](docs/ROADMAP.md) lists what is done and what is next.
 - Keyboard navigation. Use the arrow keys and Enter for everything. Press a letter to jump to an
   app, and Esc to go back.
 - Install only what you need. Four apps are part of ZeroOS. Every other app is installed, updated
-  and removed in the Apps app. See the [Apps guide](docs/APPS.md).
+  and removed in the Apps app. See the [Apps guide](docs/APPS.md). The apps have their own
+  repository, [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U).
 - Updates over the air. New versions install from the Update app, with no re-flashing. See
   [Updates](docs/UPDATE.md).
 - Power saving. On battery the screen dims after 30 seconds and turns off after a minute. Placing
@@ -57,7 +58,9 @@ These are part of ZeroOS, so a device can always get online, update itself and i
 ### Installable
 
 Install these from the Apps app. Terminal, Files and Dock are already installed on the SD card
-image, and can be removed like any other app.
+image, and can be removed like any other app. They are developed and released in
+[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U), one folder per app.
+To change an app or add one, go there.
 
 | App | What it does |
 | --- | --- |
@@ -168,7 +171,8 @@ For a full report on memory, CPU and battery use, run `zeroos-measure`. See
 
 ## Guides
 
-- [Apps](docs/APPS.md): installing apps, and making your own
+- [Apps](docs/APPS.md): installing apps, where they come from, and the app level
+- [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): the apps' own repository, for changing an app or making one
 - [Updates](docs/UPDATE.md): updating over the network
 - [IR Remote](docs/IR.md): the universal remote
 - [Remote](docs/REMOTE.md): Tailscale, SSH and file sharing

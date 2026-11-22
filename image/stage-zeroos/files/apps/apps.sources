@@ -4,4 +4,7 @@
 #                     zeroos-apps.index and the packages it lists
 #   https://...       any address that serves zeroos-apps.index the same way
 # Apps run with full access to this device: only add sources you trust.
+# The apps live in their own repository. The OS repository's releases
+# still carry them for now, as a fallback.
+hartj77-blip/CardPuter-Apps.4ME-U
 hartj77-blip/CardPuter-OS.4ME-U

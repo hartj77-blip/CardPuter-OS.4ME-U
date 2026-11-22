@@ -100,6 +100,24 @@ case "${1:-}:${2:-}" in
         mkdir -p "$ROOT/var/lib/zeroos/apps"
         touch "$ROOT/var/lib/zeroos/apps/.restored-builtins" ;;
 esac
+# The installable apps moved to their own repository (docs/APPS.md), which
+# goes first in the list of sources. An update keeps a list that was edited
+# on the device, so add the line here, once: taking it out later sticks.
+S=$ROOT/etc/zeroos/apps.sources
+if [ ! -e "$ROOT/var/lib/zeroos/apps/.apps-repo-added" ]; then
+    NEW=hartj77-blip/CardPuter-Apps.4ME-U
+    if [ -f "$S" ] && ! sed -e 's/#.*//' -e 's/[[:space:]]//g' "$S" | grep -qixF "$NEW"; then
+        awk -v new="$NEW" '
+            !done && !/^[[:space:]]*(#|$)/ { print new; done = 1 }
+            { print }
+            END { if (!done) print new }' "$S" > "$S.zeroos-tmp" &&
+            cat "$S.zeroos-tmp" > "$S"
+        rm -f "$S.zeroos-tmp"
+        echo "zeroos: added $NEW to /etc/zeroos/apps.sources"
+    fi
+    mkdir -p "$ROOT/var/lib/zeroos/apps"
+    touch "$ROOT/var/lib/zeroos/apps/.apps-repo-added"
+fi
 if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
