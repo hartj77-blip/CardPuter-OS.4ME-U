@@ -2,8 +2,9 @@
 
 ZeroOS itself is small: it comes with **Apps**, **Dock**, **Files**, **Settings**, **Terminal**,
 **Update** and **Wi-Fi**. Everything else is an app you install from the **Apps** app, downloaded
-from GitHub: Battery, Camera, Car, Clock, Compass, GPS, IR Remote, Media, Mesh, Notes, Remote,
-Sync, System, Tether, and the RF tools from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
+from GitHub: Battery, Camera, Car, Clock, Compass, GPS, IR Remote, Media, Mesh, Net Tools
+([NET.md](NET.md)), Notes, Remote, Sync, System, Tether, and the RF tools from
+[cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
 
 Each app brings its own extras with it, so the base image doesn't carry them: Remote brings
 Tailscale, Sync brings Syncthing, Camera brings libcamera and M5Stack's camera program, Mesh brings

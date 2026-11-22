@@ -4,16 +4,24 @@
 # loads every module in <build>/apps and opens each app. Fails if a module
 # won't load (a missing symbol, a wrong ABI) or an app crashes.
 #   shell/tools/modules-test.sh <build-dir> [app-id...]
-# Without ids, each module's name is taken as its one app's id.
+# Without ids, the app ids are discovered from the modules themselves, so a
+# pack module that holds several apps (rf.so, net.so) is fully tested.
 set -euo pipefail
 B=$(realpath "$1")
 T=$(mktemp -d)
 trap 'rm -rf -- "${T:?}"' EXIT
 shift
-ids=${*:-$(cd "$B/apps" && ls ./*.so | sed 's|^\./||; s|\.so$||')}
-[ -n "$ids" ] || { echo "FAIL no modules in $B/apps"; exit 1; }
 mkdir -p "$T/empty" "$T/home"
 cd "$T"
+if [ "$#" -gt 0 ]; then
+    ids="$*"
+else
+    # Ask ZeroShell which apps the modules provide (it logs one line per app).
+    HOME=$T/home ZS_APP_DIR=$B/apps "$B/zeroshell" --script "shot:none.ppm,home" > /dev/null 2> "$T/load.err" || {
+        echo "FAIL zeroshell exited while loading modules"; cat "$T/load.err"; exit 1; }
+    ids=$(sed -n 's/^zeroshell: loaded app \([^ ]*\) from .*/\1/p' "$T/load.err" | sort -u | tr '\n' ' ')
+fi
+[ -n "${ids// /}" ] || { echo "FAIL no apps in $B/apps"; exit 1; }
 HOME=$T/home ZS_APP_DIR=$T/empty "$B/zeroshell" --script "shot:none.ppm,open:apps,wait:500,shot:store.ppm" > /dev/null
 echo "ok   starts with no apps installed"
 steps="shot:all.ppm"

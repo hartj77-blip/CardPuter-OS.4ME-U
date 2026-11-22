@@ -1,0 +1,14 @@
+# Net Tools (docs/NET.md): one pack, six apps — Discover, Ports, Trace, DNS,
+# Capture and Netinfo — front-ends for the standard Linux network tools.
+NAME="Net Tools"
+HOMEPAGE=https://github.com/hartj77-blip/CardPuter-OS.4ME-U
+SUMMARY="Discover devices, scan ports, trace routes, DNS, packet capture and interface info"
+# arp-scan + nmap (Discover, Ports), mtr-tiny (Trace), dnsutils (DNS, dig),
+# tcpdump (Capture), iproute2 (Netinfo: ip, ss). iproute2 is in the base image
+# too; naming it here keeps the app self-contained.
+DEPENDS="arp-scan, nmap, mtr-tiny, dnsutils, tcpdump, iproute2"
+payload() {
+    # $F is this repository's image/stage-zeroos/files. Let the UI user run the
+    # root-only tools (arp-scan, tcpdump) through sudo -n with no password.
+    install -D -m 0440 "$F/net/zeroos-net.sudoers" "$D/etc/sudoers.d/zeroos-net"
+}

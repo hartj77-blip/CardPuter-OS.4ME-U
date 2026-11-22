@@ -37,6 +37,7 @@ Compass	Compass and spirit level
 Battery	Battery estimates, power usage and power profiles
 Clock	Clock and stopwatch
 System	CPU and memory usage
+Net Tools	Discover devices on the network, scan ports, trace routes, look up DNS, capture packets and view interface info. Six apps in one pack, over Wi-Fi or the Ethernet port
 
 Additional radio apps are available in cardputer-zero-rf.
 
@@ -75,6 +76,7 @@ Apps – Installing apps and creating your own
 Updates – Updating ZeroOS over the network
 IR Remote – Using the universal remote
 Remote – Tailscale, SSH and file sharing
+Net Tools – Network discovery, scanning and analysis
 Sync – Syncing notes and files
 Tether – Connecting through your phone
 Media and Jellyfin – Playing music from a Jellyfin server

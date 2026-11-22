@@ -1,0 +1,7 @@
+# Installed by the Net Tools app (zeroos-app-net, docs/NET.md).
+# Lets the home-screen user run the few network tools that need root
+# (device discovery and packet capture) without a password prompt, which is
+# how the UI runs them (sudo -n). Removing the app removes this file.
+# nmap (connect scan), mtr, ip, ss, dig need no root and are not listed here.
+Cmnd_Alias ZEROOS_NET = /usr/sbin/arp-scan, /usr/bin/arp-scan, /usr/bin/tcpdump, /usr/sbin/tcpdump
+pi ALL=(root) NOPASSWD: ZEROOS_NET
