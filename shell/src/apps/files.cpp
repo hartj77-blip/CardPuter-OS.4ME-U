@@ -25,6 +25,7 @@ struct Entry {
     std::string name;
     bool dir;
     long long size;
+    bool file;   // a regular file: not a device, pipe or socket
 };
 
 std::string human(long long b) {
@@ -85,7 +86,7 @@ private:
                 struct stat st{};
                 std::string full = cwd_ + (cwd_ == "/" ? "" : "/") + n;
                 if (stat(full.c_str(), &st) != 0) continue;
-                entries_.push_back({n, S_ISDIR(st.st_mode), (long long)st.st_size});
+                entries_.push_back({n, S_ISDIR(st.st_mode), (long long)st.st_size, S_ISREG(st.st_mode) != 0});
             }
             closedir(d);
         }
@@ -124,7 +125,9 @@ private:
     static bool looks_like_text(const std::string& path) {
         std::ifstream f(path, std::ios::binary);
         if (!f) return false;
-        std::string b((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        std::string b(64 * 1024, '\0');
+        f.read(&b[0], std::streamsize(b.size()));
+        b.resize(size_t(f.gcount()));
         for (size_t i = 0; i < b.size();) {
             uint8_t ch = uint8_t(b[i]);
             if (ch == 0) return false;
@@ -150,6 +153,10 @@ private:
         if (e.dir) {
             cwd_ = full;
             refresh();
+        } else if (!e.file) {
+            // A device, pipe or socket (/dev, a FIFO): reading one can block
+            // for ever (a pipe) or never end (/dev/zero), freezing the screen.
+            shell_toast("Not a file");
         } else if (is({".mp4", ".mkv", ".webm", ".mov", ".avi", ".m4v"})) {
             // Video plays on the HDMI monitor in Dock mode.
             if (hal().dock_open("video", full)) shell_toast("Playing on the monitor");

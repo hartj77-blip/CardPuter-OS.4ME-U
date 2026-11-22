@@ -100,7 +100,7 @@ public:
         label(panel, (std::string(ZS_ICON_CAMERA "  ") + head).c_str(), &zs_font_16,
               st.installed && st.present ? kGood : kWarn);
         const char* help = !st.installed
-                               ? "This image was built without the camera\napp. See docs/CAMERA.md."
+                               ? "M5Stack's camera program is missing:\nreinstall Camera in Apps."
                            : st.present
                                ? "Enter takes a photo. H shows every key\n(zoom, pan, gallery). Hold 4 for a second\n"
                                  "to come back here."

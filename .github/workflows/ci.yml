@@ -52,11 +52,49 @@ jobs:
         run: |
           gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
           python3 shell/tests/device/device_test.py build/device-native/zeroshell build/fakedev.so build/device-screens
+      # Every app on the home screen, opened with the keyboard: once with the
+      # simulated hardware, once with the device's own hardware layer on a
+      # machine with no Cardputer hardware and none of the apps' extras.
+      - name: Open every app with the keyboard, with and without hardware
+        run: python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so build/device-screens/apps
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: device-test-screens
           path: build/device-screens
+
+  apps-install:
+    name: Install every app for real (Debian trixie arm64)
+    runs-on: ubuntu-24.04-arm
+    # What the Cardputer runs (Raspberry Pi OS is trixie plus Raspberry Pi's
+    # repository), with the real apt: every app installs with what it
+    # depends on, side by side, and removes cleanly.
+    container: debian:trixie
+    steps:
+      - name: Install tools
+        run: |
+          apt-get update -qq
+          apt-get install -y -qq git ca-certificates curl gpg cmake g++ dpkg-dev python3 file >/dev/null
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # image/version.sh counts commits since the last tag
+      - name: Add Raspberry Pi's repository (as on the device)
+        run: |
+          git config --global --add safe.directory "$PWD"
+          # The same key pi-gen installs (image/build.sh pins that commit).
+          curl -fsSL -o /usr/share/keyrings/raspberrypi-archive-keyring.pgp \
+            https://raw.githubusercontent.com/CardputerZero/pi-gen/e3b4e323782a59a426b92356248f5bc09a098be1/stage0/00-configure-apt/files/raspberrypi-archive-keyring.pgp
+          echo 'deb [signed-by=/usr/share/keyrings/raspberrypi-archive-keyring.pgp] http://archive.raspberrypi.com/debian trixie main' \
+            > /etc/apt/sources.list.d/raspi.list
+          apt-get update -qq
+      - name: Build ZeroShell and the app modules
+        run: |
+          cmake -S shell -B build/device -DZS_BACKEND=device
+          cmake --build build/device -j"$(nproc)"
+      - name: Package the apps
+        run: image/apps/build.sh build/device/apps build/apps
+      - name: Install, then remove, every app
+        run: image/tests/apps-install-test.sh build/apps build/device/zeroshell
 
   web:
     name: Browser simulator (WebAssembly)
