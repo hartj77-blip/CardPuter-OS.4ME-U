@@ -2,14 +2,15 @@
 // sessions (and SSH connections) keep running when you go back. Alt+` (tmux
 // detach) or `exit` returns to ZeroShell. In the simulator, a stand-in shows
 // what would run.
+//
+// Other apps open it with shell_open_app("terminal", "<command>") to run a
+// command in a new tmux window (Remote: "ssh desktop"); "shell" opens a shell.
 #include "apps/common.h"
-#include "ui/remote.h"
 
 namespace zs {
 
 namespace {
 using namespace theme;
-std::string g_pending;   // command for the next open, set by terminal_run()
 
 class TerminalApp : public App {
 public:
@@ -43,11 +44,8 @@ public:
         }, LV_EVENT_CLICKED, this);
         shell_add_focus(b);
 
-        if (!g_pending.empty()) {
-            std::string cmd;
-            cmd.swap(g_pending);
-            open(cmd == " " ? "" : cmd);
-        }
+        std::string cmd = shell_app_arg();
+        if (!cmd.empty()) open(cmd == "shell" ? "" : cmd);
     }
 
     bool on_back() override {
@@ -97,13 +95,6 @@ private:
     lv_obj_t* fake_ = nullptr;
 };
 }  // namespace
-
-// Open the Terminal app and run cmd in it ("" = a shell).
-void terminal_run(const std::string& cmd) {
-    g_pending = cmd.empty() ? " " : cmd;
-    remote_note_use();
-    shell_open_app("terminal");
-}
 
 std::unique_ptr<App> make_terminal_app() { return std::make_unique<TerminalApp>(); }
 

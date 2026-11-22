@@ -5,24 +5,27 @@ ZeroOS is a Linux-based OS built for the M5Stack Cardputer Zero. It comes with a
 ZeroOS is an unofficial community project. It is not made, endorsed or supported by M5Stack.
 Features
 Keyboard navigation: Use the arrow keys and Enter to navigate. Press a letter to jump to an app, or Esc to go back.
-App management: Seven apps are included by default. More can be installed through the Apps app.
+App management: Four apps are part of ZeroOS itself; every other app is installed, updated and removed through the Apps app. The SD card image comes with Terminal, Files and Dock already installed.
 Over-the-air updates: Update ZeroOS directly from the device without re-flashing the SD card.
 Power saving: The screen dims after 30 seconds and turns off after a minute when running on battery. Turning the device face down switches the screen off, and picking it up wakes it again.
 HDMI desktop: Connect an external monitor to use the desktop environment, which includes a browser, video player, terminal and file manager.
 Built-in apps
+
+These are part of ZeroOS, so a device can always get online, update itself and install apps.
+
 App	Description
 Apps	Browse and install additional apps
-Dock	Desktop environment for HDMI displays, with a browser, video player, terminal and file manager
-Files	Browse files stored on the device
 Settings	Configure Wi-Fi, Bluetooth, brightness, volume and power saving. Also includes restart and shutdown options
-Terminal	Linux terminal on the Cardputer's built-in display
 Update	Download and install ZeroOS updates over the network
 Wi-Fi	Scan for and connect to wireless networks
 Installable apps
 
-These apps can be installed from the Apps app.
+These apps can be installed from the Apps app. Terminal, Files and Dock come preinstalled on the SD card image, and can be removed like any other app.
 
 App	Description
+Terminal	Linux terminal on the Cardputer's built-in display
+Files	Browse files stored on the device
+Dock	Desktop environment for HDMI displays, with a browser, video player, terminal and file manager
 IR Remote	Control TVs, projectors, audio equipment, air conditioners and lights. Includes around 2,000 remote profiles and the ability to learn buttons from your own remotes
 Media	Music player, Jellyfin streaming and voice recordings
 Notes	Simple text notes
