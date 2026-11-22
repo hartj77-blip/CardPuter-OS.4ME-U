@@ -1564,7 +1564,17 @@ private:
         std::string info = run("bluetoothctl info " + address);
         if (info.find("Paired: yes") == std::string::npos) {
             // "Just works" pairing: nothing to type here; the car may ask you to confirm.
-            std::string out = run("bluetoothctl --agent=NoInputNoOutput --timeout 25 pair " + address);
+            // bluetoothctl --agent can't answer a prompt, and gamepads (Xbox)
+            // ask "Accept pairing?": with no default agent to say yes, BlueZ
+            // refuses ("No agent available") and they connect unpaired, then
+            // drop. So drive it interactively: register the default agent,
+            // pair, and say yes to whatever it asks until it's paired.
+            std::string out = run(
+                "{ sleep 1; echo 'agent NoInputNoOutput'; sleep 1; echo default-agent; sleep 1; "
+                "echo 'pair " + address + "'; "
+                "for i in $(seq 1 13); do sleep 2; echo yes; "
+                "bluetoothctl info " + address + " | grep -q 'Paired: yes' && break; done; "
+                "echo quit; } | bluetoothctl 2>&1");
             if (out.find("Pairing successful") == std::string::npos &&
                 run("bluetoothctl info " + address).find("Paired: yes") == std::string::npos) {
                 error = "Pairing failed. Is it in pairing mode?";
