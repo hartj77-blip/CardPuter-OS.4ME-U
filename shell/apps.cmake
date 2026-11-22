@@ -8,6 +8,7 @@ zs_app(remote   "Remote"    ZS_ICON_NETWORK      0x0e8a9e make_remote_app   SOUR
 zs_app(sync     "Sync"      ZS_ICON_SYNC         0x7764d8 make_sync_app     SOURCES src/apps/sync.cpp)
 zs_app(files    "Files"     LV_SYMBOL_DIRECTORY  0xe95420 make_files_app    SOURCES src/apps/files.cpp)
 zs_app(notes    "Notes"     ZS_ICON_NOTE         0xe0a100 make_notes_app    SOURCES src/apps/notes.cpp)
+zs_app(zclaw    "ZClaw"     ZS_ICON_CHIP         0xd97757 make_zclaw_app    SOURCES src/apps/zclaw.cpp src/apps/zclaw/ai.cpp)
 zs_app(media    "Media"     LV_SYMBOL_AUDIO      0xd6336c make_media_app    SOURCES src/apps/media.cpp)
 zs_app(camera   "Camera"    ZS_ICON_CAMERA       0x2f6f8f make_camera_app   SOURCES src/apps/camera.cpp)
 zs_app(car      "Car"       ZS_ICON_CAR          0x1e88a8 make_car_app      SOURCES src/apps/car.cpp)
