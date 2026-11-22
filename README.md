@@ -12,6 +12,22 @@ radios, audio, camera, real-time clock, key LEDs and the expansion ports.
 
 *Every screen above is rendered by CI from the real UI code at 320x170, shown at 2x.*
 
+## Install
+
+1. Download the newest image:
+   [zeroos-cardputerzero-arm64.img.xz](https://github.com/hartj77-blip/cardputer-zero/releases/latest/download/zeroos-cardputerzero-arm64.img.xz)
+   (about 1.5 GB; checksum in the `.sha256` file next to it on the
+   [releases page](https://github.com/hartj77-blip/cardputer-zero/releases/latest)).
+2. Write it to a microSD card with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
+   (*Choose OS > Use custom*) or [balenaEtcher](https://etcher.balena.io/). Either takes the `.img.xz` as is.
+3. Put the card in the Cardputer Zero and switch it on. The first boot takes a few minutes.
+
+Login for SSH and the console: `pi` / `raspberry` at `cardputer.local`; change the password with `passwd`.
+After that, new versions arrive over the network with the **Update** app, no re-flash needed.
+
+Every release gets an image: the Release workflow builds it after publishing the update package
+(1.5-3 hours later), so the link above can trail a new release by that long.
+
 ## What's here (Phase 0)
 
 | Part | Status |

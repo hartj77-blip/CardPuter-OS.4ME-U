@@ -3,7 +3,8 @@ name: Release
 # Pushing a tag like v0.2.0 publishes that version as an update: the zeroos
 # package and its manifest become a GitHub release, which is where
 # zeroos-update on the device looks (docs/UPDATE.md).
-# The SD card image is separate: run "Build image" for a fresh one.
+# The SD card image is built afterwards (1.5-3 hours) and attached to the same
+# release as zeroos-cardputerzero-arm64.img.xz; the update is live before that.
 # Nothing is published unless all of CI (simulator, screenshots, browser
 # build, device build, update tests) passes on the tagged commit first.
 # A tag with a "-" (v0.3.0-rc1) becomes a pre-release: devices only take
@@ -50,3 +51,9 @@ jobs:
           case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease --latest=false) ;; esac
           gh release create "$GITHUB_REF_NAME" build/update/zeroos_*.deb build/update/zeroos-update.manifest \
             --title "ZeroOS ${GITHUB_REF_NAME#v}" --generate-notes "${pre[@]}"
+
+  image:
+    needs: release
+    uses: ./.github/workflows/image.yml
+    with:
+      release_tag: ${{ github.ref_name }}

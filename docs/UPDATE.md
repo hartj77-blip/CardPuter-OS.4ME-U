@@ -68,6 +68,13 @@ publishes a GitHub release with two files: `zeroos_0.2.0_arm64.deb` and
 `zeroos-update.manifest`. Devices look at the newest release, so they see it
 the next time someone opens **Update**. The tag is the version.
 
+The SD card image follows: once the release exists, the same workflow builds
+the full image (1.5-3 hours) and attaches it to the release as
+`zeroos-cardputerzero-arm64.img.xz` with a `.sha256`, so the README's download
+link always gives new users the newest version. To attach an image to a
+release by hand (or replace one), run **Build image** from the Actions tab with
+that release's tag in *release_tag*.
+
 It first runs all of CI on the tagged commit (simulator, screenshots, browser
 build, device build, update tests) and publishes nothing if any of it fails.
 A tag with a `-`, such as `v0.3.0-rc1`, is published as a pre-release:
@@ -116,7 +123,9 @@ An update replaces ZeroOS's own files. It does not touch:
 - A release that needs a new Debian package says so in its notes; until
   then the feature that needs it reports that the tool is missing.
 
-For those, flash a new image from the **Build image** workflow.
+For those, flash a new image: the newest is always at
+[releases/latest](https://github.com/hartj77-blip/cardputer-zero/releases/latest)
+(see the README's Install section), or run the **Build image** workflow.
 
 ## Trust
 
