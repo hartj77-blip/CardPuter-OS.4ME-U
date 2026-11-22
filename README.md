@@ -98,7 +98,8 @@ and then use the Update app.
 
 There are two ways to get online:
 
-- On the device: open the Wi-Fi app, pick your network and type the password.
+- On the device: open the Wi-Fi app, pick your network and type the password. The password shows
+  as you type it, Backspace deletes, and Enter connects.
 - Before the first start: in Raspberry Pi Imager, fill in your Wi-Fi name and password in the
   settings it offers before writing the card. ZeroOS applies them on the first boot.
 
@@ -170,6 +171,7 @@ For developers:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Hardware notes](docs/HARDWARE.md)
+- [Hardware test checklist](docs/HARDWARE-TEST.md): one line per app to try on a real Cardputer
 - [Roadmap](docs/ROADMAP.md)
 
 ## Run it on a PC
@@ -190,6 +192,20 @@ There is also a browser version (WebAssembly). Building it needs [Emscripten](ht
 ```sh
 web/build.sh build/zeroos-simulator.html
 ```
+
+## Tests
+
+Every pull request opens each app with the keyboard, with and without hardware, and installs each
+app with `apt` on Debian arm64. To run the keyboard tests on Linux:
+
+```sh
+cmake -S shell -B build/device-native -DZS_BACKEND=device && cmake --build build/device-native -j
+gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
+python3 shell/tests/device/device_test.py build/device-native/zeroshell build/fakedev.so
+python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so
+```
+
+To check a real Cardputer by hand, use the [hardware test checklist](docs/HARDWARE-TEST.md).
 
 ## Build from source
 

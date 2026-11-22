@@ -1,5 +1,6 @@
 #include "ui/shell.h"
 
+#include <cstdio>
 #include <ctime>
 
 #include "hal/hal.h"
@@ -349,6 +350,9 @@ void Shell::apply_pending() {
     if (pending_.empty()) return;
     std::string id;
     id.swap(pending_);
+    // In the journal (journalctl -u zeroshell): which app was open when
+    // something went wrong. The device tests read it too.
+    std::fprintf(stderr, "zeroshell: open %s\n", id.c_str());
     if (id == "home") {
         app_id_ = "home";
         switch_to(make_launcher(), "");
