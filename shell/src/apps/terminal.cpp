@@ -16,6 +16,13 @@ class TerminalApp : public App {
 public:
     void build(lv_obj_t* root) override {
         root_ = root;
+        // On the device, opening the app opens the terminal; nothing is drawn
+        // first (it would flash before the console takes the screen), and
+        // closing it (Ctrl+Q or exit) goes back to the home screen.
+        std::string cmd = shell_app_arg();
+        if (cmd == "shell") cmd.clear();
+        if (shell_open_terminal(cmd)) return;
+        // Simulator: a page with help and a button, and a stand-in console.
         lv_obj_t* panel = lv_obj_create(root);
         style_panel(panel);
         lv_obj_set_pos(panel, 6, 4);
@@ -44,10 +51,7 @@ public:
         }, LV_EVENT_CLICKED, this);
         shell_add_focus(b);
 
-        // Opening the app opens the terminal; this page is what you come
-        // back to (Ctrl+Q or exit), with the button to go in again.
-        std::string cmd = shell_app_arg();
-        open(cmd == "shell" ? "" : cmd);
+        show_fake(cmd);
     }
 
     bool on_back() override {

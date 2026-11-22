@@ -283,7 +283,11 @@ void Shell::tick_cb(lv_timer_t* t) {
         // Nobody is looking: don't leave the sensor running with the screen off.
         if (s->handoff_camera_ && power().screen_off()) hal().camera_close();
         if (!(s->handoff_camera_ ? hal().camera_active() : hal().terminal_active())) {
-            if (!s->handoff_camera_) platform_console_handoff(false);
+            if (!s->handoff_camera_) {
+                platform_console_handoff(false);
+                // The Terminal app has nothing to show on the device: go home.
+                if (s->app_id_ == "terminal") s->go_home();
+            }
             s->handoff_ = s->handoff_camera_ = false;
             power().set_handoff(false);
             s->screen_changed();
