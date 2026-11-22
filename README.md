@@ -95,7 +95,7 @@ sudo apt install g++-aarch64-linux-gnu
 cmake -S shell -B build/device -DZS_BACKEND=device -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/aarch64-linux-gnu.cmake
 cmake --build build/device -j                # zeroshell, plus build/device/apps/*.so
 image/apps/build.sh build/device/apps        # the app packages and zeroos-apps.index, in build/apps
-image/build.sh build/device/zeroshell        # needs Docker; 1-2 hours. ZEROOS_APPS="notes media" preinstalls apps
+image/build.sh build/device/zeroshell        # needs Docker; 1-2 hours on x86 (qemu), much less on an arm64 machine. ZEROOS_APPS="notes media" preinstalls apps
 ```
 
 After the first flash, new versions go on over the network: open **Update** on the device, or push
