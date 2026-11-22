@@ -6,9 +6,6 @@ the pocket computer with a keyboard, a 320x170 screen and a Raspberry Pi CM0 ins
 It is Debian Linux with a home screen made for the Cardputer: everything works from the keyboard,
 it looks like a small Ubuntu desktop, and it supports all of the board's hardware (battery, motion
 sensors, IR, radios, audio, camera, clock, key lights and the expansion ports).
-
-> **Early project.** The apps work in the simulator and the image builds in CI, but much of it
-> has not yet been tested on a real device. Expect rough edges, and please report what you find.
 >
 > ZeroOS is an unofficial community project. It is not made, endorsed or supported by M5Stack.
 
