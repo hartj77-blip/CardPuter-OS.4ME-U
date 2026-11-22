@@ -4,21 +4,17 @@
 # speed, turn the backlight and panel fully off, and switch the expansion
 # port 5 V (an LED-class supply, e.g. ext_5v_out) for GPS and LoRa modules. These sysfs files appear
 # when the drivers load, so a udev rule can't reliably catch all of them.
-# The panel driver loads about 15 s into the boot; wait for it (30 s at most)
+# The panel driver is loaded early (modules-load.d/zeroos-lcd.conf) but can
+# still be a few seconds behind; wait for it (30 s at most)
 # so its files are there to open up, and ZeroShell starts with a screen.
 udevadm wait --timeout=30 /dev/fb_lcd 2>/dev/null ||
     echo "zeroos: no /dev/fb_lcd after 30 s (LCD driver not loaded?)" >&2
 # The expansion 5 V (ext_5v_out) hangs off an I2C IO expander whose LED
-# device can appear after the LCD. ZeroShell looks for it once, at start, so
-# without it the GPS and LoRa caps get no power for the whole session. Give
-# it up to 10 s more. (90-zeroos.udev opens it up whenever it appears.)
-i=0
-while [ "$i" -lt 10 ] && ! ls -d /sys/class/leds/*5v* >/dev/null 2>&1; do
-    sleep 1
-    i=$((i + 1))
-done
+# device can appear after the LCD. Don't hold up the UI for it: 90-zeroos.udev
+# opens it up to video whenever it appears, and ZeroShell looks for it again
+# when it is needed (linux_hal.cpp, find_ext5v).
 ls -d /sys/class/leds/*5v* >/dev/null 2>&1 ||
-    echo "zeroos: no expansion 5 V supply (/sys/class/leds/*5v*); GPS and LoRa caps get no power" >&2
+    echo "zeroos: expansion 5 V supply not there yet; udev will open it up when it appears" >&2
 for f in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor \
          /sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq \
          /sys/class/backlight/*/bl_power \
