@@ -98,8 +98,8 @@ private:
             lv_obj_set_width(a, 136);
         } else {
             const char* head = !st_.installed ? "Not installed"
+                               : (st_.running || st_.failing) && st_.no_radio ? "No radio"
                                : st_.failing ? "Radio error"
-                               : st_.running && st_.no_radio ? "No radio"
                                : st_.running ? LV_SYMBOL_OK " Mesh on"
                                : starting_   ? "Starting..."
                                              : "Mesh off";
@@ -109,8 +109,8 @@ private:
                                   ? "The radio service keeps stopping. Power off, reseat the Cap LoRa-1262, try again."
                                   : st_.error;
             const char* hint = !st_.installed ? "meshtasticd is missing: reinstall Mesh in Apps."
-                               : st_.failing ? err.c_str()
                                : st_.no_radio ? "Plug in the Cap LoRa-1262 with the power off, then turn the mesh on."
+                               : st_.failing ? err.c_str()
                                : st_.running ? "Connect to Wi-Fi to chat from your phone."
                                              : "Text over LoRa radio, miles away, with no signal or internet.";
             lv_obj_t* h = label(panel, hint, &zs_font_12, kMuted);

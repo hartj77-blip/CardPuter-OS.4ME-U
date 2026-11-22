@@ -1271,8 +1271,12 @@ private:
             if (now - mesh_err_at_ >= 10) {   // the journal is slow: not every refresh
                 mesh_err_at_ = now;
                 mesh_err_ = mesh_last_error();
+                // 2.7 stops (Aborted) instead of using a simulated radio when
+                // no Cap is plugged in: that's "No radio", not a radio error.
+                mesh_no_radio_ = mesh_saw_no_radio();
             }
             m.error = mesh_err_;
+            m.no_radio = mesh_no_radio_;
         }
         if (m.running) {
             // Without a working radio the daemon falls back to a simulated
@@ -1281,10 +1285,7 @@ private:
             if (mesh_log_checks_ < 3 && now - mesh_log_at_ >= 15) {
                 mesh_log_at_ = now;
                 ++mesh_log_checks_;
-                mesh_no_radio_ = !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
-                                      // 2.7.x: "SX126x init result -2", "No SX1262 radio"
-                                      "grep -m1 -E 'init result -[0-9]|No [A-Za-z0-9]+ radio|SimRadio|"
-                                      "[Rr]adio init failed'").empty();
+                mesh_no_radio_ = mesh_saw_no_radio();
             }
             m.no_radio = mesh_no_radio_;
             const NetStatus& n = net_cache_;   // poll() refreshes it; read_net() forks ~7 times
@@ -1402,6 +1403,13 @@ private:
     }
     // The daemon's last error from this run (since mesh_start, else this
     // boot): ERROR/CRIT lines first, then anything that reads like one.
+    // The daemon's log says it found no LoRa radio (pi is in the adm group).
+    bool mesh_saw_no_radio() {
+        return !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
+                    // 2.7.x: "SX126x init result -2", "No sx1262 radio"
+                    "grep -m1 -iE 'init result -[0-9]|No [A-Za-z0-9]+ radio|SimRadio|"
+                    "radio init failed'").empty();
+    }
     std::string mesh_last_error() {
         std::string since = mesh_started_at_ ? "--since @" + std::to_string(long(mesh_started_at_) - 1) : "-b";
         std::istringstream in(run("journalctl -u meshtasticd " + since + " --no-pager -n 200 -o cat 2>/dev/null"));
