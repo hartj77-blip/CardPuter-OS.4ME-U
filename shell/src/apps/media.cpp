@@ -1,5 +1,5 @@
-// Media: music from ~/Music, voice notes from the mic, and music from a
-// Jellyfin server, in three tabs.
+// Media: music from ~/Music, voice notes from the mic, and music and video
+// from a Jellyfin server, in three tabs.
 //
 //   Left/Right   switch tab          Up/Down   choose
 //   Enter        play / open         Space     pause / resume
@@ -10,12 +10,18 @@
 //
 // Playing goes through the shell's queue (ui/player.h), so it carries on to
 // the next track after you leave the app or the screen turns off.
+//
+// A Jellyfin movie or episode plays full width in the app (docs/JELLYFIN.md):
+//   Space pause   Left/Right -/+10 s   Up/Down +/-1 min   0 from the start
+//   + / - volume   M on the monitor (Dock mode)   Esc or S stop
+// Video belongs to the app: it stops when you leave Media.
 #include <cstdlib>
 #include <functional>
 #include <random>
 
 #include "apps/common.h"
 #include "ui/player.h"
+#include "ui/power.h"
 #include "ui/prefs.h"
 
 namespace zs {
@@ -24,6 +30,16 @@ using namespace theme;
 
 constexpr int kListW = 178;
 constexpr int kBars = 9;
+// The video picture: the whole content area. 16:9 fills it at 267 x 150.
+constexpr int kVidW = kScreenW;
+constexpr int kVidH = kContentH;
+// What we ask the server for: a picture about the size of the screen (it
+// scales down, never up) at a bitrate Wi-Fi on a Pi Zero 2 keeps up with.
+constexpr int kStreamW = 427, kStreamH = 240, kStreamKbps = 700;
+// And for the monitor in Dock mode: 720p, decoded in hardware there.
+constexpr int kDockW = 1280, kDockH = 720, kDockKbps = 4000;
+constexpr uint32_t kReportEveryMs = 30000;
+constexpr uint32_t kOsdMs = 3000;   // the info bar stays up this long after a key
 
 std::string mmss(int ms) {
     if (ms < 0) return "--:--";
@@ -33,6 +49,12 @@ std::string mmss(int ms) {
 
 class MediaApp : public App {
 public:
+    ~MediaApp() override {
+        // Leaving the app: the screen is being torn down, so only stop the
+        // video and tell the server where we got to.
+        close_video(false);
+    }
+
     void build(lv_obj_t* root) override {
         root_ = root;
 
@@ -102,6 +124,10 @@ public:
     }
 
     void tick() override {
+        if (vid_) {
+            video_tick();
+            return;
+        }
         auto& h = hal();
         PlaybackState pb = h.playback();
         RecordState rs = h.record_state();
@@ -164,6 +190,7 @@ public:
     }
 
     bool on_key(uint32_t key) override {
+        if (vid_) return video_key(key);
         if (input_) return false;   // typing in the text box
         auto& h = hal();
         switch (key) {
@@ -213,6 +240,10 @@ public:
     }
 
     bool on_back() override {
+        if (vid_) {
+            close_video(true);
+            return true;
+        }
         if (input_) {
             close_input();
             return true;
@@ -232,9 +263,24 @@ private:
     struct Level {
         std::string title;
         std::vector<JfItem> items;
+        JfView view = JfView::Latest;
     };
+
+    // A list row: episodes say which, movies their year, and anything
+    // half-watched where you stopped.
+    static std::string row_text(const JfItem& it, JfView view) {
+        std::string t = it.name;
+        if (it.kind == JfItem::Episode) {
+            if (view == JfView::SeasonEpisodes && it.number >= 0) t = std::to_string(it.number) + ". " + it.name;
+            else t = it.detail + " " + it.episode_code() + " " + it.name;
+        } else if (it.kind == JfItem::Movie && it.year > 0) {
+            t += fmt(" (%d)", it.year);
+        }
+        if (it.playable_video() && it.resume_s > 0) t += "  @" + mmss(it.resume_s * 1000);
+        return t;
+    }
     // The Jellyfin tab's first screen.
-    enum Root { kSearch, kLatest, kAlbums, kArtists, kPlaylists, kSignOut, kRootCount };
+    enum Root { kSearch, kResume, kMovies, kShows, kLatest, kAlbums, kArtists, kPlaylists, kSignOut, kRootCount };
 
     static std::string host_of(const std::string& url) {
         auto a = url.find("://");
@@ -302,10 +348,12 @@ private:
             return nullptr;
         }
         if (stack_.empty()) {
-            static const char* const rows[kRootCount] = {"Search...", "Latest albums", "Albums", "Artists",
-                                                         "Playlists", "Sign out"};
-            static const char* const icons[kRootCount] = {ZS_ICON_SEARCH,    LV_SYMBOL_BELL,  LV_SYMBOL_DIRECTORY,
-                                                          LV_SYMBOL_DIRECTORY, LV_SYMBOL_LIST, LV_SYMBOL_CLOSE};
+            static const char* const rows[kRootCount] = {"Search...", "Continue watching", "Movies", "TV shows",
+                                                         "Latest albums", "Albums", "Artists", "Playlists",
+                                                         "Sign out"};
+            static const char* const icons[kRootCount] = {
+                ZS_ICON_SEARCH,      LV_SYMBOL_PLAY,      LV_SYMBOL_VIDEO, LV_SYMBOL_VIDEO, LV_SYMBOL_BELL,
+                LV_SYMBOL_DIRECTORY, LV_SYMBOL_DIRECTORY, LV_SYMBOL_LIST,  LV_SYMBOL_CLOSE};
             for (int i = 0; i < kRootCount; ++i) {
                 lv_obj_t* b = add_row(icons[i], rows[i], i);
                 if (i == keep) focus = b;
@@ -320,8 +368,9 @@ private:
             bool now = it.kind == JfItem::Track && jf::stream_url(jf_, it.id) == listed_playing_;
             const char* icon = now ? LV_SYMBOL_PLAY
                                : it.kind == JfItem::Track ? LV_SYMBOL_AUDIO
+                               : it.playable_video() ? LV_SYMBOL_VIDEO
                                : it.kind == JfItem::Playlist ? LV_SYMBOL_LIST : LV_SYMBOL_DIRECTORY;
-            lv_obj_t* b = add_row(icon, it.name, int(i));
+            lv_obj_t* b = add_row(icon, row_text(it, lv.view), int(i));
             if (now || (!focus && int(i) == keep)) focus = b;
         }
         return focus;
@@ -363,6 +412,9 @@ private:
         if (stack_.empty()) {
             switch (i) {
                 case kSearch: ask_search(); break;
+                case kResume: open_level("Continue watching", JfView::Resume, ""); break;
+                case kMovies: open_level("Movies", JfView::Movies, ""); break;
+                case kShows: open_level("TV shows", JfView::Shows, ""); break;
                 case kLatest: open_level("Latest albums", JfView::Latest, ""); break;
                 case kAlbums: open_level("Albums", JfView::Albums, ""); break;
                 case kArtists: open_level("Artists", JfView::Artists, ""); break;
@@ -385,6 +437,18 @@ private:
             case JfItem::Album: open_level(it.name, JfView::AlbumTracks, it.id); break;
             case JfItem::Artist: open_level(it.name, JfView::ArtistAlbums, it.id); break;
             case JfItem::Playlist: open_level(it.name, JfView::PlaylistTracks, it.id); break;
+            case JfItem::Series: open_level(it.name, JfView::Seasons, it.id); break;
+            case JfItem::Season:
+                if (it.series_id.empty()) {
+                    shell_toast("The server didn't say which show");
+                    break;
+                }
+                open_level(it.detail.empty() ? it.name : it.detail + ", " + it.name, JfView::SeasonEpisodes,
+                           it.series_id + ":" + it.id);
+                break;
+            case JfItem::Movie:
+            case JfItem::Episode:
+            case JfItem::Video: open_video(items, i); break;
             case JfItem::Track: {
                 // Queue every track on this screen, starting with this one.
                 std::vector<QueueItem> q;
@@ -410,6 +474,7 @@ private:
         lv_refr_now(nullptr);   // the request blocks; show the notice first
         Level lv;
         lv.title = title;
+        lv.view = view;
         std::string error;
         if (!hal().jellyfin_list(jf_, view, arg, lv.items, error)) {
             shell_toast(error);
@@ -544,6 +609,255 @@ private:
         }, self);
     }
 
+    // ---- Video ----------------------------------------------------------
+
+    static std::string new_session_id() {
+        std::random_device rd;
+        return fmt("%08x%08x%08x%08x", unsigned(rd()), unsigned(rd()), unsigned(rd()), unsigned(rd()));
+    }
+
+    // Play items[i] (a movie or episode) on the screen. The rest of the list
+    // stays with it, so an episode can go on to the next one.
+    void open_video(const std::vector<JfItem>& items, int i) {
+        const JfItem& it = items[size_t(i)];
+        close_video(true);
+        player_stop();   // music and video share the speaker
+        std::string session = new_session_id();
+        std::string url = jf::video_url(jf_, it.id, session, kStreamW, kStreamH, kStreamKbps);
+        if (url.empty()) {
+            shell_toast("Can't play " + it.name);
+            return;
+        }
+        vid_pixels_.assign(size_t(kVidW) * kVidH, 0);
+        std::string error;
+        int start = it.resume_s > 0 ? it.resume_s : 0;
+        if (!hal().video_open(url, jf::auth_header(jf_), start, kVidW, kVidH, error)) {
+            shell_toast(error.empty() ? "Can't play " + it.name : error);
+            vid_pixels_.clear();
+            return;
+        }
+        vid_items_ = items;
+        vid_at_ = i;
+        vid_item_ = it;
+        vid_session_ = session;
+        vid_reported_at_ = lv_tick_get();
+        vid_started_ = false;
+        vid_auto_paused_ = false;
+        build_video_view();
+        show_osd();
+        if (start > 0) shell_toast("Resuming at " + mmss(start * 1000) + "   0: from the start");
+    }
+
+    void build_video_view() {
+        vid_ = lv_obj_create(root_);
+        style_plain(vid_);
+        lv_obj_set_pos(vid_, 0, 0);
+        lv_obj_set_size(vid_, kVidW, kVidH);
+        lv_obj_set_style_bg_color(vid_, c(0x000000), 0);
+        lv_obj_set_style_bg_opa(vid_, LV_OPA_COVER, 0);
+        lv_obj_remove_flag(vid_, LV_OBJ_FLAG_SCROLLABLE);
+
+        vid_dsc_ = lv_image_dsc_t{};
+        vid_dsc_.header.magic = LV_IMAGE_HEADER_MAGIC;
+        vid_dsc_.header.cf = LV_COLOR_FORMAT_RGB565;
+        vid_dsc_.header.w = kVidW;
+        vid_dsc_.header.h = kVidH;
+        vid_dsc_.header.stride = kVidW * 2;
+        vid_dsc_.data = reinterpret_cast<const uint8_t*>(vid_pixels_.data());
+        vid_dsc_.data_size = uint32_t(vid_pixels_.size() * 2);
+        vid_img_ = lv_image_create(vid_);
+        lv_image_set_src(vid_img_, &vid_dsc_);
+        lv_obj_set_pos(vid_img_, 0, 0);
+
+        vid_wait_ = label(vid_, "Loading...", &zs_font_14, kText);
+        lv_obj_center(vid_wait_);
+
+        // The info bar along the bottom: title, time, a progress line.
+        vid_osd_ = lv_obj_create(vid_);
+        style_plain(vid_osd_);
+        lv_obj_set_size(vid_osd_, kVidW, 40);
+        lv_obj_align(vid_osd_, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_set_style_bg_color(vid_osd_, c(0x000000), 0);
+        lv_obj_set_style_bg_opa(vid_osd_, LV_OPA_70, 0);
+        lv_obj_remove_flag(vid_osd_, LV_OBJ_FLAG_SCROLLABLE);
+        vid_title_ = label(vid_osd_, "", &zs_font_12, kText);
+        lv_obj_set_width(vid_title_, kVidW - 12);
+        lv_label_set_long_mode(vid_title_, LV_LABEL_LONG_DOT);
+        lv_obj_set_pos(vid_title_, 6, 2);
+        vid_bar_ = thin_bar(vid_osd_, kVidW - 12, 3, kAccent);
+        lv_bar_set_range(vid_bar_, 0, 1000);
+        lv_obj_set_pos(vid_bar_, 6, 19);
+        vid_time_ = label(vid_osd_, "", &zs_font_12, kMuted);
+        lv_obj_set_pos(vid_time_, 6, 24);
+        vid_hint_ = label(vid_osd_, "Space pause  " LV_SYMBOL_LEFT LV_SYMBOL_RIGHT " seek  Esc stop", &zs_font_12,
+                          kMuted);
+        lv_obj_align(vid_hint_, LV_ALIGN_TOP_RIGHT, -6, 24);
+        std::string t = vid_item_.kind == JfItem::Episode
+                            ? vid_item_.detail + " " + vid_item_.episode_code() + " " + vid_item_.name
+                            : vid_item_.name;
+        lv_label_set_text(vid_title_, t.c_str());
+
+        if (group) lv_group_focus_obj(nullptr);
+        // Pictures come faster than the shell's 10 Hz tick.
+        vid_timer_ = lv_timer_create([](lv_timer_t* t) {
+            static_cast<MediaApp*>(lv_timer_get_user_data(t))->video_pump();
+        }, 20, this);
+    }
+
+    void video_pump() {
+        if (!vid_) return;
+        if (power().screen_off()) return;   // nobody is looking; the tick pauses it
+        if (hal().video_frame(vid_pixels_.data())) {
+            lv_obj_invalidate(vid_img_);
+            if (!vid_started_) {
+                vid_started_ = true;
+                hal().jellyfin_report(jf_, JfReport::Start, vid_item_.id, vid_session_, vid_item_.resume_s, false);
+            }
+        }
+    }
+
+    void video_tick() {
+        VideoState st = hal().video();
+        uint32_t now = lv_tick_get();
+        if (!st.open) {
+            video_ended(st);
+            return;
+        }
+        if (power().screen_off()) {
+            // Face down or timed out: stop watching, keep the place.
+            if (!st.paused) {
+                hal().video_pause(true);
+                vid_auto_paused_ = true;
+            }
+        } else if (!st.paused) {
+            power().stay_awake(now);
+        }
+        vid_pos_s_ = st.pos_ms / 1000;
+        if (now - vid_reported_at_ >= kReportEveryMs) {
+            vid_reported_at_ = now;
+            hal().jellyfin_report(jf_, JfReport::Progress, vid_item_.id, vid_session_, vid_pos_s_, st.paused);
+        }
+
+        const char* wait = st.loading ? "Loading..." : st.paused ? LV_SYMBOL_PAUSE "  Paused" : "";
+        lv_label_set_text(vid_wait_, wait);
+        if (*wait) lv_obj_remove_flag(vid_wait_, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(vid_wait_, LV_OBJ_FLAG_HIDDEN);
+
+        bool osd = st.paused || st.loading || now - vid_osd_at_ < kOsdMs;
+        if (osd) lv_obj_remove_flag(vid_osd_, LV_OBJ_FLAG_HIDDEN);
+        else lv_obj_add_flag(vid_osd_, LV_OBJ_FLAG_HIDDEN);
+        if (osd) {
+            int permille = st.dur_ms > 0 ? int(1000LL * st.pos_ms / st.dur_ms) : 0;
+            lv_bar_set_value(vid_bar_, permille, LV_ANIM_OFF);
+            lv_label_set_text(vid_time_, (mmss(st.pos_ms) + " / " + mmss(st.dur_ms) +
+                                          fmt("   " LV_SYMBOL_VOLUME_MID " %d%%", hal().volume()))
+                                             .c_str());
+        }
+    }
+
+    void video_ended(const VideoState& st) {
+        bool finished = st.finished;
+        std::string error = st.error;
+        // Finished: the server should forget the resume point.
+        if (finished) vid_pos_s_ = vid_item_.duration_s > 0 ? vid_item_.duration_s : vid_pos_s_;
+        close_video(true);
+        if (!error.empty()) {
+            shell_toast(error);
+            return;
+        }
+        if (!finished) return;
+        // An episode: on to the next one in the list.
+        int next = vid_at_ + 1;
+        // (Only within the season: a list like Continue watching mixes shows.)
+        if (vid_item_.kind == JfItem::Episode && next < int(vid_items_.size()) &&
+            vid_items_[size_t(next)].kind == JfItem::Episode &&
+            vid_items_[size_t(next)].series_id == vid_item_.series_id &&
+            vid_items_[size_t(next)].season == vid_item_.season &&
+            vid_items_[size_t(next)].number > vid_item_.number) {
+            std::vector<JfItem> items = vid_items_;
+            items[size_t(next)].resume_s = 0;
+            shell_toast("Next: " + items[size_t(next)].name);
+            open_video(items, next);
+        } else {
+            shell_toast("Finished " + vid_item_.name);
+        }
+    }
+
+    void show_osd() { vid_osd_at_ = lv_tick_get(); }
+
+    bool video_key(uint32_t key) {
+        auto& h = hal();
+        show_osd();
+        switch (key) {
+            case ' ':
+            case LV_KEY_ENTER: {
+                VideoState st = h.video();
+                h.video_pause(!st.paused);
+                vid_auto_paused_ = false;
+                hal().jellyfin_report(jf_, JfReport::Progress, vid_item_.id, vid_session_, st.pos_ms / 1000,
+                                      !st.paused);
+                return true;
+            }
+            case LV_KEY_LEFT: h.video_seek(-10, false); return true;
+            case LV_KEY_RIGHT: h.video_seek(+10, false); return true;
+            case LV_KEY_UP: h.video_seek(+60, false); return true;
+            case LV_KEY_DOWN: h.video_seek(-60, false); return true;
+            case '0': h.video_seek(0, true); return true;
+            case '+': case '=':
+                h.set_volume(std::min(100, h.volume() + 5));
+                return true;
+            case '-': case '_':
+                h.set_volume(std::max(0, h.volume() - 5));
+                return true;
+            case 's': case 'S': close_video(true); return true;
+            case 'm': case 'M': video_to_monitor(); return true;
+            case LV_KEY_ESC: return false;   // on_back() closes it
+        }
+        return true;   // the list is underneath: keep keys from it
+    }
+
+    // Dock mode: hand the video to the monitor's player, from where we are.
+    void video_to_monitor() {
+        if (!hal().display().dock_running) {
+            shell_toast("Start Dock mode for the monitor first");
+            return;
+        }
+        JfItem it = vid_item_;
+        int at = hal().video().pos_ms / 1000;
+        std::string url = jf::video_url(jf_, it.id, new_session_id(), kDockW, kDockH, kDockKbps);
+        close_video(true);
+        if (!jf::write_dock_options(jf_, at) || !hal().dock_open("video", url)) {
+            shell_toast("Can't open the video on the monitor");
+            return;
+        }
+        shell_toast("Playing on the monitor");
+    }
+
+    // Stop the video, tell the server where it stopped and, with ui, take
+    // the picture off the screen.
+    void close_video(bool ui) {
+        if (vid_timer_) {
+            lv_timer_delete(vid_timer_);
+            vid_timer_ = nullptr;
+        }
+        if (!vid_) return;
+        VideoState st = hal().video();
+        if (st.open) vid_pos_s_ = st.pos_ms / 1000;
+        hal().video_close();
+        hal().jellyfin_report(jf_, JfReport::Stop, vid_item_.id, vid_session_, vid_pos_s_, false);
+        if (ui) {
+            lv_obj_delete(vid_);
+            // The list may have a stale resume point; show the place we stopped.
+            for (auto& lvl : stack_)
+                for (auto& x : lvl.items)
+                    if (x.id == vid_item_.id) x.resume_s = st.finished ? 0 : vid_pos_s_;
+            rebuild_list();
+        }
+        vid_ = nullptr;
+        vid_pixels_.clear();
+        vid_pixels_.shrink_to_fit();
+    }
+
     std::string confirm_path_;   // voice note waiting for a second X to delete
     uint32_t confirm_at_ = 0;
     lv_obj_t* root_ = nullptr;
@@ -565,6 +879,21 @@ private:
     Done done_;
     std::string typed_server_, typed_user_;
     bool was_recording_ = false;
+
+    // Video
+    lv_obj_t* vid_ = nullptr;   // the player view, over everything; null when no video
+    lv_obj_t *vid_img_ = nullptr, *vid_wait_ = nullptr, *vid_osd_ = nullptr, *vid_title_ = nullptr,
+             *vid_bar_ = nullptr, *vid_time_ = nullptr, *vid_hint_ = nullptr;
+    lv_timer_t* vid_timer_ = nullptr;
+    lv_image_dsc_t vid_dsc_{};
+    std::vector<uint16_t> vid_pixels_;
+    std::vector<JfItem> vid_items_;   // the list it was started from
+    int vid_at_ = -1;
+    JfItem vid_item_;
+    std::string vid_session_;
+    uint32_t vid_reported_at_ = 0, vid_osd_at_ = 0;
+    int vid_pos_s_ = 0;
+    bool vid_started_ = false, vid_auto_paused_ = false;
 };
 }  // namespace
 

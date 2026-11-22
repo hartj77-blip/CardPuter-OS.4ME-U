@@ -12,6 +12,13 @@ if [ $# -eq 0 ]; then
     [ -n "$f" ] || exit 0
     set -- "$dir/$f"
 fi
+# A Jellyfin stream from the Media app: its sign-in header (and where to
+# start) are in a file only we can read, not on the command line.
+case "$1" in
+    http://*|https://*)
+        opts="$HOME/.config/zeroos/jellyfin-mpv.conf"
+        [ -r "$opts" ] && set -- --include="$opts" "$@" ;;
+esac
 exec mpv --hwdec=v4l2m2m-copy --hwdec-codecs=h264 \
     --cache=yes --demuxer-max-bytes=32MiB --demuxer-max-back-bytes=8MiB \
     --vd-lavc-threads=4 --keep-open=no --force-window=yes "$@"

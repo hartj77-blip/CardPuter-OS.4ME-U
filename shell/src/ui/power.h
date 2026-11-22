@@ -41,6 +41,11 @@ public:
     // count as activity (and wake the screen); ZeroShell doesn't act on them.
     void set_handoff(bool on) { handoff_ = on; }
 
+    // Something is being watched (a video): counts as activity, so the
+    // screen neither dims nor turns off. Brings a dimmed screen back up, but
+    // never turns on one that is off (face down, or the user's choice).
+    void stay_awake(uint32_t now_ms);
+
     bool screen_off() const { return state_ == State::Off; }
     bool dimmed() const { return state_ == State::Dim; }
 

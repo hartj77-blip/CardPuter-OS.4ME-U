@@ -65,7 +65,7 @@ image, and can be removed like any other app.
 | Files | Browse the files on the device |
 | Dock | Desktop on an HDMI monitor, with a browser, video player, terminal and file manager ([guide](docs/DOCK.md)) |
 | IR Remote | Universal remote for TVs, projectors, audio equipment, air conditioners and lights. About 2,000 remotes, and it can learn buttons from your own ([guide](docs/IR.md)) |
-| Media | Music player, Jellyfin streaming and voice recordings ([guide](docs/JELLYFIN.md)) |
+| Media | Music player, Jellyfin music and video streaming, and voice recordings ([guide](docs/JELLYFIN.md)) |
 | Notes | Simple text notes |
 | ZClaw | AI assistant. Chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/ZCLAW.md)) |
 | Remote | Tailscale: reach your other devices, SSH, remote desktop and file sharing ([guide](docs/REMOTE.md)) |
@@ -80,6 +80,8 @@ image, and can be removed like any other app.
 | Battery | Time left, power use and power profiles ([guide](docs/PERFORMANCE.md)) |
 | Clock | Clock and stopwatch |
 | System | CPU and memory use |
+| Dev Tools | Four apps for writing code on the keyboard: Code (projects, the micro editor, run with one key), REPL, Git and a Serial monitor for Arduino and ESP32 boards ([guide](docs/DEV.md)) |
+| Games | Play your own NES, Game Boy and GBA games, plus SNES, Mega Drive, PC Engine, PlayStation and more with downloadable libretro cores ([guide](docs/GAMES.md)) |
 
 ## Install
 
@@ -174,12 +176,14 @@ For a full report on memory, CPU and battery use, run `zeroos-measure`. See
 - [Sync](docs/SYNC.md): syncing notes and files
 - [Tether](docs/TETHER.md): getting online through your phone
 - [Router](docs/ROUTER.md): a portable router for your laptop, through a Tailscale exit node
-- [Media and Jellyfin](docs/JELLYFIN.md): music from your server
+- [Media and Jellyfin](docs/JELLYFIN.md): music and video from your server
 - [Car](docs/CAR.md): music in the car
 - [Camera](docs/CAMERA.md): photos and QR codes
 - [Dock](docs/DOCK.md): the desktop on a monitor
 - [GPS and LoRa](docs/EXPANSION.md): expansion modules
 - [Battery and performance](docs/PERFORMANCE.md): power saving and memory
+- [Dev Tools](docs/DEV.md): coding, Git and serial on the device
+- [Games](docs/GAMES.md): classic console games with libretro cores
 
 For developers:
 

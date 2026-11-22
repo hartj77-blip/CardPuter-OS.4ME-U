@@ -138,14 +138,16 @@ pid_t spawn(const std::vector<std::string>& argv) {
 #ifdef __EMSCRIPTEN__
     return -1;
 #else
+    // argv is built before fork: with video playing, libmpv's threads run in
+    // this process, and the child may only make async-signal-safe calls.
+    std::vector<char*> a;
+    for (auto& s : argv) a.push_back(const_cast<char*>(s.c_str()));
+    a.push_back(nullptr);
     pid_t pid = fork();
     if (pid == 0) {
         setpgid(0, 0);
         int devnull = open("/dev/null", O_RDWR);
         if (devnull >= 0) { dup2(devnull, 0); dup2(devnull, 1); dup2(devnull, 2); }
-        std::vector<char*> a;
-        for (auto& s : argv) a.push_back(const_cast<char*>(s.c_str()));
-        a.push_back(nullptr);
         execvp(a[0], a.data());
         _exit(127);
     }
@@ -161,6 +163,11 @@ pid_t spawn_pipe(const std::vector<std::string>& argv, int& fd) {
 #else
     int p[2];
     if (pipe(p) < 0) return -1;
+    // argv is built before fork: with video playing, libmpv's threads run in
+    // this process, and the child may only make async-signal-safe calls.
+    std::vector<char*> a;
+    for (auto& s : argv) a.push_back(const_cast<char*>(s.c_str()));
+    a.push_back(nullptr);
     pid_t pid = fork();
     if (pid == 0) {
         setpgid(0, 0);
@@ -169,9 +176,6 @@ pid_t spawn_pipe(const std::vector<std::string>& argv, int& fd) {
         dup2(p[1], 1);
         close(p[0]);
         close(p[1]);
-        std::vector<char*> a;
-        for (auto& s : argv) a.push_back(const_cast<char*>(s.c_str()));
-        a.push_back(nullptr);
         execvp(a[0], a.data());
         _exit(127);
     }
@@ -512,6 +516,7 @@ public:
 
     bool play(const std::string& path) override {
         stop();
+        video_.close();
         play_pid_ = spawn({"play", "-q", path});
         if (play_pid_ <= 0) return false;
         pb_ = PlaybackState{};
@@ -524,6 +529,7 @@ public:
     }
     bool play_stream(const std::string& url, const std::string& auth, int duration_s) override {
         stop();
+        video_.close();
         if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0) return false;
         // mpv, not sox: it streams over HTTP and plays whatever the server sends.
         std::vector<std::string> argv = {"mpv", "--no-video", "--no-terminal", "--really-quiet", "--no-config",
@@ -551,6 +557,24 @@ public:
                        std::string& error) override {
         return jf::list(s, view, arg, out, error);
     }
+    void jellyfin_report(const JfSession& s, JfReport what, const std::string& item_id,
+                         const std::string& play_session, int pos_s, bool paused) override {
+        jf::report(s, what, item_id, play_session, pos_s, paused);
+    }
+    bool video_open(const std::string& url, const std::string& auth, int start_s, int w, int h,
+                    std::string& error) override {
+        stop();   // one thing on the speaker at a time
+        if (url.rfind("http://", 0) != 0 && url.rfind("https://", 0) != 0) {
+            error = "Not a video address";
+            return false;
+        }
+        return video_.open(url, auth, start_s, w, h, error);
+    }
+    bool video_frame(uint16_t* rgb565) override { return video_.frame(rgb565); }
+    VideoState video() override { return video_.state(); }
+    void video_pause(bool paused) override { video_.set_paused(paused); }
+    void video_seek(int seconds, bool absolute) override { video_.seek(seconds, absolute); }
+    void video_close() override { video_.close(); }
     void set_paused(bool p) override {
         if (play_pid_ <= 0) return;
 #ifndef __EMSCRIPTEN__
@@ -750,6 +774,7 @@ private:
     time_t media_scan_ = 0;
     static constexpr const char* kCameraApp = "/usr/bin/camera_app";
     PlaybackState pb_;
+    MpvVideo video_;   // libmpv, loaded on first use
     RecordState rec_;
     PlayClock clock_, rec_clock_;
     std::vector<std::pair<std::string, int>> durations_;

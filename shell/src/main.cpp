@@ -12,6 +12,7 @@
 //   key:<char>                           one character key
 //   open:<app-id>  home                  jump straight to an app / home
 //   wait:<ms>                            let timers and animations run
+//   live:<ms>                            the same, in real time (real processes, e.g. video)
 //   shot:<file.ppm>                      save the screen
 #include <unistd.h>
 

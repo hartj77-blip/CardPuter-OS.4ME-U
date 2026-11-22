@@ -104,16 +104,26 @@ if(ZS_APP_MODULES)
   install(TARGETS ${ZS_APP_MODULES} LIBRARY DESTINATION lib/zeroos/apps)
 endif()
 
-# Unit tests for code that needs no screen (IR codes): ctest, or run ir_test.
+# Unit tests for code that needs no screen (IR codes, the Jellyfin client): ctest, or run ir_test.
 if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   enable_testing()
   add_executable(ir_test tests/ir_test.cpp src/ir/ir.cpp src/ir/db.cpp)
   target_include_directories(ir_test PRIVATE src)
   target_compile_options(ir_test PRIVATE -Wall -Wextra)
   add_test(NAME ir_test COMMAND ir_test)
+  add_executable(jellyfin_test tests/jellyfin_test.cpp src/hal/jellyfin.cpp)
+  target_include_directories(jellyfin_test PRIVATE src)
+  target_compile_options(jellyfin_test PRIVATE -Wall -Wextra)
+  add_test(NAME jellyfin_test COMMAND jellyfin_test)
   # ZClaw's AI requests and replies (no network).
   add_executable(zclaw_test tests/zclaw_test.cpp src/apps/zclaw/ai.cpp)
   target_include_directories(zclaw_test PRIVATE src)
   target_compile_options(zclaw_test PRIVATE -Wall -Wextra)
   add_test(NAME zclaw_test COMMAND zclaw_test)
+  # A test-pattern libretro core for the Games app (tests/games/testcore.c):
+  # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
+  add_library(zstest_libretro MODULE tests/games/testcore.c)
+  set_target_properties(zstest_libretro PROPERTIES PREFIX "" C_VISIBILITY_PRESET hidden
+                        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test-cores")
+  target_link_libraries(zstest_libretro PRIVATE m)
 endif()
