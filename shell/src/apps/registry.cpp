@@ -141,7 +141,9 @@ const AppInfo* app_find(const std::string& id) {
 
 bool app_modules_stale() {
     for (auto& [path, l] : g_modules) {
-        if (!l.mod) continue;
+        // Opened counts even if refused (an older app ABI): dlopen() would
+        // hand back that old copy, so its new build needs a restart too.
+        if (!l.opened) continue;
         struct stat st{};
         // Gone (removed) is fine: the code stays mapped until we exit.
         if (stat(path.c_str(), &st) == 0 && !same_time(st.st_mtim, l.mtime)) return true;

@@ -22,6 +22,8 @@ CONF=${ZEROOS_UPDATE_CONF:-/etc/zeroos/update.conf}
 STATE_DIR=${ZEROOS_UPDATE_STATE:-/var/lib/zeroos/update}
 RUN_DIR=${ZEROOS_UPDATE_RUN:-/run/zeroos}
 RELEASE=${ZEROOS_RELEASE:-/etc/zeroos-release}
+ZEROSHELL=${ZEROOS_SHELL:-/usr/bin/zeroshell}
+APPS=${ZEROOS_APPS:-/usr/bin/zeroos-apps}
 SETTLE=${ZEROOS_UPDATE_SETTLE:-10}      # seconds ZeroShell must stay up
 APPS_WAIT=${ZEROOS_UPDATE_APPS_WAIT:-900}   # seconds to wait for the Apps app to finish a job
 STATUS=$RUN_DIR/update.status
@@ -192,6 +194,9 @@ put_on() {
     DEBIAN_FRONTEND=noninteractive dpkg --force-confold --force-confdef -i "$1" >&2
 }
 
+# The app ABI of the installed ZeroShell ("" if it can't say).
+app_abi() { "$ZEROSHELL" --app-abi 2>/dev/null || true; }
+
 # install_deb <file>: check it, install it, restart ZeroShell, roll back if
 # ZeroShell won't stay up.
 install_deb() {
@@ -222,6 +227,8 @@ install_deb() {
         DEBIAN_FRONTEND=noninteractive apt-get -f install -y -o Dpkg::Options::=--force-confold >&2 ||
             log "the repair did not finish (sudo dpkg --configure -a); updating ZeroOS anyway"
     fi
+    local abi_before
+    abi_before=$(app_abi)
     if ! put_on "$deb"; then
         if [ -f "$STATE_DIR/current.deb" ]; then
             put_on "$STATE_DIR/current.deb" ||
@@ -253,6 +260,22 @@ install_deb() {
         cp -f "$deb" "$STATE_DIR/current.deb"
     fi
     current=$ver
+
+    # This version loads apps built another way (a new app ABI): the installed
+    # apps no longer show on the home screen. Put their new builds on now, so
+    # nobody has to know to press U in Apps. zeroos-apps takes the lock itself.
+    if [ "$(app_abi)" != "$abi_before" ] && [ -x "$APPS" ]; then
+        flock -u 8
+        exec 8>&-
+        status installing 100 "Updating apps for $ver"
+        if "$APPS" upgrade >&2; then
+            if systemctl is-enabled -q zeroshell.service 2>/dev/null; then
+                systemctl restart zeroshell.service || true
+            fi
+        else
+            log "could not update the apps; Apps > U tries again"
+        fi
+    fi
     status done 100 "Now on $ver"
 }
 

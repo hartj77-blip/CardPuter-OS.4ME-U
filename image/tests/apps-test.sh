@@ -247,7 +247,9 @@ expect "upgrade, restore: done" state done
 grep -q "zeroos-app-gps_1.0.0_arm64.deb" "$T/apt.log" && ok "upgrade, restore: installs what was built in" || bad "upgrade, restore: $(cat "$T/apt.log")"
 grep -q "zeroos-app-notes_" "$T/apt.log" && bad "upgrade, restore: reinstalled an installed app" || ok "upgrade, restore: leaves installed apps alone"
 [ -e "$T/state/restore" ] && bad "upgrade, restore: list left behind" || ok "upgrade, restore: only once"
-grep -q 'apt-get autoremove --purge -y' "$T/apt.log" && ok "upgrade, restore: old extras cleared" || bad "upgrade, restore: no autoremove"
+grep -q 'apt-get autoremove -y' "$T/apt.log" && ok "upgrade, restore: old extras cleared" || bad "upgrade, restore: no autoremove"
+# Not purged: that would wipe what they keep (Tailscale's login).
+grep -q 'apt-get autoremove --purge' "$T/apt.log" && bad "upgrade, restore: purged old extras" || ok "upgrade, restore: keeps old extras' settings"
 # Apps built for an older app ABI block apt until they are gone: an install
 # takes them off first and lists them for update-all to put back.
 printf 'zeroos-app-notes 1.0.0 zeroos-app-abi-0\nzeroos-app-old 1.0.0 zeroos-app-abi-0\n' > "$T/installed"

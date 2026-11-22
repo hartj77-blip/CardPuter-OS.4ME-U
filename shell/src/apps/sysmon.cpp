@@ -106,7 +106,10 @@ private:
             lv_bar_set_value(disk_bar_, s.disk_total_gb10 ? s.disk_used_gb10 * 100 / s.disk_total_gb10 : 0, LV_ANIM_ON);
             lv_label_set_text(temp_, fmt("%d C", s.cpu_temp_c).c_str());
             lv_label_set_text(model_, s.model == "CardputerZero" ? "Standard" : "Lite");
-            lv_label_set_text(os_, s.os_version.c_str());
+            // The row says OS already; "ZeroOS 0.3.3+7.g089fedc" ran over it.
+            std::string os = s.os_version;
+            if (os.rfind("ZeroOS ", 0) == 0) os.erase(0, 7);
+            lv_label_set_text(os_, os.c_str());
             lv_label_set_text(host_, s.hostname.c_str());
             lv_label_set_text(ip_, n.ip.empty() ? "offline" : n.ip.c_str());
             lv_label_set_text(up_, fmt("%ldh %02ldm", s.uptime_s / 3600, (s.uptime_s / 60) % 60).c_str());

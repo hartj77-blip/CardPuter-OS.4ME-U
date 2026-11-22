@@ -42,6 +42,7 @@
 #include <climits>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <map>
 #include <sstream>
@@ -402,8 +403,21 @@ public:
             n.ssid = f[1];
             n.signal = std::atoi(f[2].c_str());
             n.secure = !f[3].empty() && f[3] != "--";
-            v.push_back(n);
+            // One row per network: nmcli lists each access point (a mesh, or
+            // 2.4 and 5 GHz), and joining goes by name anyway.
+            auto same = std::find_if(v.begin(), v.end(), [&](const WifiNetwork& o) { return o.ssid == n.ssid; });
+            if (same == v.end()) {
+                v.push_back(n);
+            } else {
+                same->connected = same->connected || n.connected;
+                same->signal = std::max(same->signal, n.signal);
+            }
         }
+        // nmcli sorts by signal, but merging can raise one: the connected one
+        // first, then strongest.
+        std::stable_sort(v.begin(), v.end(), [](const WifiNetwork& a, const WifiNetwork& b) {
+            return a.connected != b.connected ? a.connected : a.signal > b.signal;
+        });
         return v;
     }
 
@@ -496,18 +510,23 @@ public:
     std::vector<Track> music_library() override {
         std::vector<Track> v;
         std::string root = home() + "/Music";
-        auto add_dir = [&](const std::string& dir, const std::string& artist) {
-            for (auto& n : list_dir(dir)) {
-                std::string full = dir + "/" + n;
-                if (has_ext(n, {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".opus"}))
-                    v.push_back({full, stem(n), artist, cached_duration(full)});
-            }
-        };
-        add_dir(root, "Music");
-        for (auto& n : list_dir(root)) {  // one level of album/artist folders
-            struct stat st{};
-            if (stat((root + "/" + n).c_str(), &st) == 0 && S_ISDIR(st.st_mode)) add_dir(root + "/" + n, n);
-        }
+        // Artist/Album/Disc/track: look a few folders down. The artist is the
+        // folder right under ~/Music.
+        std::function<void(const std::string&, const std::string&, int)> add_dir =
+            [&](const std::string& dir, const std::string& artist, int depth) {
+                for (auto& n : list_dir(dir)) {
+                    if (n[0] == '.') continue;
+                    std::string full = dir + "/" + n;
+                    if (has_ext(n, {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".opus"})) {
+                        v.push_back({full, stem(n), artist, cached_duration(full)});
+                        continue;
+                    }
+                    struct stat st{};
+                    if (depth < 4 && stat(full.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
+                        add_dir(full, depth == 0 ? n : artist, depth + 1);
+                }
+            };
+        add_dir(root, "Music", 0);
         std::sort(v.begin(), v.end(), [](const Track& a, const Track& b) {
             return a.artist == b.artist ? a.title < b.title : a.artist < b.artist;
         });
@@ -1026,7 +1045,10 @@ private:
     void gps_line(const std::string& js) {
         std::string cls = json_str(js, "class");
         if (cls == "DEVICES" || cls == "DEVICE") {
-            gps_.device = js.find("\"path\"") != std::string::npos;
+            // /etc/default/gpsd names /dev/serial0 whether or not a GPS is
+            // plugged in, so a path alone means nothing. gpsd adds "driver"
+            // once a receiver actually talks (a second or two).
+            gps_.device = js.find("\"driver\"") != std::string::npos;
         } else if (cls == "TPV") {
             gps_.device = true;
             gps_.mode = int(json_num(js, "mode", 0));
@@ -1262,8 +1284,12 @@ private:
             if (now - mesh_err_at_ >= 10) {   // the journal is slow: not every refresh
                 mesh_err_at_ = now;
                 mesh_err_ = mesh_last_error();
+                // 2.7 stops (Aborted) instead of using a simulated radio when
+                // no Cap is plugged in: that's "No radio", not a radio error.
+                mesh_no_radio_ = mesh_saw_no_radio();
             }
             m.error = mesh_err_;
+            m.no_radio = mesh_no_radio_;
         }
         if (m.running) {
             // Without a working radio the daemon falls back to a simulated
@@ -1272,10 +1298,7 @@ private:
             if (mesh_log_checks_ < 3 && now - mesh_log_at_ >= 15) {
                 mesh_log_at_ = now;
                 ++mesh_log_checks_;
-                mesh_no_radio_ = !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
-                                      // 2.7.x: "SX126x init result -2", "No SX1262 radio"
-                                      "grep -m1 -E 'init result -[0-9]|No [A-Za-z0-9]+ radio|SimRadio|"
-                                      "[Rr]adio init failed'").empty();
+                mesh_no_radio_ = mesh_saw_no_radio();
             }
             m.no_radio = mesh_no_radio_;
             const NetStatus& n = net_cache_;   // poll() refreshes it; read_net() forks ~7 times
@@ -1393,6 +1416,13 @@ private:
     }
     // The daemon's last error from this run (since mesh_start, else this
     // boot): ERROR/CRIT lines first, then anything that reads like one.
+    // The daemon's log says it found no LoRa radio (pi is in the adm group).
+    bool mesh_saw_no_radio() {
+        return !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
+                    // 2.7.x: "SX126x init result -2", "No sx1262 radio"
+                    "grep -m1 -iE 'init result -[0-9]|No [A-Za-z0-9]+ radio|SimRadio|"
+                    "radio init failed'").empty();
+    }
     std::string mesh_last_error() {
         std::string since = mesh_started_at_ ? "--since @" + std::to_string(long(mesh_started_at_) - 1) : "-b";
         std::istringstream in(run("journalctl -u meshtasticd " + since + " --no-pager -n 200 -o cat 2>/dev/null"));

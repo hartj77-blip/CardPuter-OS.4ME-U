@@ -112,6 +112,13 @@ for id in $ids; do
     if zeroos-apps remove "$id" > "/tmp/remove-$id.log" 2>&1 &&
        ! dpkg-query -W -f '${db:Status-Abbrev}\n' "zeroos-app-$id" 2>/dev/null | grep -q '^ii'; then
         ok "$id removes"
+        # The apps still here keep their own extras (an autoremove once took
+        # M5Stack's camera program whenever any other app was removed).
+        for f in /var/lib/zeroos/apps/extras/*; do
+            [ -e "$f" ] || continue
+            dpkg-query -W -f '${db:Status-Abbrev}' "$(cat "$f")" 2>/dev/null | grep -q '^ii' ||
+                bad "removing $id took $(basename "$f")'s extra $(cat "$f")"
+        done
     else
         bad "$id won't remove"; tail -15 "/tmp/remove-$id.log" | sed 's/^/     /'
     fi
