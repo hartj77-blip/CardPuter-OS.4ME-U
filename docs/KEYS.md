@@ -3,6 +3,9 @@
 Everything on ZeroOS works from the keyboard. Arrows move, Enter opens, and Esc (top left) goes back.
 The \` key works as Esc too.
 
+The keys are being redesigned: [UX.md](UX.md) is the plan (hold Esc for home, Ctrl + Space for the
+taskbar panel, 1 to 9 pick items, Tab for a menu). This page describes the keys as they are today.
+
 ## Number keys
 
 When you're not typing in a text box, the number keys work as buttons. In a text box they type

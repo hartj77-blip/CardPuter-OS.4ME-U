@@ -1,0 +1,313 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ZeroOS UI 2 mockups</title>
+<!-- Mockups for docs/UX.md, each screen at the real 320 x 170.
+     Render to PNG: node docs/ux/render.js -->
+<link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1e1e1e; --surface: #303030; --surface2: #424242; --text: #f7f7f7; --muted: #aea79f;
+    --accent: #e95420; --good: #4bc16b; --bad: #f0524f; --info: #19b6ee;
+    --aub: #2c001e; --aub2: #77216f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #777; font-family: Ubuntu, sans-serif; padding: 16px; display: flex; flex-wrap: wrap; gap: 16px; }
+  figure { display: flex; flex-direction: column; gap: 4px; }
+  figcaption { font: 12px Ubuntu, sans-serif; color: #fff; }
+  .scr { width: 320px; height: 170px; background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; }
+  .sb { height: 18px; background: #000; display: flex; align-items: center; padding: 0 5px; font-size: 12px; gap: 6px; }
+  .sb .t { font-weight: 500; }
+  .sb .title { color: var(--text); }
+  .sb .ic { margin-left: auto; display: flex; gap: 6px; align-items: center; font-size: 10px; }
+  .sb .ic span { font-size: 11px; }
+  .body { position: absolute; top: 18px; bottom: 14px; left: 0; right: 0; overflow: hidden; }
+  .sk { position: absolute; bottom: 0; left: 0; right: 0; height: 14px; background: #101010; color: var(--muted);
+        font-size: 11px; display: flex; align-items: center; gap: 9px; padding: 0 5px; white-space: nowrap; }
+  .sk b { font-weight: 400; background: var(--surface2); color: var(--text); border-radius: 3px; padding: 0 3px;
+          font-size: 10px; line-height: 11px; margin-right: 3px; display: inline-block; min-width: 11px; text-align: center; }
+  .sk .flt { color: var(--text); }
+  .sk .r { margin-left: auto; }
+  .row { height: 22px; display: flex; align-items: center; margin: 0 4px; padding: 0 5px; border-radius: 4px; white-space: nowrap; }
+  .row.f { background: var(--accent); }
+  .row > i { width: 16px; font-size: 11px; color: var(--muted); margin-right: 5px; text-align: center; }
+  .row.f > i { color: #fff; }
+  .n { width: 12px; height: 12px; border-radius: 3px; background: var(--surface2); color: var(--muted); font-size: 9px;
+       text-align: center; line-height: 12px; margin-right: 6px; flex: none; }
+  .row.f .n { background: rgba(0,0,0,.25); color: #fff; }
+  .n.blank { background: none; }
+  .val { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .row.f .val { color: #fff; }
+  .on { color: var(--good); }
+  .hl { color: var(--accent); font-weight: 500; }
+  .row.f .hl { color: #fff; text-decoration: underline; }
+  .head { font-size: 9px; letter-spacing: .08em; color: var(--muted); padding: 1px 9px 1px; font-weight: 500; }
+  .tabs { display: flex; gap: 2px; padding: 3px 4px 0; font-size: 12px; }
+  .tabs span { padding: 2px 7px 3px; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tabs span.on { color: var(--text); border-color: var(--accent); }
+  .tabs .hint { margin-left: auto; font-size: 10px; color: var(--muted); border: none; }
+  .dim { position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+
+  /* Home */
+  .home { background: linear-gradient(90deg, var(--aub), var(--aub2)); }
+  .search { margin: 4px 4px 0; height: 22px; border-radius: 5px; background: rgba(0,0,0,.4); display: flex; align-items: center;
+            padding: 0 7px; gap: 6px; font-size: 14px; }
+  .search .p { color: var(--accent); font-weight: 700; }
+  .search .ph { color: rgba(255,255,255,.45); font-size: 12px; }
+  .cur { display: inline-block; width: 1px; height: 14px; background: #fff; margin-left: 1px; vertical-align: -2px; }
+  .pins { display: flex; gap: 0; padding: 3px 4px 0; justify-content: space-between; }
+  .pin { width: 44px; display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; padding: 2px 0; border-radius: 5px; }
+  .pin.f { background: rgba(255,255,255,.25); }
+  .ico { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; }
+  .pin .lb { font-size: 9px; color: #fff; }
+  .pin .n { position: absolute; top: 0; left: 3px; background: rgba(0,0,0,.55); color: #fff; margin: 0; width: 11px; height: 11px; line-height: 11px; }
+  .home .row { height: 19px; }
+  .home .row.f { background: rgba(255,255,255,.25); }
+  .rico { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 8px; margin-right: 7px; flex: none; }
+  .sub { color: rgba(255,255,255,.6); font-size: 12px; margin-left: 5px; }
+  .home .sk { background: rgba(0,0,0,.5); }
+  .grp { width: 54px; font-size: 8px; letter-spacing: .06em; color: rgba(255,255,255,.55); flex: none; }
+
+  /* Menu */
+  .menu { position: absolute; right: 6px; bottom: 16px; width: 150px; background: #262626; border: 1px solid #4a4a4a;
+          border-radius: 6px; padding: 3px 0; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+  .menu .mt { font-size: 10px; color: var(--muted); padding: 1px 8px 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu .mi { height: 17px; display: flex; align-items: center; padding: 0 6px; margin: 0 3px; border-radius: 3px; font-size: 12px; }
+  .menu .mi.f { background: var(--accent); }
+  .menu .mi .l { width: 13px; font-weight: 700; color: var(--accent); font-size: 11px; }
+  .menu .mi.f .l { color: #fff; }
+  .menu .mi.bad { color: var(--bad); }
+  .menu .mi.off { color: #6a6a6a; }
+  .menu .mi.off .l { color: #6a6a6a; }
+  .menu hr { border: none; border-top: 1px solid #3c3c3c; margin: 2px 6px; }
+
+  /* Confirm */
+  .dlg { position: absolute; left: 40px; right: 40px; top: 44px; background: #2a2a2a; border: 1px solid #4a4a4a; border-radius: 7px;
+         padding: 9px 11px; box-shadow: 0 4px 14px rgba(0,0,0,.6); }
+  .dlg .q { font-size: 14px; font-weight: 500; }
+  .dlg .d { font-size: 11px; color: var(--muted); margin: 3px 0 9px; }
+  .dlg .btns { display: flex; gap: 6px; }
+  .dlg .btn { flex: 1; height: 20px; border-radius: 4px; background: var(--surface2); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .dlg .btn.bad { background: var(--bad); }
+  .dlg .btn b { font-weight: 400; font-size: 10px; opacity: .8; }
+
+  /* Player */
+  .player { padding: 6px 9px; display: flex; gap: 10px; }
+  .art { width: 64px; height: 64px; border-radius: 6px; background: linear-gradient(135deg, #e95420, #77216f); display: flex; align-items: center; justify-content: center; font-size: 26px; color: rgba(255,255,255,.85); flex: none; }
+  .meta .tt { font-size: 16px; font-weight: 500; }
+  .meta .ar { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .meta .nx { font-size: 11px; color: var(--muted); margin-top: 8px; }
+  .bar { margin: 8px 9px 0; height: 4px; background: var(--surface2); border-radius: 2px; position: relative; }
+  .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 34%; background: var(--accent); border-radius: 2px; }
+  .times { display: flex; justify-content: space-between; margin: 3px 9px 0; font-size: 10px; color: var(--muted); }
+
+  /* Help */
+  .help { padding: 3px 9px; display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; row-gap: 0; font-size: 11px; }
+  .help div { display: flex; height: 16px; align-items: center; gap: 6px; white-space: nowrap; }
+  .help b { font-weight: 500; background: var(--surface2); border-radius: 3px; padding: 0 4px; font-size: 10px; min-width: 18px; text-align: center; line-height: 12px; }
+  .help .h { grid-column: 1 / -1; font-size: 9px; letter-spacing: .08em; color: var(--muted); height: 13px; font-weight: 500; }
+
+  /* Panel */
+  .tiles { position: absolute; left: 0; right: 0; top: 0; background: #181818; padding: 5px 4px 6px; display: flex; gap: 3px; border-bottom: 1px solid #333; }
+  .tile { flex: 1; height: 48px; border-radius: 6px; background: var(--surface); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; position: relative; font-size: 9px; color: var(--muted); }
+  .tile i { font-size: 14px; color: var(--text); }
+  .tile.act { background: #5a2a17; }
+  .tile.act i { color: var(--accent); }
+  .tile.f { outline: 2px solid var(--accent); }
+  .tile .n { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; line-height: 10px; font-size: 8px; margin: 0; }
+</style>
+</head>
+<body>
+
+<!-- 1. Home -->
+<figure><figcaption>01 Home: search, pinned, recent</figcaption>
+<div class="scr home" id="s01">
+  <div class="sb"><span class="t">21:44</span><span class="ic"><i class="fa-brands fa-bluetooth-b"></i><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body">
+    <div class="search"><span class="p">›</span><span class="cur"></span><span class="ph">Type to search apps, settings, files</span></div>
+    <div class="pins">
+      <div class="pin"><span class="n">1</span><div class="ico" style="background:#333"><i class="fa-solid fa-terminal"></i></div><span class="lb">Terminal</span></div>
+      <div class="pin"><span class="n">2</span><div class="ico" style="background:#f5761a"><i class="fa-solid fa-folder"></i></div><span class="lb">Files</span></div>
+      <div class="pin"><span class="n">3</span><div class="ico" style="background:#f6b51b"><i class="fa-solid fa-note-sticky"></i></div><span class="lb">Notes</span></div>
+      <div class="pin"><span class="n">4</span><div class="ico" style="background:#e5326c"><i class="fa-solid fa-music"></i></div><span class="lb">Media</span></div>
+      <div class="pin"><span class="n">5</span><div class="ico" style="background:#c7162b"><i class="fa-solid fa-tower-broadcast"></i></div><span class="lb">IR Remote</span></div>
+      <div class="pin"><span class="n">6</span><div class="ico" style="background:#4a90d9"><i class="fa-solid fa-table-cells"></i></div><span class="lb">Apps</span></div>
+      <div class="pin"><span class="n">7</span><div class="ico" style="background:#666"><i class="fa-solid fa-gear"></i></div><span class="lb">Settings</span></div>
+    </div>
+    <div class="head" style="color:rgba(255,255,255,.55)">RECENT</div>
+    <div class="row f"><div class="rico" style="background:#e5326c"><i class="fa-solid fa-music"></i></div>Media<span class="sub">Night Drive</span><span class="val"><i class="fa-solid fa-play"></i></span></div>
+    <div class="row"><div class="rico" style="background:#c7162b"><i class="fa-solid fa-tower-broadcast"></i></div>IR Remote<span class="sub">Living room TV</span></div>
+    <div class="row"><div class="rico" style="background:#f6b51b"><i class="fa-solid fa-note-sticky"></i></div>Notes<span class="sub">notes.txt</span></div>
+  </div>
+  <div class="sk"><span><b>⏎</b>Resume</span><span><b>↓</b>All apps</span><span><b>0</b>Keys</span><span class="r"><b>⇥</b>Menu</span></div>
+</div></figure>
+
+<!-- 2. Home search -->
+<figure><figcaption>02 Home: typing “wi” searches everything</figcaption>
+<div class="scr home" id="s02">
+  <div class="sb"><span class="t">21:44</span><span class="ic"><i class="fa-brands fa-bluetooth-b"></i><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body">
+    <div class="search"><span class="p">›</span><span>wi<span class="cur"></span></span></div>
+    <div style="height:3px"></div>
+    <div class="row f"><span class="n">1</span><span class="grp" style="color:#fff">APP</span><span class="hl">Wi</span>-Fi<span class="val">Open</span></div>
+    <div class="row"><span class="n">2</span><span class="grp">ACTION</span>Turn&nbsp;<span class="hl">Wi</span>-Fi off<span class="val on">On</span></div>
+    <div class="row"><span class="n">3</span><span class="grp">SETTING</span><span class="hl">Wi</span>-Fi › Saved networks</div>
+    <div class="row"><span class="n">4</span><span class="grp">NETWORK</span>HomeNet<span class="val">connected</span></div>
+    <div class="row"><span class="n">5</span><span class="grp">FILE</span><span class="hl">wi</span>ring-plan.txt<span class="val">Documents</span></div>
+  </div>
+  <div class="sk"><span class="flt"><i class="fa-solid fa-magnifying-glass"></i> wi</span><span><b>⏎</b>Open</span><span><b>1-9</b>Pick</span><span class="r"><b>⇥</b>Menu</span></div>
+</div></figure>
+
+<!-- 3. Files list -->
+<figure><figcaption>03 A List screen: number badges, soft-key bar</figcaption>
+<div class="scr" id="s03">
+  <div class="sb"><span class="t">21:44</span><span class="title">Files</span><span style="color:var(--muted)">~/Documents</span><span class="ic"><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body" style="padding-top:3px">
+    <div class="row"><span class="n">1</span><i class="fa-solid fa-folder"></i>Invoices<span class="val">12</span></div>
+    <div class="row f"><span class="n">2</span><i class="fa-solid fa-file-lines"></i>notes.txt<span class="val">2 KB</span></div>
+    <div class="row"><span class="n">3</span><i class="fa-solid fa-file-lines"></i>packing-list.md<span class="val">1 KB</span></div>
+    <div class="row"><span class="n">4</span><i class="fa-solid fa-file-image"></i>receipt.jpg<span class="val">48 KB</span></div>
+    <div class="row"><span class="n">5</span><i class="fa-solid fa-file-lines"></i>wiring-plan.txt<span class="val">4 KB</span></div>
+    <div class="row"><span class="n">6</span><i class="fa-solid fa-file-pdf"></i>zero-manual.pdf<span class="val">1.2 MB</span></div>
+  </div>
+  <div class="sk"><span><b>⏎</b>Open</span><span><b>⌫</b>Up</span><span><b>a-z</b>Find</span><span class="r"><b>⇥</b>Menu</span></div>
+</div></figure>
+
+<!-- 4. Files menu -->
+<figure><figcaption>04 Tab opens the menu: every action, with its letter</figcaption>
+<div class="scr" id="s04">
+  <div class="sb"><span class="t">21:44</span><span class="title">Files</span><span style="color:var(--muted)">~/Documents</span><span class="ic"><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body" style="padding-top:3px">
+    <div class="row"><span class="n">1</span><i class="fa-solid fa-folder"></i>Invoices<span class="val">12</span></div>
+    <div class="row f"><span class="n">2</span><i class="fa-solid fa-file-lines"></i>notes.txt<span class="val">2 KB</span></div>
+    <div class="row"><span class="n">3</span><i class="fa-solid fa-file-lines"></i>packing-list.md<span class="val">1 KB</span></div>
+    <div class="row"><span class="n">4</span><i class="fa-solid fa-file-image"></i>receipt.jpg<span class="val">48 KB</span></div>
+    <div class="row"><span class="n">5</span><i class="fa-solid fa-file-lines"></i>wiring-plan.txt<span class="val">4 KB</span></div>
+    <div class="row"><span class="n">6</span><i class="fa-solid fa-file-pdf"></i>zero-manual.pdf<span class="val">1.2 MB</span></div>
+  </div>
+  <div class="dim" style="bottom:14px;top:18px"></div>
+  <div class="menu" style="bottom:15px">
+    <div class="mt">notes.txt</div>
+    <div class="mi f"><span class="l">O</span>Open</div>
+    <div class="mi"><span class="l">E</span>Rename</div>
+    <div class="mi"><span class="l">C</span>Copy</div>
+    <div class="mi"><span class="l">S</span>Share to PC</div>
+    <hr>
+    <div class="mi"><span class="l">N</span>New folder</div>
+    <div class="mi bad"><span class="l" style="color:var(--bad)">D</span>Delete</div>
+  </div>
+  <div class="sk"><span><b>a-z</b>Run</span><span><b>⏎</b>Open</span><span class="r"><b>Esc</b>Close</span></div>
+</div></figure>
+
+<!-- 5. Confirm -->
+<figure><figcaption>05 One way to confirm anything destructive</figcaption>
+<div class="scr" id="s05">
+  <div class="sb"><span class="t">21:44</span><span class="title">Wi-Fi</span><span class="ic"><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body" style="padding-top:3px">
+    <div class="row f"><span class="n">1</span><i class="fa-solid fa-wifi"></i>HomeNet<span class="val">connected</span></div>
+    <div class="row"><span class="n">2</span><i class="fa-solid fa-wifi"></i>Workshop-5G<span class="val">61%</span></div>
+    <div class="row"><span class="n">3</span><i class="fa-solid fa-wifi"></i>CoffeeBar Guest<span class="val">open</span></div>
+    <div class="row"><span class="n">4</span><i class="fa-solid fa-wifi"></i>DIRECT-printer<span class="val">30%</span></div>
+  </div>
+  <div class="dim"></div>
+  <div class="dlg">
+    <div class="q">Forget “HomeNet”?</div>
+    <div class="d">You’ll need its password to join again.</div>
+    <div class="btns"><div class="btn">Cancel <b>Esc</b></div><div class="btn bad">Forget <b>⏎</b></div></div>
+  </div>
+  <div class="sk"><span><b>⏎</b>Forget</span><span class="r"><b>Esc</b>Cancel</span></div>
+</div></figure>
+
+<!-- 6. Settings -->
+<figure><figcaption>06 Settings: one tree, numbered like a phone menu</figcaption>
+<div class="scr" id="s06">
+  <div class="sb"><span class="t">21:44</span><span class="title">Settings</span><span class="ic"><i class="fa-brands fa-bluetooth-b"></i><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body" style="padding-top:3px">
+    <div class="row f"><span class="n">1</span><i class="fa-solid fa-wifi"></i>Wi-Fi<span class="val">HomeNet</span></div>
+    <div class="row"><span class="n">2</span><i class="fa-brands fa-bluetooth-b"></i>Bluetooth<span class="val on">On</span></div>
+    <div class="row"><span class="n">3</span><i class="fa-solid fa-sun"></i>Display<span class="val">70%, dim 30 s</span></div>
+    <div class="row"><span class="n">4</span><i class="fa-solid fa-volume-high"></i>Sound<span class="val">60%</span></div>
+    <div class="row"><span class="n">5</span><i class="fa-solid fa-battery-three-quarters"></i>Battery &amp; power<span class="val">78%, Balanced</span></div>
+    <div class="row"><span class="n">6</span><i class="fa-solid fa-clock"></i>Date &amp; time<span class="val">21:44</span></div>
+  </div>
+  <div class="sk"><span><b>⏎</b>Open</span><span><b>a-z</b>Find</span><span><b>0</b>Keys</span><span class="r"><b>⇥</b>Menu</span></div>
+</div></figure>
+
+<!-- 7. Player -->
+<figure><figcaption>07 A Control screen: letters are shortcuts, and it says so</figcaption>
+<div class="scr" id="s07">
+  <div class="sb"><span class="t">21:44</span><span class="title">Media</span><span class="ic"><i class="fa-brands fa-bluetooth-b"></i><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body">
+    <div class="tabs"><span class="on">Playing</span><span>Music</span><span>Voice</span><span>Jellyfin</span><span class="hint">◂ ▸</span></div>
+    <div class="player">
+      <div class="art"><i class="fa-solid fa-music"></i></div>
+      <div class="meta"><div class="tt">Low Battery Blues</div><div class="ar">Bench Tapes · Solder Fumes</div><div class="nx">Next: Pocket Computer</div><div class="nx" style="margin-top:3px"><i class="fa-solid fa-volume-high"></i> 60%</div></div>
+    </div>
+    <div class="bar"><i></i></div>
+    <div class="times"><span>1:22</span><span>4:03</span></div>
+  </div>
+  <div class="sk"><span><b>␣</b>Pause</span><span><b>N</b>Next</span><span><b>P</b>Prev</span><span><b>+-</b>Vol</span><span class="r"><b>⇥</b>Menu</span></div>
+</div></figure>
+
+<!-- 8. Key help -->
+<figure><figcaption>08 0 shows every key for this screen</figcaption>
+<div class="scr" id="s08">
+  <div class="sb"><span class="t">21:44</span><span class="title">Keys · Files</span><span class="ic"><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body">
+    <div class="help">
+      <span class="h">THIS SCREEN</span>
+      <div><b>a-z</b>Find a file</div><div><b>⌫</b>Up a folder</div>
+      <div><b>^E</b>Rename</div><div><b>^C</b>Copy</div>
+      <div><b>^S</b>Share to PC</div><div><b>^D</b>Delete</div>
+      <span class="h">EVERYWHERE</span>
+      <div><b>⏎</b>Open / do</div><div><b>Esc</b>Back</div>
+      <div><b>⇥</b>Menu</div><div><b>1-9</b>Pick item</div>
+      <div><b>hold Esc</b>Home</div><div><b>^␣</b>Taskbar panel</div>
+    </div>
+  </div>
+  <div class="sk"><span>Any key closes</span></div>
+</div></figure>
+
+<!-- 9. Panel -->
+<figure><figcaption>09 Ctrl + Space: the taskbar panel, tiles on 1-7</figcaption>
+<div class="scr" id="s09">
+  <div class="sb"><span class="t">21:44</span><span class="title">Files</span><span class="ic"><i class="fa-brands fa-bluetooth-b"></i><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body" style="padding-top:3px">
+    <div class="row"><span class="n">1</span><i class="fa-solid fa-folder"></i>Invoices<span class="val">12</span></div>
+    <div class="row f"><span class="n">2</span><i class="fa-solid fa-file-lines"></i>notes.txt<span class="val">2 KB</span></div>
+    <div class="row"><span class="n">3</span><i class="fa-solid fa-file-lines"></i>packing-list.md<span class="val">1 KB</span></div>
+    <div class="row"><span class="n">4</span><i class="fa-solid fa-file-image"></i>receipt.jpg<span class="val">48 KB</span></div>
+    <div class="row"><span class="n">5</span><i class="fa-solid fa-file-lines"></i>wiring-plan.txt<span class="val">4 KB</span></div>
+    <div class="dim"></div>
+    <div class="tiles">
+      <div class="tile act"><span class="n">1</span><i class="fa-solid fa-wifi"></i>HomeNet</div>
+      <div class="tile act"><span class="n">2</span><i class="fa-brands fa-bluetooth-b"></i>On</div>
+      <div class="tile f"><span class="n">3</span><i class="fa-solid fa-volume-high"></i>60%</div>
+      <div class="tile"><span class="n">4</span><i class="fa-solid fa-sun"></i>70%</div>
+      <div class="tile"><span class="n">5</span><i class="fa-solid fa-battery-three-quarters"></i>2:32</div>
+      <div class="tile"><span class="n">6</span><i class="fa-solid fa-clock"></i>Clock</div>
+      <div class="tile"><span class="n">7</span><i class="fa-solid fa-gear"></i>More</div>
+    </div>
+  </div>
+  <div class="sk"><span><b>◂▸</b>Tile</span><span><b>▴▾</b>Volume</span><span><b>⏎</b>Mute</span><span class="r"><b>Esc</b>Close</span></div>
+</div></figure>
+
+<!-- 10. All apps -->
+<figure><figcaption>10 All apps: A-Z, typing filters</figcaption>
+<div class="scr" id="s10">
+  <div class="sb"><span class="t">21:44</span><span class="title">All apps</span><span style="color:var(--muted)">23</span><span class="ic"><i class="fa-solid fa-wifi"></i><span><i class="fa-solid fa-battery-three-quarters"></i> 78%</span></span></div>
+  <div class="body" style="padding-top:3px">
+    <div class="row"><span class="n">1</span><div class="rico" style="background:#4a90d9"><i class="fa-solid fa-table-cells"></i></div>Apps<span class="val">Get more apps</span></div>
+    <div class="row"><span class="n">2</span><div class="rico" style="background:#2e7d32"><i class="fa-solid fa-battery-three-quarters"></i></div>Battery</div>
+    <div class="row"><span class="n">3</span><div class="rico" style="background:#1e88e5"><i class="fa-solid fa-camera"></i></div>Camera</div>
+    <div class="row f"><span class="n">4</span><div class="rico" style="background:#1976d2"><i class="fa-solid fa-car"></i></div>Car<span class="val">USB stick, Bluetooth</span></div>
+    <div class="row"><span class="n">5</span><div class="rico" style="background:#5e35b1"><i class="fa-solid fa-clock"></i></div>Clock</div>
+    <div class="row"><span class="n">6</span><div class="rico" style="background:#d81b60"><i class="fa-solid fa-compass"></i></div>Compass</div>
+  </div>
+  <div class="sk"><span><b>⏎</b>Open</span><span><b>a-z</b>Find</span><span><b>^P</b>Pin</span><span class="r"><b>⇥</b>Menu</span></div>
+</div></figure>
+
+</body>
+</html>
