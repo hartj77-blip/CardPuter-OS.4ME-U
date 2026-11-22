@@ -58,7 +58,7 @@ Section: misc
 Priority: optional
 Depends: $deps
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
-Homepage: ${HOMEPAGE:-https://github.com/hartj77-blip/cardputer-zero}
+Homepage: ${HOMEPAGE:-https://github.com/hartj77-blip/CardPuter-OS.4ME-U}
 Description: $NAME for ZeroOS
  $SUMMARY
  Installed by the Apps app (zeroos-apps).

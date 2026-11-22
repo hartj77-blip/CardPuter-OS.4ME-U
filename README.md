@@ -17,9 +17,9 @@ ZeroOS is an unofficial community project. It is not made, endorsed or supported
 ## Install
 
 1. Download the newest image:
-   [zeroos-cardputerzero-arm64.img.xz](https://github.com/hartj77-blip/cardputer-zero/releases/latest/download/zeroos-cardputerzero-arm64.img.xz)
+   [zeroos-cardputerzero-arm64.img.xz](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest/download/zeroos-cardputerzero-arm64.img.xz)
    (about 1.5 GB; checksum in the `.sha256` file next to it on the
-   [releases page](https://github.com/hartj77-blip/cardputer-zero/releases/latest)).
+   [releases page](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest)).
 2. Write it to a microSD card with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
    (*Choose OS > Use custom*) or [balenaEtcher](https://etcher.balena.io/). Either takes the `.img.xz` as is.
 3. Put the card in the Cardputer Zero and switch it on. The first boot takes a few minutes.

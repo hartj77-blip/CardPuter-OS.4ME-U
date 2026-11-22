@@ -25,7 +25,7 @@ RELEASE=${ZEROOS_RELEASE:-/etc/zeroos-release}
 SETTLE=${ZEROOS_UPDATE_SETTLE:-10}      # seconds ZeroShell must stay up
 STATUS=$RUN_DIR/update.status
 
-UPDATE_URL=https://github.com/hartj77-blip/cardputer-zero/releases/latest/download
+UPDATE_URL=https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest/download
 ALLOW_HTTP=0
 # shellcheck disable=SC1090
 [ -r "$CONF" ] && . "$CONF"

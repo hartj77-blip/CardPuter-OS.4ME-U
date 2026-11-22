@@ -83,7 +83,7 @@ struct MockJob {
 MockJob g_job;
 Status g_mock_status;
 std::map<std::string, std::string> g_mock_installed;   // id -> version
-std::vector<std::string> g_mock_sources = {"hartj77-blip/cardputer-zero", "hartj77-blip/cardputer-zero-rf"};
+std::vector<std::string> g_mock_sources = {"hartj77-blip/CardPuter-OS.4ME-U", "hartj77-blip/cardputer-zero-rf"};
 bool g_mock_init = false;
 uint32_t g_mock_refreshed = 0;
 
@@ -185,7 +185,7 @@ std::vector<Entry> mock_catalog() {
         e.needs = m.needs;
         e.version = "0.4.0";
         e.size_kb = m.kb;
-        e.source = m.source ? m.source : "hartj77-blip/cardputer-zero";
+        e.source = m.source ? m.source : "hartj77-blip/CardPuter-OS.4ME-U";
         auto it = g_mock_installed.find(e.id);
         if (it != g_mock_installed.end()) e.installed = it->second;
         out.push_back(e);

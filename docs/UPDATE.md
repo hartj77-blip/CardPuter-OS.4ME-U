@@ -124,7 +124,7 @@ An update replaces ZeroOS's own files. It does not touch:
   then the feature that needs it reports that the tool is missing.
 
 For those, flash a new image: the newest is always at
-[releases/latest](https://github.com/hartj77-blip/cardputer-zero/releases/latest)
+[releases/latest](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest)
 (see the README's Install section), or run the **Build image** workflow.
 
 ## Trust

@@ -39,7 +39,7 @@ Section: misc
 Priority: optional
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
 Provides: zeroos-app-abi-$ABI
-Homepage: https://github.com/hartj77-blip/cardputer-zero
+Homepage: https://github.com/hartj77-blip/CardPuter-OS.4ME-U
 Description: ZeroOS for the Cardputer Zero
  ZeroShell (the home screen and apps), its services and system settings.
  Installed by the image and by zeroos-update.
