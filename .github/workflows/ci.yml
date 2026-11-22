@@ -19,12 +19,44 @@ jobs:
         run: cmake -S shell -B build/sim -DZS_BACKEND=sim && cmake --build build/sim -j"$(nproc)"
       - name: Build headless
         run: cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/headless -j"$(nproc)"
+      - name: Unit tests
+        run: ctest --test-dir build/headless --output-on-failure
       - name: Render every screen (fails if any app crashes)
         run: shell/tools/screenshots.sh build/headless/zeroshell build/screenshots
+      - name: Apps as installable modules (fails if one won't load or crashes)
+        # The device build loads every non-base app from a module (docs/APPS.md).
+        # Same here: no modules installed, then every one installed and opened.
+        run: |
+          cmake -S shell -B build/modules -DZS_BACKEND=headless -DZS_APPS_AS_MODULES=ON
+          cmake --build build/modules -j"$(nproc)"
+          shell/tools/modules-test.sh build/modules
       - uses: actions/upload-artifact@v4
         with:
           name: screenshots
           path: build/screenshots
+
+  device-test:
+    name: Device build, run with a fake screen and keyboard
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ python3-pil
+      - name: Key translation tests
+        run: shell/tests/run.sh
+      # The same code the Cardputer runs (framebuffer + evdev keyboard),
+      # built for this machine: start it, press keys, check what was typed.
+      - name: Build device backend (native)
+        run: cmake -S shell -B build/device-native -DZS_BACKEND=device && cmake --build build/device-native -j"$(nproc)"
+      - name: Start, navigate and type
+        run: |
+          gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
+          python3 shell/tests/device/device_test.py build/device-native/zeroshell build/fakedev.so build/device-screens
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-test-screens
+          path: build/device-screens
 
   web:
     name: Browser simulator (WebAssembly)
@@ -56,6 +88,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/aarch64-linux-gnu.cmake
           cmake --build build/device -j"$(nproc)"
           aarch64-linux-gnu-strip build/device/zeroshell
+          aarch64-linux-gnu-strip --strip-unneeded build/device/apps/*.so
       - uses: actions/upload-artifact@v4
         with:
           name: zeroshell-arm64
@@ -64,9 +97,19 @@ jobs:
       # tools/push-update.sh to try this build without re-flashing.
       - name: Update tests
         run: image/tests/update-test.sh
+      - name: App install tests
+        run: image/tests/apps-test.sh
       - name: Package
         run: image/package.sh build/device/zeroshell build/update
+      - name: Package the apps
+        run: image/apps/build.sh build/device/apps build/apps
       - uses: actions/upload-artifact@v4
         with:
           name: zeroos-package
           path: build/update/
+      # Every installable app and zeroos-apps.index (docs/APPS.md): try one on
+      # a device with: sudo zeroos-apps install-file zeroos-app-<id>_*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zeroos-apps
+          path: build/apps/

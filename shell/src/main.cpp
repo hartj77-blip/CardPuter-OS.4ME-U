@@ -4,6 +4,7 @@
 //   zeroshell --mock          device build, but with simulated hardware
 //   zeroshell --zoom N        simulator window scale (default 3)
 //   zeroshell --script S      headless build: run a key script and save screenshots
+//   zeroshell --app-abi       the app module ABI (docs/APPS.md)
 //
 // Script syntax (headless): comma-separated steps
 //   right left up down enter esc bksp   navigation keys
@@ -24,6 +25,7 @@
 #include "lvgl.h"
 #include "platform/platform.h"
 #include "ui/shell.h"
+#include "ui/store.h"
 #include "ui/theme.h"
 
 using namespace zs;
@@ -38,16 +40,20 @@ int main(int argc, char** argv) {
         else if (a == "--real-hal") mock = false;
         else if (a == "--zoom" && i + 1 < argc) zoom = std::atoi(argv[++i]);
         else if (a == "--script" && i + 1 < argc) script = argv[++i];
-        else if (a == "--version") {
+        else if (a == "--app-abi") {   // zeroos-apps offers only modules built for this
+            std::printf("%d\n", ZS_APP_ABI);
+            return 0;
+        } else if (a == "--version") {
             std::printf("zeroshell %s (%s)\n", ZS_VERSION, ZS_BACKEND_NAME);
             return 0;
         } else {
-            std::fprintf(stderr, "usage: %s [--mock|--real-hal] [--zoom N] [--script STEPS] [--version]\n", argv[0]);
+            std::fprintf(stderr, "usage: %s [--mock|--real-hal] [--zoom N] [--script STEPS] [--version] [--app-abi]\n", argv[0]);
             return 2;
         }
     }
 
     set_hal(mock ? make_mock_hal() : make_linux_hal());
+    store::set_mock(mock);
     lv_init();
 
     lv_indev_t* keypad = platform_init(theme::kScreenW, theme::kScreenH, zoom);

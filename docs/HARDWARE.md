@@ -11,12 +11,12 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | SoC | RP3A0 (BCM2837), 4x A53 @ 1 GHz, 512 MB | | Everything |
 | Display | ST7789V3 320x170, SPI | `/dev/fb_lcd`: fb0, or fb1 with a monitor connected at boot (DRM mipi-dbi + firmware blob) | ZeroShell |
 | Backlight | PWM | `/sys/class/backlight/*` | Settings > Brightness |
-| Keyboard | TCA8418 (I2C 0x34) | evdev input device | All input |
+| Keyboard | TCA8418 (I2C 0x34) | evdev input device. M5's driver handles Shift, Fn and Sym itself (tap = next key only, double tap = lock) and sends a different key code per layer; `shell/src/platform/keys.cpp` turns those into characters | All input |
 | Key LEDs | Shift, Fn, Sym, 3 status | `/sys/class/leds/*` | `Hal::set_led` (modifier state, alerts: Phase 1) |
 | Fuel gauge | BQ27220 | `/sys/class/power_supply/bq27220-0/` | Status bar, Battery app |
 | RTC | RX8130CE | `/dev/rtc0` | Offline time, Clock app |
 | IMU* | BMI270 + BMM150 | iio (`in_accel_*`, `in_anglvel_*`, `in_magn_*`) | Compass, level |
-| IR | TX + RX on GPIO | rc-core: `ir-ctl`, `ir-keytable` | IR Remote |
+| IR | TX + RX on GPIO | rc-core: `ir-ctl` sends our own encoded timings and learns raw (docs/IR.md) | IR Remote |
 | Audio | ES8389 codec, AW8737A amp, 1 W speaker, mic, TRRS | ALSA/PipeWire; sox `play`/`rec` | Media app (music, voice notes), volume, mute |
 | Wi-Fi / BT | BCM43439 2.4 GHz | NetworkManager, BlueZ | Wi-Fi app, Settings, Bluetooth audio in the Car app |
 | Ethernet | SR9900A (USB) | `eth0` | Status, System app |

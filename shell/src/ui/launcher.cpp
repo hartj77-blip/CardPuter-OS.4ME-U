@@ -23,7 +23,10 @@ constexpr int kGridY = 3;
 constexpr int kDotsY = kGridY + kRows * kCellH + 5;
 
 // The dock's favourites, top to bottom.
-const char* const kFavourites[] = {"terminal", "files", "notes", "remote", "settings"};
+// The first four installed of these, then Settings. Missing ones (not
+// installed) are skipped, so Apps fills in on a fresh ZeroOS.
+const char* const kFavourites[] = {"terminal", "files", "notes", "remote", "apps"};
+constexpr int kDockSlots = 5;
 constexpr int kFavCount = int(sizeof kFavourites / sizeof kFavourites[0]);
 
 // A Yaru-style icon: a white glyph on a coloured rounded square.
@@ -66,10 +69,15 @@ public:
         lv_obj_set_style_bg_color(dock, c(0x000000), 0);
         lv_obj_set_style_bg_opa(dock, LV_OPA_60, 0);
         lv_obj_remove_flag(dock, LV_OBJ_FLAG_SCROLLABLE);
-        const int pitch = kContentH / kFavCount;
-        for (int f = 0; f < kFavCount; ++f) {
+        const int pitch = kContentH / kDockSlots;
+        std::vector<std::string> favs;
+        for (int fav = 0; fav < kFavCount && int(favs.size()) < kDockSlots - 1; ++fav)
+            if (app_find(kFavourites[fav])) favs.push_back(kFavourites[fav]);
+        favs.push_back("settings");
+        for (auto& fav : favs) {
             for (size_t i = 0; i < apps.size(); ++i) {
-                if (apps[i].id != kFavourites[f]) continue;
+                if (apps[i].id != fav) continue;
+                const int f = int(dock_.size());
                 lv_obj_t* slot = lv_obj_create(dock);
                 style_highlight(slot, 7);
                 lv_obj_set_size(slot, 28, 28);
@@ -125,6 +133,7 @@ public:
             return true;
         }
         if (in_dock_) return dock_key(key);
+        if (n == 0) return false;   // no apps at all (a build with every app a module)
         int col = sel_ % kCols;
         switch (key) {
             case LV_KEY_RIGHT: select((sel_ + 1) % n); return true;
@@ -205,6 +214,7 @@ private:
     }
 
     void select(int i) {
+        if (cells_.empty()) return;
         if (sel_ >= 0 && sel_ < int(cells_.size())) lv_obj_remove_state(cells_[sel_], LV_STATE_USER_1);
         sel_ = i;
         lv_obj_add_state(cells_[sel_], LV_STATE_USER_1);

@@ -28,6 +28,7 @@
 
 #include "hal/hal.h"
 #include "hal/lcd_fb.h"
+#include "platform/keys.h"
 #include "hal/play_clock.h"
 #include "ui/shell.h"
 
@@ -79,6 +80,10 @@ void install_quit_handlers() {
 namespace {
 // The keyboard is a TCA8418 matrix exposed as an evdev device. Prefer it by
 // name, fall back to the first device that reports letter keys.
+bool is_builtin_name(const char* name) {
+    return std::strstr(name, "tca8418") || std::strstr(name, "TCA8418") || std::strstr(name, "keypad");
+}
+
 std::string find_keyboard() {
     if (const char* env = std::getenv("ZS_KEYBOARD")) return env;
     std::string fallback;
@@ -92,10 +97,67 @@ std::string find_keyboard() {
         ioctl(fd, EVIOCGBIT(EV_KEY, sizeof keys), keys);
         close(fd);
         bool has_a = keys[KEY_A / (8 * sizeof(long))] & (1UL << (KEY_A % (8 * sizeof(long))));
-        if (std::strstr(name, "tca8418") || std::strstr(name, "TCA8418") || std::strstr(name, "keypad")) return path;
+        if (is_builtin_name(name)) return path;
         if (has_a && fallback.empty()) fallback = path;
     }
-    return fallback.empty() ? "/dev/input/event0" : fallback;
+    return fallback;   // empty: no keyboard yet (its driver can load after we start)
+}
+
+// The built-in keyboard's Sym layer sends its own key codes (keys.h); any
+// other keyboard is read as a US one. ZS_KEYMAP=us|cardputer overrides.
+KeyLayout keyboard_layout(int fd) {
+    if (const char* env = std::getenv("ZS_KEYMAP")) {
+        if (!std::strcmp(env, "us")) return KeyLayout::Us;
+        if (!std::strcmp(env, "cardputer")) return KeyLayout::Cardputer;
+    }
+    char name[128] = {0};
+    if (ioctl(fd, EVIOCGNAME(sizeof name - 1), name) < 0) return KeyLayout::Cardputer;
+    std::printf("zeroshell: keyboard name \"%s\"\n", name);
+    return is_builtin_name(name) ? KeyLayout::Cardputer : KeyLayout::Us;
+}
+
+static_assert(kKeyUp == LV_KEY_UP && kKeyDown == LV_KEY_DOWN && kKeyRight == LV_KEY_RIGHT &&
+              kKeyLeft == LV_KEY_LEFT && kKeyEsc == LV_KEY_ESC && kKeyDel == LV_KEY_DEL &&
+              kKeyBackspace == LV_KEY_BACKSPACE && kKeyEnter == LV_KEY_ENTER && kKeyNext == LV_KEY_NEXT &&
+              kKeyPrev == LV_KEY_PREV && kKeyHome == LV_KEY_HOME && kKeyEnd == LV_KEY_END,
+              "keys.h must match LVGL's key values");
+
+// We read the keyboard ourselves: LVGL's own evdev driver only passes on
+// arrows, Enter, Esc and a few more, and drops every letter and digit.
+KeyTranslator g_translator;
+uint32_t g_cur_key = 0;
+lv_indev_state_t g_cur_state = LV_INDEV_STATE_RELEASED;
+
+bool open_keyboard() {
+    std::string kb = find_keyboard();
+    if (kb.empty()) return false;
+    g_kb_fd = open(kb.c_str(), O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+    if (g_kb_fd < 0) {
+        std::fprintf(stderr, "zeroshell: cannot open keyboard %s: %s\n", kb.c_str(), std::strerror(errno));
+        return false;
+    }
+    std::printf("zeroshell: keyboard %s\n", kb.c_str());
+    g_translator = KeyTranslator(keyboard_layout(g_kb_fd));
+    std::fflush(stdout);
+    return true;
+}
+
+void keyboard_read_cb(lv_indev_t*, lv_indev_data_t* data) {
+    input_event ev;
+    while (g_kb_fd >= 0 && read(g_kb_fd, &ev, sizeof ev) == ssize_t(sizeof ev)) {
+        if (ev.type == EV_KEY) g_translator.feed(ev.code, ev.value);
+        else if (ev.type == EV_SYN && ev.code == SYN_DROPPED) g_translator.reset();
+    }
+    // One press or release per read; LVGL reads again while more wait, so
+    // fast typing is not lost.
+    KeyEvent e;
+    if (g_translator.next(e)) {
+        g_cur_key = e.key;
+        g_cur_state = e.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    }
+    data->key = g_cur_key;
+    data->state = g_cur_state;
+    data->continue_reading = g_translator.pending();
 }
 }  // namespace
 
@@ -154,14 +216,13 @@ lv_indev_t* platform_init(int, int, int) {
     install_quit_handlers();
     lv_display_t* d = lv_linux_fbdev_create();
     lv_linux_fbdev_set_file(d, fb.c_str());
-    std::string kb = find_keyboard();
-    std::printf("zeroshell: keyboard %s\n", kb.c_str());
-    lv_indev_t* in = lv_evdev_create(LV_INDEV_TYPE_KEYPAD, kb.c_str());
+    if (!open_keyboard()) std::fprintf(stderr, "zeroshell: no keyboard yet, will keep looking\n");
+    lv_indev_t* in = lv_indev_create();
+    lv_indev_set_type(in, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(in, keyboard_read_cb);
     // Keys would also reach the Linux console on tty1 behind us (a known
     // stock-image problem); the image masks getty@tty1 to prevent that.
     g_keypad = in;
-    // lv_evdev_t keeps the device fd as its first member (LVGL 9.2, pinned).
-    if (void* dsc = lv_indev_get_driver_data(in)) g_kb_fd = *static_cast<int*>(dsc);
     return in;
 }
 
@@ -199,7 +260,14 @@ int platform_run() {
                 if (g_keypad) lv_indev_read(g_keypad);
             }
         } else {
+            // No keyboard at start (driver not loaded yet): look again
+            // about once a second.
             usleep(ms * 1000);
+            static uint32_t last_try = 0;
+            if (lv_tick_elaps(last_try) >= 1000) {
+                last_try = lv_tick_get();
+                open_keyboard();
+            }
         }
     }
     std::printf("zeroshell: stopping\n");

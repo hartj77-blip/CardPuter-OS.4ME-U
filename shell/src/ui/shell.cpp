@@ -329,6 +329,18 @@ void Shell::open_app(const std::string& id) {
     // Deferred: apps often call this from their own on_key(), and switching
     // destroys the calling app. apply_pending() runs once the call returns.
     pending_ = id;
+    app_arg_.clear();
+}
+
+void Shell::open_app(const std::string& id, const std::string& arg) {
+    pending_ = id;
+    app_arg_ = arg;
+}
+
+std::string Shell::take_app_arg() {
+    std::string a;
+    a.swap(app_arg_);
+    return a;
 }
 
 void Shell::go_home() { pending_ = "home"; }
@@ -342,14 +354,18 @@ void Shell::apply_pending() {
         switch_to(make_launcher(), "");
         return;
     }
-    for (auto& info : app_registry()) {
-        if (info.id == id) {
-            app_id_ = id;
-            switch_to(info.make(), info.name);
-            return;
-        }
+    if (const AppInfo* info = app_find(id)) {
+        app_id_ = id;
+        // Copy what switch_to needs: an app may reload the registry.
+        auto make = info->make;
+        std::string name = info->name;
+        switch_to(make(), name);
+        app_arg_.clear();   // build() had its chance to read it
+        return;
     }
-    toast("Unknown app: " + id);
+    app_arg_.clear();
+    // Installable apps (docs/APPS.md) that aren't on this device yet.
+    toast("Not installed: get it from Apps");
 }
 
 void Shell::toast(const std::string& msg) {
@@ -379,8 +395,8 @@ bool Shell::handle_key(uint32_t key) {
     bool used = false;
     lv_obj_t* focused = group_ ? lv_group_get_focused(group_) : nullptr;
     bool in_text = focused && lv_obj_check_type(focused, &lv_textarea_class);
-    // The Cardputer has no Esc key on the base layer; ` (top-left) doubles as
-    // Back. In a text box it types a `, unless the box is empty: then it's
+    // Esc (top-left) is Back. ` doubles as Back for keyboards without an
+    // Esc key. In a text box it types a `, unless the box is empty: then it's
     // Back too, so there's always a way out of a password or search box.
     if (key == '`' && (!in_text || lv_textarea_get_text(focused)[0] == '\0')) key = LV_KEY_ESC;
     if (app_ && app_->on_key(key)) {
@@ -456,6 +472,8 @@ void Shell::screen_changed() {
 // Service functions declared in app.h
 void shell_toast(const std::string& msg) { Shell::get().toast(msg); }
 void shell_open_app(const std::string& id) { Shell::get().open_app(id); }
+void shell_open_app(const std::string& id, const std::string& arg) { Shell::get().open_app(id, arg); }
+std::string shell_app_arg() { return Shell::get().take_app_arg(); }
 void shell_go_home() { Shell::get().go_home(); }
 void shell_add_focus(lv_obj_t* obj) { Shell::get().add_focus(obj); }
 void shell_screen_changed() { Shell::get().screen_changed(); }

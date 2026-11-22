@@ -4,11 +4,14 @@ ZeroOS is five layers. Each one only talks to the layer below it, so apps never 
 
 | Layer | What it is | Where |
 | --- | --- | --- |
-| 5. Apps | Built-in apps (C++/LVGL). Later: Python SDK and store apps | `shell/src/apps/` |
+| 5. Apps | C++/LVGL apps: seven built in, the rest installable modules from the Apps app ([APPS.md](APPS.md)) | `shell/src/apps/`, `image/apps/` |
 | 4. ZeroShell | Status bar, launcher, app switching, toasts, key routing | `shell/src/ui/` |
 | 3. Hardware layer | One interface (`zs::Hal`) for battery, IMU, radios, audio, IR, LEDs, power | `shell/src/hal/` |
 | 2. Linux services | NetworkManager, BlueZ, PipeWire, libcamera, systemd | Debian packages |
 | 1. Base image | Raspberry Pi OS trixie arm64, pinned 6.18.39 kernel, M5 board drivers | `image/` |
+
+IR codes (`shell/src/ir/`: Flipper `.ir` files, protocol encoders, the code database) are a small library
+the IR Remote app and the hardware layer share, with no LVGL in it so it is unit tested on its own (docs/IR.md).
 
 ## ZeroShell
 
@@ -19,7 +22,10 @@ ZeroOS is five layers. Each one only talks to the layer below it, so apps never 
   app's `on_key()`, then to shell keys (Esc = back, Up/Down = move focus), and only then to the
   focused LVGL widget. This is how an app can use letters as shortcuts while text fields still type.
 - **Apps** implement `zs::App` (`build`, `tick`, `on_key`, `on_back`) and are listed in
-  `apps/registry.cpp`. Switching apps is deferred until the current key handler returns, so an app
+  `shell/apps.cmake`. Base apps are compiled into ZeroShell; on the device every other app is a module
+  (`/usr/lib/zeroos/apps/<id>.so`) that `apps/registry.cpp` loads, installed as a package by the Apps
+  app (see [APPS.md](APPS.md)). The simulator compiles every app in. Apps reach each other only through
+  `shell_open_app(id, arg)`, never by calling into another app's code, since that app may not be installed. Switching apps is deferred until the current key handler returns, so an app
   can safely open another app from its own handler.
 
 - **Look.** Ubuntu's desktop at 320x170: a black top bar (app name, date and time, status icons), a

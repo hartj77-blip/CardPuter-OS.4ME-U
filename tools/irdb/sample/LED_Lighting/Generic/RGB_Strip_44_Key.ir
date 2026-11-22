@@ -1,0 +1,51 @@
+Filetype: IR signals file
+Version: 1
+# Common 44-key RGB LED strip remote (NEC, address 00)
+#
+name: On
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 40 00 00 00
+#
+name: Off
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 41 00 00 00
+#
+name: Red
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 58 00 00 00
+#
+name: Green
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 59 00 00 00
+#
+name: Blue
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 45 00 00 00
+#
+name: White
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 44 00 00 00
+#
+name: Brighter
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 5C 00 00 00
+#
+name: Dimmer
+type: parsed
+protocol: NEC
+address: 00 00 00 00
+command: 5D 00 00 00

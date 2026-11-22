@@ -144,7 +144,7 @@ private:
             kv_row(panel, "Runs", mode_label(sync_mode()));
             kv_row(panel, "ID", st_.device_id.substr(0, 7).c_str());
         }
-        const char* hint = !st_.installed ? "Syncthing comes with ZeroOS images."
+        const char* hint = !st_.installed ? "Syncthing is missing: reinstall Sync in Apps."
                            : !st_.requests.empty() ? "Enter: accept\nDel: ignore"
                            : st_.devices.empty() ? "Add this Cardputer in Syncthing on your PC or phone: Show my device ID."
                            : "Notes, Documents and Recordings stay the same everywhere.";

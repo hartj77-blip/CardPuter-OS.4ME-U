@@ -1,0 +1,27 @@
+Filetype: IR signals file
+Version: 1
+# Sony sound bars (SIRC15)
+#
+name: Power
+type: parsed
+protocol: SIRC15
+address: 10 00 00 00
+command: 15 00 00 00
+#
+name: Vol_up
+type: parsed
+protocol: SIRC15
+address: 10 00 00 00
+command: 12 00 00 00
+#
+name: Vol_dn
+type: parsed
+protocol: SIRC15
+address: 10 00 00 00
+command: 13 00 00 00
+#
+name: Mute
+type: parsed
+protocol: SIRC15
+address: 10 00 00 00
+command: 14 00 00 00

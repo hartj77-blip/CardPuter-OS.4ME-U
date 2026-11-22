@@ -1,0 +1,14 @@
+# Car (docs/CAR.md): USB stick mode for a car stereo, Bluetooth audio with
+# the car's play and skip buttons.
+NAME="Car"
+SUMMARY="USB stick mode for a car stereo, Bluetooth audio with the car's buttons"
+DEPENDS="mtools, dosfstools, fdisk"
+NEEDS="mtools"
+STOP_ON_REMOVE="zeroos-usb-stick.service"
+payload() {
+    install -D -m 0755 "$F/car/zeroos-usb-stick" "$D/usr/lib/zeroos/usb-stick"
+    install -D -m 0644 "$F/car/zeroos-usb-stick.service" "$D/etc/systemd/system/zeroos-usb-stick.service"
+    # uinput: BlueZ turns the car's play/skip buttons into key presses with it.
+    install -d "$D/etc/modules-load.d"
+    printf 'uinput\nlibcomposite\n' > "$D/etc/modules-load.d/zeroos-car.conf"
+}

@@ -8,7 +8,7 @@
 //   Wi-Fi      nmcli (NetworkManager)
 //   Bluetooth  bluetoothctl / rfkill
 //   audio      wpctl (PipeWire), falls back to amixer
-//   IR         ir-ctl / ir-keytable (rc-core, gpio-ir-tx / gpio-ir-recv)
+//   IR         ir-ctl (rc-core, gpio-ir-tx / gpio-ir-recv); codes encoded in ir/ir.cpp
 //   QR codes   rpicam-vid (preview frames on a pipe)
 //   tethering  /usr/bin/zeroos-tether (bluetoothctl + nmcli), run in the background
 //   media      sox: `play` for mp3/flac/ogg/wav, `rec` for voice notes, `soxi` for
@@ -45,6 +45,10 @@
 #include <iomanip>
 #include <map>
 #include <sstream>
+#include <chrono>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include "hal/hal.h"
 #include "hal/lcd_fb.h"
@@ -260,6 +264,7 @@ std::string find_power_supply() {
 class LinuxHal : public Hal {
 public:
     ~LinuxHal() override {
+        net_thread_stop();
         scan_stop();
         tether_end();
         gps_stop();
@@ -282,6 +287,9 @@ public:
             if (mesh_wanted_) mesh_log_checks_ = 0;   // look for "no radio" as if it just started
         }
         find_ext5v();
+#ifndef __EMSCRIPTEN__
+        net_thread_ = std::thread([this] { net_thread_main(); });
+#endif
     }
 
     // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
@@ -306,19 +314,44 @@ public:
         // Battery and IMU are cheap sysfs reads; cache them per poll.
         bat_cache_ = read_battery();
         imu_cache_ = read_imu();
-        if (++net_ticks_ % 20 == 0) net_cache_ = read_net();  // every ~2 s
+        {
+            std::lock_guard<std::mutex> lock(net_mu_);
+            if (net_new_) net_cache_ = net_shared_;
+            net_new_ = false;
+        }
     }
 
     BatteryInfo battery() override { return bat_cache_; }
     ImuSample imu() override { return imu_cache_; }
-    NetStatus net() override {
-        // Before poll()'s first 2 s refresh: read it now, but at most once a
-        // second (read_net forks ~7 times; the status bar asks every frame).
-        if (net_ticks_ < 20 && net_cache_.ip.empty() && time(nullptr) != net_early_at_) {
-            net_early_at_ = time(nullptr);
-            net_cache_ = read_net();
+    NetStatus net() override { return net_cache_; }
+
+    // read_net() runs nmcli, bluetoothctl and others (about 7 programs, up
+    // to a second or more together on this CPU). On the UI thread that froze
+    // the screen and the keyboard every 2 s, so it has its own thread;
+    // poll() picks up the result.
+    void net_thread_main() {
+        for (;;) {
+            NetStatus n = read_net();
+            std::unique_lock<std::mutex> lock(net_mu_);
+            net_shared_ = n;
+            net_new_ = true;
+            net_cv_.wait_for(lock, std::chrono::seconds(2), [this] { return net_stop_ || net_now_; });
+            if (net_stop_) return;
+            net_now_ = false;
         }
-        return net_cache_;
+    }
+    void net_refresh_soon() {
+        std::lock_guard<std::mutex> lock(net_mu_);
+        net_now_ = true;
+        net_cv_.notify_one();
+    }
+    void net_thread_stop() {
+        {
+            std::lock_guard<std::mutex> lock(net_mu_);
+            net_stop_ = true;
+            net_cv_.notify_one();
+        }
+        if (net_thread_.joinable()) net_thread_.join();
     }
 
     SystemInfo system() override {
@@ -381,7 +414,10 @@ public:
         // --wait bounds the attempt (default 90 s): this runs on the UI thread.
         std::string cmd = "nmcli --wait 20 dev wifi connect " + id;
         if (!psk.empty()) cmd += " password " + shell_quote(psk);
-        if (run(cmd + " && echo OK").find("OK") != std::string::npos) return true;
+        if (run(cmd + " && echo OK").find("OK") != std::string::npos) {
+            net_refresh_soon();
+            return true;
+        }
         if (psk.empty()) return false;
         // A failed attempt with a typed password must not leave that password
         // saved: NetworkManager would keep retrying it and the next connect
@@ -395,7 +431,10 @@ public:
         while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
         return s;
     }
-    void set_wifi_enabled(bool on) override { run(std::string("nmcli radio wifi ") + (on ? "on" : "off")); }
+    void set_wifi_enabled(bool on) override {
+        run(std::string("nmcli radio wifi ") + (on ? "on" : "off"));
+        net_refresh_soon();
+    }
     void set_bt_enabled(bool on) override { run(std::string("rfkill ") + (on ? "unblock" : "block") + " bluetooth"); }
 
     int brightness() override {
@@ -605,26 +644,68 @@ public:
         }
     }
 
-    bool ir_send(const IrCode& c) override {
-        char sc[32];
-        std::snprintf(sc, sizeof sc, "0x%x", c.scancode);
-        std::string out = run("ir-ctl -S " + shell_quote(c.protocol) + ":" + sc + " && echo OK");
+    // IR: rc-core gives one /dev/lircN per direction (gpio-ir-tx sends,
+    // gpio-ir-recv receives); ask ir-ctl which is which.
+    std::string ir_device(bool send) {
+        std::string& cached = send ? ir_tx_ : ir_rx_;
+        if (!cached.empty()) return cached;
+        for (auto& n : list_dir("/dev/")) {
+            if (n.rfind("lirc", 0) != 0) continue;
+            std::string dev = "/dev/" + n;
+            std::string f = run("ir-ctl -d " + dev + " --features");
+            if (f.find(send ? "can send" : "can receive") != std::string::npos) return cached = dev;
+        }
+        return "";
+    }
+
+    bool ir_send(const ir::Wave& w) override {
+        std::string dev = ir_device(true);
+        if (dev.empty() || w.timings.empty() || w.timings.size() > 1023) return false;
+        char path[] = "/tmp/zeroos-ir-XXXXXX";
+        int fd = mkstemp(path);
+        if (fd < 0) return false;
+        std::string body;
+        for (size_t i = 0; i < w.timings.size(); ++i)
+            body += (i % 2 ? "space " : "pulse ") + std::to_string(w.timings[i]) + "\n";
+        bool wrote = write(fd, body.data(), body.size()) == ssize_t(body.size());
+        close(fd);
+        std::string out;
+        if (wrote)
+            out = run("ir-ctl -d " + dev + " -c " + std::to_string(w.carrier) + " -s " + path + " && echo OK");
+        unlink(path);
         return out.find("OK") != std::string::npos;
     }
 
-    bool ir_learn(IrCode& out, int timeout_ms) override {
-        // ir-keytable -t prints lines like:
-        //   lirc protocol(nec): scancode = 0x40bf12
+    bool ir_learn(std::vector<uint32_t>& timings, int timeout_ms) override {
+        std::string dev = ir_device(false);
+        if (dev.empty()) return false;
         int secs = timeout_ms / 1000 > 0 ? timeout_ms / 1000 : 1;
-        std::string o = run("timeout " + std::to_string(secs) +
-                            " ir-keytable -c -p all -t");
-        auto p = o.find("protocol(");
-        auto s = o.find("scancode = ");
-        if (p == std::string::npos || s == std::string::npos) return false;
-        auto e = o.find(')', p);
-        out.protocol = o.substr(p + 9, e - p - 9);
-        out.scancode = unsigned(std::strtoul(o.c_str() + s + 11, nullptr, 16));
-        return true;
+        // One message (--one-shot where this ir-ctl has it). Output is either
+        // "+9000 -4500 +560 ..." or "pulse 9000 / space 4500" lines.
+        std::string o = run("o=; ir-ctl --help 2>&1 | grep -q -- --one-shot && o=-1; timeout " +
+                            std::to_string(secs) + " ir-ctl -d " + dev + " -r $o");
+        timings.clear();
+        std::istringstream in(o);
+        std::string tok;
+        int want = -1;   // after "pulse"/"space": 1 mark, 0 space; -2: skip a value
+        auto add = [&](bool mark, long v) {
+            if (v <= 0) return;
+            if (timings.empty() && !mark) return;
+            bool last_mark = timings.size() % 2 == 1;
+            if (!timings.empty() && last_mark == mark) timings.back() += uint32_t(v);
+            else timings.push_back(uint32_t(v));
+        };
+        while (in >> tok) {
+            if (want == -2) { want = -1; continue; }
+            if (want >= 0) { add(want == 1, std::atol(tok.c_str())); want = -1; continue; }
+            if (tok == "pulse") want = 1;
+            else if (tok == "space") want = 0;
+            else if (tok == "timeout" || tok == "carrier") want = -2;
+            else if (tok[0] == '+') add(true, std::atol(tok.c_str() + 1));
+            else if (tok[0] == '-') add(false, std::atol(tok.c_str() + 1));
+        }
+        if (timings.size() % 2 == 0 && !timings.empty()) timings.pop_back();
+        return timings.size() >= 7;
     }
 
     void power_off() override { run("systemctl poweroff"); }
@@ -669,6 +750,7 @@ private:
     RecordState rec_;
     PlayClock clock_, rec_clock_;
     std::vector<std::pair<std::string, int>> durations_;
+    std::string ir_tx_, ir_rx_;   // /dev/lircN, found on first use
 
     DisplayStatus display() override {
         DisplayStatus d;
@@ -1084,7 +1166,7 @@ private:
                 tether_.busy.clear();
                 tether_.busy_mac.clear();
                 tether_.passkey.clear();
-                net_ticks_ = 19;   // the status bar's network icons: look again now
+                net_refresh_soon();   // the status bar's network icons: look again now
             }
         }
     }
@@ -1667,7 +1749,8 @@ private:
         return s;
     }
 
-    NetStatus read_net() {
+    // Runs on the network thread: must not touch any member.
+    static NetStatus read_net() {
         NetStatus n;
         n.wifi_enabled = run("nmcli radio wifi").find("enabled") != std::string::npos;
         std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi"));
@@ -1762,9 +1845,12 @@ private:
     std::string bat_, accel_, magn_, backlight_;
     BatteryInfo bat_cache_;
     ImuSample imu_cache_;
-    NetStatus net_cache_;
-    time_t net_early_at_ = 0;
-    long net_ticks_ = 0;
+    NetStatus net_cache_;          // UI thread's copy
+    NetStatus net_shared_;         // from the network thread, under net_mu_
+    bool net_new_ = false, net_stop_ = false, net_now_ = false;
+    std::mutex net_mu_;
+    std::condition_variable net_cv_;
+    std::thread net_thread_;
 };
 
 }  // namespace

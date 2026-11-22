@@ -10,6 +10,13 @@ umask 022
 HERE=$(cd "$(dirname "$0")" && pwd)
 BIN=$1 OUT=$2 VERSION=$3
 ARCH=${ZEROOS_ARCH:-arm64}
+# Installable apps (docs/APPS.md) depend on zeroos-app-abi-<n>: the app ABI
+# of this ZeroShell (ZS_APP_ABI in shell/src/ui/app.h; zeroshell --app-abi).
+# The image build has no shell/ next to it: image/build.sh writes app-abi.
+if [ -n "${ZEROOS_APP_ABI:-}" ]; then ABI=$ZEROOS_APP_ABI
+elif [ -f "$HERE/app-abi" ]; then ABI=$(cat "$HERE/app-abi")
+else ABI=$(sed -n 's/^#define ZS_APP_ABI \([0-9]*\).*/\1/p' "$HERE/../../shell/src/ui/app.h"); fi
+[[ $ABI =~ ^[0-9]+$ ]] || { echo "error: can't tell the app ABI (shell/src/ui/app.h)" >&2; exit 1; }
 
 case "$VERSION" in
     [0-9]*) ;;
@@ -31,6 +38,7 @@ Maintainer: ZeroOS <noreply@github.com>
 Section: misc
 Priority: optional
 Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
+Provides: zeroos-app-abi-$ABI
 Homepage: https://github.com/hartj77-blip/cardputer-zero
 Description: ZeroOS for the Cardputer Zero
  ZeroShell (the home screen and apps), its services and system settings.
@@ -83,12 +91,11 @@ if [ -d /run/systemd/system ]; then
     udevadm control --reload || true
     # New settings take effect now, not at the next reboot.
     case $changed in *etc/default/earlyoom*) systemctl try-restart earlyoom.service || true ;; esac
-    case $changed in *etc/default/gpsd*) systemctl try-restart gpsd.service || true ;; esac
 fi
 POSTINST
 chmod 0755 "$STAGE/DEBIAN/postinst"
-# The one file people edit: an update leaves their copy alone.
-echo /etc/zeroos/update.conf > "$STAGE/DEBIAN/conffiles"
+# The files people edit: an update leaves their copies alone.
+printf '%s\n' /etc/zeroos/update.conf /etc/zeroos/apps.sources > "$STAGE/DEBIAN/conffiles"
 
 mkdir -p "$OUT"
 DEB="zeroos_${VERSION}_${ARCH}.deb"

@@ -108,7 +108,7 @@ private:
             std::string err = st_.error.empty()
                                   ? "The radio service keeps stopping. Power off, reseat the Cap LoRa-1262, try again."
                                   : st_.error;
-            const char* hint = !st_.installed ? "meshtasticd comes with ZeroOS images."
+            const char* hint = !st_.installed ? "meshtasticd is missing: reinstall Mesh in Apps."
                                : st_.failing ? err.c_str()
                                : st_.no_radio ? "Plug in the Cap LoRa-1262 with the power off, then turn the mesh on."
                                : st_.running ? "Connect to Wi-Fi to chat from your phone."

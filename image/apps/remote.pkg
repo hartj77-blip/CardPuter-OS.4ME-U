@@ -1,0 +1,19 @@
+# Remote (docs/REMOTE.md): Tailscale sign-in, SSH and mosh to your devices,
+# remote desktop on the monitor (Dock), Taildrop into ~/Downloads.
+NAME="Remote"
+SUMMARY="Tailscale sign-in, SSH to your devices, remote desktop, Taildrop"
+DEPENDS="tailscale, mosh, freerdp3-wayland"
+# Tailscale is off at boot; ZeroShell starts it when needed (Settings > Tailscale).
+DISABLE_DEPS="tailscaled.service"
+ENABLE="zeroos-taildrop.service"
+STOP_ON_REMOVE="tailscaled.service"
+payload() {
+    install -D -m 0644 "$F/remote/zeroos-taildrop.service" "$D/etc/systemd/system/zeroos-taildrop.service"
+    install -D -m 0644 "$F/remote/tailscaled-zeroos.conf" "$D/etc/systemd/system/tailscaled.service.d/zeroos.conf"
+    # Tailscale's own Debian repository (it isn't in Debian). zeroos-apps puts
+    # these two in place before asking apt for tailscale.
+    install -D -m 0644 "$KEYS/tailscale.gpg" "$D/usr/share/keyrings/zeroos-app-remote.gpg"
+    install -d "$D/etc/apt/sources.list.d"
+    echo "deb [signed-by=/usr/share/keyrings/zeroos-app-remote.gpg] https://pkgs.tailscale.com/stable/debian trixie main" \
+        > "$D/etc/apt/sources.list.d/zeroos-app-remote.list"
+}
