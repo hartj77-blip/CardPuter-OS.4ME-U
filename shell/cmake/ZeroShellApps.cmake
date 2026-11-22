@@ -3,7 +3,7 @@
 #
 #   include(path/to/shell/cmake/ZeroShellApps.cmake)
 #   zs_app(<id> <name> <icon> <color> <make-function>
-#          SOURCES <file.cpp>... [BASE] [ORDER <n>])
+#          SOURCES <file.cpp>... [LIBS <lib>...] [BASE] [ORDER <n>])
 #   ...
 #   zs_apps_build(<zeroshell-target> <shell-src-dir>)
 #   zs_link_lvgl(<zeroshell-target>)
@@ -14,12 +14,14 @@
 # becomes its own <id>.so in <build>/apps/; with it off (the simulator,
 # screenshots, the browser build) every app is compiled in.
 # Apps are listed on the home screen in the order zs_app() was called,
-# unless ORDER says otherwise (base apps use 10, 20, 30...; others use 1000+).
+# unless ORDER says otherwise (this repository's apps use 10, 20, 30...).
+# SOURCES are relative to the file that calls zs_app(). LIBS are linked into
+# the app (static libraries must be built with -fPIC for a module).
 
 set(ZS_SHELL_CMAKE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 function(zs_app id name icon color make)
-  cmake_parse_arguments(A "BASE" "ORDER" "SOURCES" ${ARGN})
+  cmake_parse_arguments(A "BASE" "ORDER" "SOURCES;LIBS" ${ARGN})
   if(NOT id MATCHES "^[a-z0-9][a-z0-9-]*$")
     message(FATAL_ERROR "zs_app: id '${id}' must be lower-case letters, digits and -")
   endif()
@@ -37,7 +39,7 @@ function(zs_app id name icon color make)
   endif()
   set(srcs "")
   foreach(s ${A_SOURCES})
-    get_filename_component(abs "${s}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    get_filename_component(abs "${s}" ABSOLUTE BASE_DIR "${CMAKE_CURRENT_LIST_DIR}")
     list(APPEND srcs "${abs}")
   endforeach()
   set_property(GLOBAL APPEND PROPERTY ZS_APP_IDS ${id})
@@ -48,6 +50,7 @@ function(zs_app id name icon color make)
   set_property(GLOBAL PROPERTY ZS_APP_${id}_ORDER "${A_ORDER}")
   set_property(GLOBAL PROPERTY ZS_APP_${id}_BASE "${A_BASE}")
   set_property(GLOBAL PROPERTY ZS_APP_${id}_SOURCES "${srcs}")
+  set_property(GLOBAL PROPERTY ZS_APP_${id}_LIBS "${A_LIBS}")
 endfunction()
 
 # Link LVGL into ZeroShell. With app modules, all of it: a module may use a
@@ -77,8 +80,12 @@ function(zs_apps_build target shell_src)
     get_property(order GLOBAL PROPERTY ZS_APP_${id}_ORDER)
     get_property(base GLOBAL PROPERTY ZS_APP_${id}_BASE)
     get_property(srcs GLOBAL PROPERTY ZS_APP_${id}_SOURCES)
+    get_property(libs GLOBAL PROPERTY ZS_APP_${id}_LIBS)
     if(base OR NOT ZS_APPS_AS_MODULES)
       target_sources(${target} PRIVATE ${srcs})
+      if(libs)
+        target_link_libraries(${target} PRIVATE ${libs})
+      endif()
       string(APPEND decls "std::unique_ptr<App> ${make}();\n")
       if(base)
         set(is_base true)
@@ -110,6 +117,9 @@ function(zs_apps_build target shell_src)
         $<TARGET_PROPERTY:${target},COMPILE_DEFINITIONS>
         $<TARGET_PROPERTY:lvgl,INTERFACE_COMPILE_DEFINITIONS>)
       target_compile_options(zsapp_${id} PRIVATE $<TARGET_PROPERTY:${target},COMPILE_OPTIONS>)
+      if(libs)
+        target_link_libraries(zsapp_${id} PRIVATE ${libs})
+      endif()
       list(APPEND modules zsapp_${id})
     endif()
   endforeach()
