@@ -528,7 +528,10 @@ public:
         // mpv, not sox: it streams over HTTP and plays whatever the server sends.
         std::vector<std::string> argv = {"mpv", "--no-video", "--no-terminal", "--really-quiet", "--no-config",
                                          "--cache=yes", "--demuxer-max-bytes=16MiB"};
-        if (!auth.empty()) argv.push_back("--http-header-fields=Authorization: " + auth);
+        // -append takes one header as is. --http-header-fields is a list split
+        // at commas, and Jellyfin's header is full of them: the token never
+        // arrived and every stream got 401.
+        if (!auth.empty()) argv.push_back("--http-header-fields-append=Authorization: " + auth);
         argv.push_back("--");
         argv.push_back(url);
         play_pid_ = spawn(argv);

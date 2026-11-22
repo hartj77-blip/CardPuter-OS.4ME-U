@@ -318,6 +318,18 @@ upgrade_all() {
             n=$((n + 1))
         fi
     done <<< "$todo"
+    # Apps that were part of ZeroOS before an update made them installable
+    # (the zeroos package writes the list): put them back, once.
+    if [ -s "$STATE_DIR/restore" ]; then
+        for id in $(cat "$STATE_DIR/restore"); do
+            [[ $id =~ ^[a-z0-9][a-z0-9-]*$ ]] || continue
+            [ -z "$(installed_version "$id")" ] && [ -n "$(field "$id" version)" ] || continue
+            app=$id
+            install_app "$id"
+            n=$((n + 1))
+        done
+        rm -f -- "$STATE_DIR/restore"
+    fi
     app=""
     status done 100 "$n app(s) updated"
 }

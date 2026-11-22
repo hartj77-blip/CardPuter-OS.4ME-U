@@ -1,0 +1,3 @@
+# Files: browse the device's files; opens text in Notes, video on the monitor.
+NAME="Files"
+SUMMARY="Browse the files on this device"

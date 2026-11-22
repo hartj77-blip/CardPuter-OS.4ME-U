@@ -238,7 +238,8 @@ void Power::set_docked(bool docked, uint32_t now_ms) {
     if (docked == docked_) return;
     docked_ = docked;
     last_input_ = now_ms;
-    if (docked) shell_open_app("dock");   // the LCD shows what's on the monitor
+    // The LCD shows what's on the monitor (if the Dock app is installed).
+    if (docked && app_find("dock")) shell_open_app("dock");
     set_state(State::On, now_ms);
     apply_cpu();
     shell_screen_changed();
@@ -259,7 +260,8 @@ void Power::watch_dock(uint32_t now_ms) {
         } else if (mode == "ask") {
             set_state(State::On, now_ms);
             last_input_ = now_ms;
-            shell_open_app("dock");
+            if (app_find("dock")) shell_open_app("dock");
+            else shell_toast("Monitor connected: get Dock from Apps to use it");
         }
     }
     hdmi_was_ = d.hdmi_connected;

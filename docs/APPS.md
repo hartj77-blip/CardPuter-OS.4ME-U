@@ -1,9 +1,16 @@
 # Apps
 
-ZeroOS itself is small: it comes with **Apps**, **Dock**, **Files**, **Settings**, **Terminal**,
-**Update** and **Wi-Fi**. Everything else is an app you install from the **Apps** app, downloaded
-from GitHub: Battery, Camera, Car, Clock, Compass, GPS, IR Remote, Media, Mesh, Notes, Remote,
-Sync, System, Tether, and the RF tools from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
+ZeroOS itself is small: it comes with **Apps**, **Settings**, **Update** and **Wi-Fi**, which are
+what a device needs to get online, update itself and install apps. Everything else is an app you
+install from the **Apps** app, downloaded from GitHub: Battery, Camera, Car, Clock, Compass, Dock,
+Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal, Tether, and the RF
+tools from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
+
+Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
+with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**
+and press **U** (which that update needs anyway, for the new app ABI). Their system parts stay
+in ZeroOS: the desktop on the monitor (`zeroos-dock`), which Files, Camera, Mesh and Remote also
+use, and the console service behind Terminal. Remote's SSH and mosh need the Terminal app.
 
 Each app brings its own extras with it, so the base image doesn't carry them: Remote brings
 Tailscale, Sync brings Syncthing, Camera brings libcamera and M5Stack's camera program, Mesh brings
@@ -105,5 +112,7 @@ they are, ZeroShell skips them and the store doesn't offer them.
 - Nothing here has run on a Cardputer yet: the installer is tested against stand-ins for apt and
   GitHub (`image/tests/apps-test.sh`), and the modules in a headless ZeroShell on a PC.
 - A ZeroOS update doesn't update apps by itself; open **Apps** and press **U**.
+- Removing Terminal also removes one-key SSH from Remote (Remote says so); removing Dock leaves
+  Dock mode reachable through Settings' "On HDMI" option.
 - The store shows an app's real icon only once it's installed (until then, a grid).
 - An app's page doesn't show screenshots.
