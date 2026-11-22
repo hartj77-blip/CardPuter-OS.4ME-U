@@ -497,6 +497,9 @@ std::string report_body(const std::string& item_id, const std::string& play_sess
 
 void report(const JfSession& s, JfReport what, const std::string& item_id, const std::string& play_session,
             int pos_s, bool paused) {
+#ifdef __EMSCRIPTEN__
+    return;   // the browser simulator has no processes (and no server)
+#else
     if (!s.signed_in() || !safe_id(item_id)) return;
     const char* path = what == JfReport::Start ? "/Sessions/Playing"
                        : what == JfReport::Progress ? "/Sessions/Playing/Progress"
@@ -515,6 +518,7 @@ void report(const JfSession& s, JfReport what, const std::string& item_id, const
     }
     int st;
     waitpid(pid, &st, 0);
+#endif
 }
 
 bool write_dock_options(const JfSession& s, int start_s) {
