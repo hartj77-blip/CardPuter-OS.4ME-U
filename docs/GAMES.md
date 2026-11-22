@@ -73,11 +73,20 @@ before the system one.
 On a full-size keyboard, X and Z are A and B too. Hold several keys at once: Games reads the
 keyboard directly, so you can run and jump.
 
-**Gamepads** work as well: USB, or Bluetooth. Pair a Bluetooth one once in the Terminal: turn on
-Bluetooth in **Settings**, put the gamepad in pairing mode, then run `bluetoothctl`, and in it
-`scan on`, then `pair`, `trust` and `connect` with the gamepad's address. Buttons follow the usual
+**Gamepads** work as well: USB, or Bluetooth. Pair a Bluetooth one once: put it in pairing mode,
+open **Bluetooth** (on the home screen, or Settings > Bluetooth devices), press **S** to scan and
+**Enter** on the gamepad. It reconnects by itself after that. Buttons follow the usual
 layout, the d-pad or left stick moves, and Home/Guide opens the menu. A gamepad that connects
 mid-game is picked up within a couple of seconds.
+
+**Xbox Wireless Controller** (Xbox One S / Series, Bluetooth): turn it on, hold the small pair
+button on top until the Xbox logo flashes fast, then **S** and **Enter** in **Bluetooth**. The logo
+goes solid when it's paired. Pairing only works for 2 minutes after a scan (anything nearby could
+pair while it's open). If the logo keeps blinking after pairing, update the controller (Xbox
+Accessories app on Windows, or an Xbox), then **X** (forget) and pair again. ZeroOS sets BlueZ up
+for these controllers (`Privacy = device` and steady LE connection values in
+`/etc/bluetooth/main.conf`, set by `/usr/lib/zeroos/bluetooth-conf`): without them they drop
+after a couple of minutes and forget the pairing.
 
 **Saves.** Games with a battery save (most RPGs) are saved as they are played and when you quit,
 in `~/Games/saves/<game>.srm`. **Save state** stores the exact moment in

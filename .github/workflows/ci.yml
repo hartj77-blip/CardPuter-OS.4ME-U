@@ -136,6 +136,8 @@ jobs:
         run: image/tests/update-test.sh
       - name: App install tests
         run: image/tests/apps-test.sh
+      - name: Bluetooth config tests
+        run: image/tests/bluetooth-conf-test.sh
       - name: Package
         run: image/package.sh build/device/zeroshell build/update
       - name: Package the apps

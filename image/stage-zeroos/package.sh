@@ -118,6 +118,13 @@ if [ ! -e "$ROOT/var/lib/zeroos/apps/.apps-repo-added" ]; then
     mkdir -p "$ROOT/var/lib/zeroos/apps"
     touch "$ROOT/var/lib/zeroos/apps/.apps-repo-added"
 fi
+# BlueZ options for Bluetooth LE gamepads (Xbox): edited in place, since
+# main.conf belongs to the bluez package.
+bt_changed=""
+if [ -x "$ROOT/usr/lib/zeroos/bluetooth-conf" ]; then
+    bt_changed=$("$ROOT/usr/lib/zeroos/bluetooth-conf" "$ROOT/etc/bluetooth/main.conf" 2>/dev/null || true)
+fi
+[ -n "$bt_changed" ] && changed="$changed /etc/bluetooth/main.conf"
 if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
@@ -129,6 +136,9 @@ if [ -d /run/systemd/system ]; then
     systemd-tmpfiles --create /etc/tmpfiles.d/zeroos-memory.conf 2>/dev/null || true
     # New settings take effect now, not at the next reboot.
     case $changed in *etc/default/earlyoom*) systemctl try-restart earlyoom.service || true ;; esac
+    # Once, when the options were first set: connected Bluetooth devices
+    # reconnect a moment later.
+    case $changed in *etc/bluetooth/main.conf*) systemctl try-restart bluetooth.service || true ;; esac
 fi
 POSTINST
 chmod 0755 "$STAGE/DEBIAN/postinst"

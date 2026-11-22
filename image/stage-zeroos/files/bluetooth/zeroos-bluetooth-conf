@@ -1,0 +1,60 @@
+#!/bin/sh
+# zeroos-bluetooth-conf [main.conf]: set the BlueZ options ZeroOS needs for
+# Bluetooth LE gamepads (Xbox Series), keeping everything else in the file.
+# Prints "changed" if it edited the file. Run by the zeroos package's postinst.
+#
+# Why each one (docs/GAMES.md, research in PR #22):
+#   Privacy = device         BlueZ then hands over an identity key when pairing;
+#                            without it the Xbox controller never finishes
+#                            bonding, drops after ~2.5 min and forgets us.
+#   JustWorksRepairing       a gamepad that lost its key can pair again
+#   ControllerMode = dual    LE and classic (the default, said out loud)
+#   [LE] connection values   BlueZ doesn't apply the controller's preferred
+#                            ones; these keep the link steady.
+set -eu
+CONF=${1:-/etc/bluetooth/main.conf}
+[ -f "$CONF" ] || exit 0
+
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+awk '
+BEGIN {
+    # section|key|value
+    n = split("General|Privacy|device,General|JustWorksRepairing|always,General|ControllerMode|dual," \
+              "LE|MinConnectionInterval|7,LE|MaxConnectionInterval|9,LE|ConnectionLatency|0," \
+              "LE|ConnectionSupervisionTimeout|200", want, ",")
+    for (i = 1; i <= n; i++) { split(want[i], f, "|"); sec[i] = f[1]; key[i] = f[2]; val[i] = f[3]; done[i] = 0 }
+}
+# Before leaving a section, add its keys that had no line (set or commented).
+function flush(s,   i) {
+    for (i = 1; i <= n; i++)
+        if (sec[i] == s && !done[i]) { print key[i] " = " val[i]; done[i] = 1 }
+}
+/^\[[^]]+\][ \t]*$/ {
+    if (cur != "") flush(cur)
+    cur = $0; gsub(/^\[|\][ \t]*$/, "", cur)
+    print; next
+}
+{
+    for (i = 1; i <= n; i++) {
+        if (sec[i] != cur || done[i]) continue
+        if ($0 ~ "^#?[ \t]*" key[i] "[ \t]*=") {
+            print key[i] " = " val[i]; done[i] = 1; next
+        }
+    }
+    print
+}
+END {
+    if (cur != "") flush(cur)
+    # Sections the file lacks altogether.
+    for (i = 1; i <= n; i++)
+        if (!done[i]) {
+            if (!(sec[i] in added)) { print ""; print "[" sec[i] "]"; added[sec[i]] = 1 }
+            print key[i] " = " val[i]; done[i] = 1
+        }
+}' "$CONF" > "$tmp"
+
+if ! cmp -s "$CONF" "$tmp"; then
+    cat "$tmp" > "$CONF"   # keeps the file's owner and mode
+    echo changed
+fi

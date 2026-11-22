@@ -71,6 +71,7 @@ jobs:
         run: |
           image/tests/update-test.sh
           image/tests/apps-test.sh
+          image/tests/bluetooth-conf-test.sh
       - name: Package
         run: |
           image/package.sh build/device/zeroshell build/update

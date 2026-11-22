@@ -313,6 +313,7 @@ public:
         if (gps_fd_ >= 0 && time(nullptr) - gps_want_ > 5) gps_stop();
         mesh_pump();
         if (visible_pid_ > 0 && exited(visible_pid_)) visible_pid_ = -1;   // reap the pairing window
+        if (pair_pid_ > 0 && exited(pair_pid_)) pair_pid_ = -1;
         // Nobody has looked through the camera for 3 s: turn it off.
         if (scan_pid_ > 0 && time(nullptr) - scan_want_ > 3) scan_stop();
         tether_pump();
@@ -788,7 +789,7 @@ private:
     long long cpu_prev_[2] = {0, 0};
     std::vector<ProcMem> top_;
     int top_calls_ = 0;
-    pid_t play_pid_ = -1, rec_pid_ = -1, cam_pid_ = -1, visible_pid_ = -1;
+    pid_t play_pid_ = -1, rec_pid_ = -1, cam_pid_ = -1, visible_pid_ = -1, pair_pid_ = -1;
     std::vector<int> media_fds_;
     time_t media_scan_ = 0;
     static constexpr const char* kCameraApp = "/usr/bin/camera_app";
@@ -1549,9 +1550,31 @@ private:
         });
         return v;
     }
+    // A bluetoothctl that is BlueZ's default agent and accepts every pairing
+    // request (its built-in "agent auto"), with the adapter pairable, for
+    // `seconds`. Gamepads (Xbox) ask "Accept pairing?" the moment they
+    // connect; with no default agent BlueZ refuses ("No agent available") and
+    // they connect unpaired, then drop. Only for a short window while someone
+    // is pairing: an always-on yes would let anyone nearby pair a keyboard.
+    // bluetoothctl registers its own agent first; dropping it is async, hence
+    // the pauses. `extra` runs inside the window (Car's "Be found").
+    static std::string pairing_window_cmd(int seconds, const std::string& extra_on = "",
+                                          const std::string& extra_off = "") {
+        return "{ sleep 1; echo 'agent off'; sleep 0.5; echo 'agent auto'; sleep 0.5; echo default-agent; "
+               "echo 'pairable on'; " + extra_on + "sleep " + std::to_string(seconds) + "; " + extra_off +
+               "echo 'pairable off'; echo quit; } | bluetoothctl >/dev/null 2>&1";
+    }
+    void bt_pairing_window(int seconds) {
+#ifndef __EMSCRIPTEN__
+        if (pair_pid_ > 0) kill_child(pair_pid_, SIGTERM);
+        pair_pid_ = spawn({"sh", "-c", pairing_window_cmd(seconds)});
+        usleep(2500 * 1000);   // registered and pairable before anything asks
+#endif
+    }
     void bt_scan() override {
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
+        bt_pairing_window(120);   // scanning: about to pair something
         run("bluetoothctl --timeout 8 scan on");
     }
     bool bt_connect(const std::string& address, std::string& error) override {
@@ -1563,11 +1586,13 @@ private:
         run("bluetoothctl power on");
         std::string info = run("bluetoothctl info " + address);
         if (info.find("Paired: yes") == std::string::npos) {
-            // "Just works" pairing: nothing to type here; the car may ask you to confirm.
-            std::string out = run("bluetoothctl --agent=NoInputNoOutput --timeout 25 pair " + address);
+            // "Just works" pairing: nothing to type here. The window's agent
+            // answers whatever the device asks, before or after our pair.
+            bt_pairing_window(60);
+            std::string out = run("bluetoothctl --timeout 25 pair " + address);
             if (out.find("Pairing successful") == std::string::npos &&
                 run("bluetoothctl info " + address).find("Paired: yes") == std::string::npos) {
-                error = "Pairing failed. Is it in pairing mode?";
+                error = "Pairing failed. Put it in pairing mode (lights flash fast), then try again";
                 return false;
             }
         }
@@ -1599,12 +1624,11 @@ private:
         if (seconds <= 0) return;
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
-        // bluetoothctl stays open as the pairing agent for the whole time,
-        // then trusts whatever paired so it can reconnect by itself.
-        std::string s = std::to_string(seconds);
+        // bluetoothctl stays open as the (default, accept-all) pairing agent
+        // for the whole time, then trusts whatever paired so it can
+        // reconnect by itself.
         visible_pid_ = spawn({"sh", "-c",
-            "(echo 'discoverable on'; echo 'pairable on'; sleep " + s + "; echo 'discoverable off') "
-            "| bluetoothctl --agent=NoInputNoOutput >/dev/null 2>&1; "
+            pairing_window_cmd(seconds, "echo 'discoverable on'; ", "echo 'discoverable off'; ") + "; "
             "bluetoothctl devices Paired | while read -r _ a _; do bluetoothctl trust \"$a\"; done"});
 #endif
     }
