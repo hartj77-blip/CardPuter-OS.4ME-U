@@ -22,7 +22,10 @@ radios, audio, camera, real-time clock, key LEDs and the expansion ports.
    (*Choose OS > Use custom*) or [balenaEtcher](https://etcher.balena.io/). Either takes the `.img.xz` as is.
 3. Put the card in the Cardputer Zero and switch it on. The first boot takes a few minutes.
 
-Login for SSH and the console: `pi` / `raspberry` at `cardputer.local`; change the password with `passwd`.
+Log in as `pi` at `cardputer.local` (SSH) or with the **Terminal** app. Every card starts with the
+password `raspberry`, so the first login asks you to choose a new one before anything else.
+Until then, SSH commands without a terminal (`scp`, `tools/push-update.sh`) are refused; signing in
+with an SSH key set in Raspberry Pi Imager skips the question (change the password later with `passwd`).
 After that, new versions arrive over the network with the **Update** app, no re-flash needed.
 
 Every release gets an image: the Release workflow builds it after publishing the update package

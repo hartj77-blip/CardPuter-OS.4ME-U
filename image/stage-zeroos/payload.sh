@@ -60,6 +60,13 @@ install -m 0755 "$F/update/zeroos-update"      "$D/usr/bin/zeroos-update"
 install -m 0644 "$F/update/zeroos-update.service" "$F/update/zeroos-update-check.service" \
                                                "$D/etc/systemd/system/"
 install -m 0644 "$F/update/update.conf"        "$D/etc/zeroos/update.conf"
+# First login: choose a new password while the image's default is still set.
+# The marker and the sshd setting that switch this on are made by the image
+# build only (01-run.sh), so an update never turns it on for a device.
+install -m 0755 "$F/password/first-password" "$F/password/password-check" "$D/usr/lib/zeroos/"
+install -m 0644 "$F/password/zeroos-password-check.service" "$F/password/zeroos-password-check.path" \
+                                               "$D/etc/systemd/system/"
+install -D -m 0644 "$F/password/profile.sh"    "$D/etc/profile.d/zeroos-password.sh"
 # First-boot volume: WirePlumber's default is close to silent on this speaker (M5 bug #262).
 install -D -m 0644 "$F/50-zeroos-default-volume.conf" \
                    "$D/etc/wireplumber/wireplumber.conf.d/50-zeroos-default-volume.conf"
