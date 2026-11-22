@@ -42,6 +42,7 @@
 #include <climits>
 #include <cstdlib>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <map>
 #include <sstream>
@@ -496,18 +497,23 @@ public:
     std::vector<Track> music_library() override {
         std::vector<Track> v;
         std::string root = home() + "/Music";
-        auto add_dir = [&](const std::string& dir, const std::string& artist) {
-            for (auto& n : list_dir(dir)) {
-                std::string full = dir + "/" + n;
-                if (has_ext(n, {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".opus"}))
-                    v.push_back({full, stem(n), artist, cached_duration(full)});
-            }
-        };
-        add_dir(root, "Music");
-        for (auto& n : list_dir(root)) {  // one level of album/artist folders
-            struct stat st{};
-            if (stat((root + "/" + n).c_str(), &st) == 0 && S_ISDIR(st.st_mode)) add_dir(root + "/" + n, n);
-        }
+        // Artist/Album/Disc/track: look a few folders down. The artist is the
+        // folder right under ~/Music.
+        std::function<void(const std::string&, const std::string&, int)> add_dir =
+            [&](const std::string& dir, const std::string& artist, int depth) {
+                for (auto& n : list_dir(dir)) {
+                    if (n[0] == '.') continue;
+                    std::string full = dir + "/" + n;
+                    if (has_ext(n, {".mp3", ".flac", ".ogg", ".wav", ".m4a", ".opus"})) {
+                        v.push_back({full, stem(n), artist, cached_duration(full)});
+                        continue;
+                    }
+                    struct stat st{};
+                    if (depth < 4 && stat(full.c_str(), &st) == 0 && S_ISDIR(st.st_mode))
+                        add_dir(full, depth == 0 ? n : artist, depth + 1);
+                }
+            };
+        add_dir(root, "Music", 0);
         std::sort(v.begin(), v.end(), [](const Track& a, const Track& b) {
             return a.artist == b.artist ? a.title < b.title : a.artist < b.artist;
         });
