@@ -68,8 +68,9 @@ receives from `ir-ctl --features`. Learning runs `ir-ctl -r --one-shot` for up t
 
 ## The database
 
-The image and every update package carry it in `/usr/share/zeroos/ir` (about 12 MB on disk,
-under 1 MB in the package). `tools/irdb/build_irdb.py --fetch` clones a pinned Flipper-IRDB
+It comes with the IR Remote app (docs/APPS.md), whose package installs it in
+`/usr/share/zeroos/ir` (about 12 MB on disk, under 1 MB in the package), so the base image
+doesn't carry it. `tools/irdb/build_irdb.py --fetch` clones a pinned Flipper-IRDB
 commit and writes:
 
 - the `.ir` files as published, `<Category>/<Brand>/<Model>.ir`;
@@ -78,8 +79,8 @@ commit and writes:
   most-used first, each credited to the brand that uses it most;
 - `SOURCE.txt` (commit) and Flipper-IRDB's `LICENSE`.
 
-`image/package.sh` and `image/build.sh` run it (into `build/irdb`) when it isn't there yet; set
-`ZEROOS_IRDB` to use another folder. To move to a newer Flipper-IRDB, change `COMMIT` in the
+`image/apps/build.sh` runs it (into `build/irdb`) when it isn't there yet; set `ZEROOS_IRDB` to
+use another folder. To move to a newer Flipper-IRDB, change `COMMIT` in the
 script. The app reads `ZEROOS_IR_DB` instead of `/usr/share/zeroos/ir` if it is set, which is how
 the simulator gets codes:
 

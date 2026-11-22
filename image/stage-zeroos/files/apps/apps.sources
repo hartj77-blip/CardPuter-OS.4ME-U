@@ -1,0 +1,8 @@
+# Where the Apps app gets apps from (docs/APPS.md), most trusted first: when
+# two sources offer the same app, the first one wins.
+#   owner/repo        a GitHub repository; its newest release must hold
+#                     zeroos-apps.index and the packages it lists
+#   https://...       any address that serves zeroos-apps.index the same way
+# Apps run with full access to this device: only add sources you trust.
+hartj77-blip/cardputer-zero
+hartj77-blip/cardputer-zero-rf

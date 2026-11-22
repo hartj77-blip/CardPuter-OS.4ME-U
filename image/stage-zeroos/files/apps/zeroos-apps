@@ -1,0 +1,413 @@
+#!/bin/bash
+# zeroos-apps: install and remove ZeroOS apps (docs/APPS.md).
+#
+#   zeroos-apps list                    what's on offer and what's installed
+#   zeroos-apps refresh                 fetch the app lists from every source
+#   zeroos-apps install <id>            download an app and install it (or update it)
+#   zeroos-apps remove <id>             remove an app and the extras it brought
+#   zeroos-apps upgrade                 update every installed app that has a newer version
+#   zeroos-apps install-file X.deb      install an app package that is already here
+#   zeroos-apps sources                 where apps come from
+#   zeroos-apps add-source <owner/repo | https://...>
+#   zeroos-apps remove-source <owner/repo | https://...>
+#   zeroos-apps run <action[:arg]>      what zeroos-apps@<action[:arg]>.service runs
+#
+# A source is a GitHub repository (owner/repo) whose newest release holds
+# zeroos-apps.index and the packages it lists, or any https:// address that
+# serves the same. Each app is one Debian package, zeroos-app-<id>, holding
+# the app's module (/usr/lib/zeroos/apps/<id>.so) and its own extras; apt
+# pulls in the Debian packages it depends on, and takes them away again on
+# removal. The download is checked against the index's SHA-256.
+#
+# Everything but list, sources and status needs root. ZeroShell's Apps app
+# starts zeroos-apps@<action>.service and reads /run/zeroos/apps.status.
+set -u
+
+SOURCES=${ZEROOS_APPS_SOURCES:-/etc/zeroos/apps.sources}
+STATE_DIR=${ZEROOS_APPS_STATE:-/var/lib/zeroos/apps}
+CACHE=${ZEROOS_APPS_CACHE:-/var/cache/zeroos/apps}
+RUN_DIR=${ZEROOS_APPS_RUN:-/run/zeroos}
+ZEROSHELL=${ZEROOS_APPS_ZEROSHELL:-/usr/bin/zeroshell}
+CATALOG=$STATE_DIR/catalog
+STATUS=$RUN_DIR/apps.status
+INDEX=zeroos-apps.index
+ROOTDIR=${ZEROOS_APPS_ROOT:-}   # tests only: where apt source files go
+
+action="" app="" last_state=""
+
+log() { echo "zeroos-apps: $*" >&2; }
+
+# status <state> [percent] [message]
+# States: refreshing, downloading, installing, removing, done, failed, offline.
+status() {
+    last_state=$1
+    mkdir -p "$RUN_DIR" 2>/dev/null || return 0
+    local tmp="$STATUS.tmp.$$"
+    {
+        echo "state=$1"
+        echo "action=$action"
+        echo "app=$app"
+        echo "percent=${2:-0}"
+        echo "message=${3:-}"
+    } > "$tmp" 2>/dev/null && chmod 0644 "$tmp" && mv -f "$tmp" "$STATUS"
+    log "$1${app:+ $app}${3:+: $3}"
+}
+
+fail() {
+    status failed 0 "$1"
+    exit 1
+}
+
+on_exit() {
+    local rc=$?
+    case $last_state in
+        refreshing|downloading|installing|removing)
+            status failed 0 "Stopped unexpectedly (code $rc). Try again" ;;
+    esac
+}
+
+need_root() {
+    [ "$(id -u)" = 0 ] || { echo "zeroos-apps: $1 needs root (try: sudo zeroos-apps $1)" >&2; exit 1; }
+}
+
+setup() {
+    mkdir -p "$RUN_DIR" "$STATE_DIR" "$CACHE" || exit 1
+    exec 9> "$RUN_DIR/apps.lock"
+    flock -n 9 || { echo "zeroos-apps: another job is running" >&2; exit 1; }
+    export DEBIAN_FRONTEND=noninteractive
+}
+
+# The app ABI of this ZeroShell: modules built for another one won't load.
+app_abi() {
+    local abi
+    abi=$("$ZEROSHELL" --app-abi 2>/dev/null)
+    if [[ $abi =~ ^[0-9]+$ ]]; then echo "$abi"; else echo 1; fi
+}
+
+# A source line -> the address its files are under, or nothing if it's no source.
+source_url() {
+    local s=$1
+    if [[ $s =~ ^https://[^[:space:]\'\"\\]+$ ]]; then
+        echo "${s%/}"
+    elif [ "${ZEROOS_APPS_ALLOW_FILE:-0}" = 1 ] && [[ $s =~ ^file:///[^[:space:]\'\"\\]+$ ]]; then
+        echo "${s%/}"   # tests only
+    elif [[ $s =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9_][A-Za-z0-9_.-]*$ ]]; then
+        echo "https://github.com/$s/releases/latest/download"
+    fi
+}
+
+list_sources() {
+    [ -r "$SOURCES" ] || return 0
+    sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' "$SOURCES" | awk 'NF'
+}
+
+# Check one index and print its usable blocks, with source= added. Nothing in
+# it is run or sourced; a block that isn't the expected shape is dropped, and
+# so is one built for another app ABI or another kind of computer.
+filter_index() {
+    local src=$1 abi=$2 arch=$3
+    awk -v src="$src" -v abi="$abi" -v arch="$arch" '
+        function flush(   n, k, i) {
+            if (id != "" && ok && v["abi"] == abi \
+                && v["file"] ~ ("^zeroos-app-" id "_[0-9][0-9A-Za-z.+~-]*_(" arch "|all)\\.deb$") \
+                && v["version"] ~ /^[0-9][0-9A-Za-z.+~-]*$/ && v["sha256"] ~ /^[0-9a-f]+$/ \
+                && length(v["sha256"]) == 64 && v["size"] ~ /^[0-9]+$/ \
+                && (v["extra-file"] == "" || (v["extra-file"] ~ /^[A-Za-z0-9][A-Za-z0-9_.+~-]*\.deb$/ \
+                    && v["extra-url"] ~ /^https:\/\/[^ \047"\\]+$/ && v["extra-sha256"] ~ /^[0-9a-f]+$/ \
+                    && length(v["extra-sha256"]) == 64))) {
+                printf "app=%s\n", id
+                n = split("name summary version abi file sha256 size needs extra-file extra-url extra-sha256", k, " ")
+                for (i = 1; i <= n; i++) if (v[k[i]] != "") printf "%s=%s\n", k[i], v[k[i]]
+                printf "source=%s\n\n", src
+            }
+            id = ""; ok = 1; split("", v)
+        }
+        BEGIN { ok = 1 }
+        /^[[:space:]]*$/ { flush(); next }
+        /^#/ { next }
+        {
+            eq = index($0, "=")
+            if (eq < 2) { ok = 0; next }
+            key = substr($0, 1, eq - 1); val = substr($0, eq + 1)
+            gsub(/[[:cntrl:]]/, "", val)
+            if (key == "app") { if (val ~ /^[a-z0-9][a-z0-9-]*$/) id = val; else ok = 0 }
+            else v[key] = substr(val, 1, 200)
+        }
+        END { flush() }'
+}
+
+refresh() {
+    local abi arch tmp src url text n=0 reached=0 out
+    abi=$(app_abi)
+    arch=${ZEROOS_APPS_ARCH:-$(dpkg --print-architecture)}
+    tmp=$(mktemp "$STATE_DIR/catalog.XXXXXX")
+    status refreshing
+    while read -r src; do
+        url=$(source_url "$src")
+        [ -n "$url" ] || { log "skipping $src: not owner/repo or https://"; continue; }
+        n=$((n + 1))
+        if ! text=$(curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 "$url/$INDEX"); then
+            log "no $INDEX from $src"
+            continue
+        fi
+        reached=$((reached + 1))
+        printf '%s\n\n' "$text" | filter_index "$src" "$abi" "$arch" >> "$tmp"
+    done < <(list_sources)
+    if [ "$n" -gt 0 ] && [ "$reached" = 0 ]; then
+        rm -f -- "${tmp:?}"
+        status offline 0 "Can't reach GitHub"
+        return 1
+    fi
+    # The first source to offer an app wins (the list is in order of trust).
+    out=$(mktemp "$STATE_DIR/catalog.XXXXXX")
+    awk -v RS= -v ORS='\n\n' '{ split($0, l, "\n"); if (!(l[1] in seen)) { seen[l[1]] = 1; print } }' \
+        "$tmp" > "$out"
+    chmod 0644 "$out"
+    mv -f "$out" "$CATALOG"
+    rm -f -- "${tmp:?}"
+    status done 100
+}
+
+# field <id> <key>: one value from the catalog.
+field() {
+    [ -r "$CATALOG" ] || return 0
+    awk -v RS= -v id="app=$1" -v key="$2=" '
+        { n = split($0, l, "\n"); if (l[1] != id) next
+          for (i = 2; i <= n; i++) if (index(l[i], key) == 1) { print substr(l[i], length(key) + 1); exit } }' "$CATALOG"
+}
+
+installed_version() {
+    dpkg-query -W -f '${db:Status-Abbrev} ${Version}\n' "zeroos-app-$1" 2>/dev/null | awk '$1 == "ii" {print $2}'
+}
+
+# download <url> <out> <size> <sha256>
+download() {
+    local url=$1 out=$2 size=$3 sha=$4 pid got pct free
+    free=$(df -Pk "$CACHE" | awk 'NR==2 {print $4}')
+    [ "$((size * 3 / 1024))" -lt "${free:-0}" ] || fail "Not enough free space"
+    rm -f -- "${out:?}"
+    curl -fsSL --connect-timeout 10 --speed-limit 1000 --speed-time 60 \
+        --retry 3 --retry-delay 2 -o "$out" "$url" &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        got=$(stat -c %s "$out" 2>/dev/null || echo 0)
+        pct=100
+        [ "$size" -gt 0 ] && pct=$((got * 100 / size))
+        [ "$pct" -gt 100 ] && pct=100
+        status downloading "$pct"
+        sleep 1
+    done 2>/dev/null
+    wait "$pid" || { rm -f -- "${out:?}"; fail "The download stopped. Try again"; }
+    [ "$(sha256sum "$out" | cut -d' ' -f1)" = "$sha" ] || { rm -f -- "${out:?}"; fail "The download was damaged. Try again"; }
+}
+
+# Some apps need a Debian repository of their own (Remote: Tailscale; Mesh:
+# Meshtastic). Their package carries the repository's list file and key;
+# put those in place first so apt can find what the app depends on. Only
+# files named for this app, in these two folders, are taken.
+apt_sources_from() {
+    local deb=$1 id=$2 dir files f
+    dir=$(mktemp -d)
+    if ! dpkg-deb -x "$deb" "$dir"; then
+        rm -rf -- "${dir:?}"
+        return 1
+    fi
+    files=$(cd "$dir" && find etc/apt/sources.list.d usr/share/keyrings -type f \
+        \( -name "zeroos-app-$id.list" -o -name "zeroos-app-$id.sources" \
+           -o -name "zeroos-app-$id.gpg" -o -name "zeroos-app-$id.asc" \) 2>/dev/null)
+    for f in $files; do install -D -m 0644 "$dir/$f" "$ROOTDIR/$f"; done
+    rm -rf -- "${dir:?}"
+    [ -n "$files" ]
+}
+
+# apt_put_on <deb>...: install packages and what they depend on.
+apt_put_on() {
+    dpkg --configure -a >&2 || fail "The package system needs repair first: sudo dpkg --configure -a"
+    apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2 &&
+        return 0
+    # Old or missing package lists (a fresh card has none): fetch them, try again.
+    apt-get update -o Acquire::Retries=3 >&2 || true
+    apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2
+}
+
+# install_debs <id> <app.deb> [extra.deb]
+install_debs() {
+    local id=$1 deb=$2 extra=${3:-} pkg arch ver xpkg
+    pkg=$(dpkg-deb -f "$deb" Package 2>/dev/null)
+    arch=$(dpkg-deb -f "$deb" Architecture 2>/dev/null)
+    ver=$(dpkg-deb -f "$deb" Version 2>/dev/null)
+    [ "$pkg" = "zeroos-app-$id" ] || fail "Not the package for $id"
+    [ "$arch" = all ] || [ "$arch" = "$(dpkg --print-architecture)" ] ||
+        fail "This app is for another kind of computer ($arch)"
+    status installing 100
+    if apt_sources_from "$deb" "$id"; then
+        apt-get update -o Acquire::Retries=3 >&2 || fail "Can't reach the app's package repository"
+    fi
+    # apt treats an argument as a file only if it has a slash.
+    case $deb in */*) ;; *) deb=./$deb ;; esac
+    if [ -n "$extra" ]; then
+        case $extra in */*) ;; *) extra=./$extra ;; esac
+        xpkg=$(dpkg-deb -f "$extra" Package 2>/dev/null)
+        apt_put_on "$extra" "$deb" || fail "Could not install $id. Nothing else changed"
+        # The extra goes when the app goes (apt autoremove).
+        [ -n "$xpkg" ] && apt-mark auto "$xpkg" >&2
+    else
+        apt_put_on "$deb" || fail "Could not install $id. Nothing else changed"
+    fi
+    status done 100 "$id $ver installed"
+}
+
+install_app() {
+    local id=$1 ver file sha size xfile xurl xsha base
+    [[ $id =~ ^[a-z0-9][a-z0-9-]*$ ]] || fail "No such app: $id"
+    [ -s "$CATALOG" ] || refresh || exit 1
+    ver=$(field "$id" version)
+    if [ -z "$ver" ]; then
+        refresh || exit 1
+        ver=$(field "$id" version)
+    fi
+    [ -n "$ver" ] || fail "No source offers $id"
+    file=$(field "$id" file)
+    sha=$(field "$id" sha256)
+    size=$(field "$id" size)
+    base=$(source_url "$(field "$id" source)")
+    [ -n "$base" ] || fail "No source offers $id"
+    status downloading 0
+    download "$base/$file" "$CACHE/$file" "$size" "$sha"
+    xfile=$(field "$id" extra-file)
+    xurl=$(field "$id" extra-url)
+    xsha=$(field "$id" extra-sha256)
+    if [ -n "$xfile" ]; then
+        download "$xurl" "$CACHE/$xfile" 0 "$xsha"
+        install_debs "$id" "$CACHE/$file" "$CACHE/$xfile"
+        rm -f -- "${CACHE:?}/${xfile:?}"
+    else
+        install_debs "$id" "$CACHE/$file"
+    fi
+    rm -f -- "${CACHE:?}/${file:?}"
+}
+
+remove_app() {
+    local id=$1
+    [[ $id =~ ^[a-z0-9][a-z0-9-]*$ ]] || fail "No such app: $id"
+    if [ -z "$(installed_version "$id")" ]; then
+        status done 100 "$id is not installed"
+        return 0
+    fi
+    status removing 100
+    dpkg --configure -a >&2 || true
+    apt-get purge -y "zeroos-app-$id" >&2 || fail "Could not remove $id"
+    # What it brought along (Tailscale, Syncthing...), unless another app needs it.
+    apt-get autoremove --purge -y >&2 || log "autoremove failed; extras may be left"
+    status done 100 "$id removed"
+}
+
+upgrade_all() {
+    local id ver have n=0 todo
+    refresh || exit 1
+    action=upgrade
+    todo=$(dpkg-query -W -f '${db:Status-Abbrev} ${Package} ${Version}\n' 'zeroos-app-*' 2>/dev/null |
+           awk '$1 == "ii" {sub(/^zeroos-app-/, "", $2); print $2, $3}')
+    while read -r id ver; do
+        [ -n "$id" ] || continue
+        have=$(field "$id" version)
+        [ -n "$have" ] || continue
+        if dpkg --compare-versions "$have" gt "$ver"; then
+            app=$id
+            install_app "$id"
+            n=$((n + 1))
+        fi
+    done <<< "$todo"
+    app=""
+    status done 100 "$n app(s) updated"
+}
+
+add_source() {
+    local s=$1
+    s=${s#https://github.com/}
+    s=${s%/}
+    s=${s%.git}
+    [ -n "$(source_url "$s")" ] || fail "Not a source: use owner/repo or an https:// address"
+    if ! list_sources | grep -qxF -- "$s"; then
+        mkdir -p "$(dirname "$SOURCES")"
+        echo "$s" >> "$SOURCES"
+    fi
+    refresh
+}
+
+remove_source() {
+    local s=$1 tmp
+    [ -f "$SOURCES" ] || return 0
+    tmp=$(mktemp)
+    awk -v s="$s" '{ l = $0; sub(/^[ \t]+/, "", l); sub(/[ \t]+$/, "", l); if (l != s) print }' "$SOURCES" > "$tmp"
+    cat "$tmp" > "$SOURCES"
+    rm -f -- "${tmp:?}"
+    refresh
+}
+
+list() {
+    local id
+    printf '%-12s %-12s %-12s %s\n' APP INSTALLED OFFERED SOURCE
+    {
+        [ -r "$CATALOG" ] && awk -v RS= '{ split($0, l, "\n"); print substr(l[1], 5) }' "$CATALOG"
+        dpkg-query -W -f '${db:Status-Abbrev} ${Package}\n' 'zeroos-app-*' 2>/dev/null |
+            awk '$1 == "ii" {sub(/^zeroos-app-/, "", $2); print $2}'
+    } | sort -u | while read -r id; do
+        [ -n "$id" ] || continue
+        printf '%-12s %-12s %-12s %s\n' "$id" "$(installed_version "$id")" "$(field "$id" version)" \
+            "$(field "$id" source)"
+    done
+}
+
+# One job: "install:media", "refresh", "add-source:owner/repo"...
+job() {
+    local words=$1 arg=""
+    action=${words%%:*}
+    [ "$action" != "$words" ] && arg=${words#*:}
+    case $action in
+        refresh) refresh ;;
+        install) app=$arg; install_app "$arg" ;;
+        remove) app=$arg; remove_app "$arg" ;;
+        upgrade) upgrade_all ;;
+        add-source) add_source "$arg" ;;
+        remove-source) remove_source "$arg" ;;
+        *) fail "Unknown job: $words" ;;
+    esac
+}
+
+trap on_exit EXIT
+
+case "${1:-}" in
+    list) list ;;
+    sources) list_sources ;;
+    status) [ -r "$STATUS" ] && cat "$STATUS" ;;
+    run)
+        need_root run
+        setup
+        job "${2:-}"
+        ;;
+    refresh|upgrade)
+        need_root "$1"
+        setup
+        job "$1"
+        ;;
+    install|remove|add-source|remove-source)
+        need_root "$1"
+        [ -n "${2:-}" ] || { echo "usage: zeroos-apps $1 <name>" >&2; exit 1; }
+        setup
+        job "$1:$2"
+        ;;
+    install-file)
+        need_root install-file
+        [ -f "${2:-}" ] || { echo "usage: zeroos-apps install-file <zeroos-app-x.deb>" >&2; exit 1; }
+        setup
+        action=install
+        app=$(dpkg-deb -f "$2" Package 2>/dev/null | sed -n 's/^zeroos-app-//p')
+        [ -n "$app" ] || fail "Not a ZeroOS app package"
+        install_debs "$app" "$2"
+        ;;
+    *)
+        sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+        exit 1
+        ;;
+esac

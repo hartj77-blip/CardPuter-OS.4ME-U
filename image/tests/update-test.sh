@@ -19,9 +19,6 @@ expect() {   # expect <name> <key> <value>: a line of the status file
 # --- the package ---------------------------------------------------------
 printf '#!/bin/sh\necho fake zeroshell\n' > "$T/zeroshell"
 chmod +x "$T/zeroshell"
-# A small IR code database stands in for the full one (docs/IR.md).
-python3 -I "$ROOT/tools/irdb/build_irdb.py" --src "$ROOT/tools/irdb/sample" --out "$T/irdb" >/dev/null
-export ZEROOS_IRDB=$T/irdb
 build() { ZEROOS_ARCH=$ARCH "$ROOT/image/stage-zeroos/package.sh" "$T/zeroshell" "$T/server-$1" "$1" >/dev/null; }
 build 1.0.0; build 1.1.0
 DEB=$T/server-1.1.0/zeroos_1.1.0_$ARCH.deb
@@ -29,8 +26,8 @@ DEB=$T/server-1.1.0/zeroos_1.1.0_$ARCH.deb
 dpkg-deb -x "$DEB" "$T/x"
 for f in usr/bin/zeroshell usr/bin/zeroos-update etc/systemd/system/zeroshell.service \
          etc/systemd/system/zeroos-update.service etc/zeroos/update.conf etc/zeroos-release \
-         usr/share/zeroos/overrides/etc/default/gpsd usr/share/zeroos/ir/index.tsv \
-         usr/share/zeroos/ir/universal/TVs.ir usr/share/zeroos/ir/TVs/LG/LG_TV.ir; do
+         usr/share/zeroos/overrides/etc/default/earlyoom usr/bin/zeroos-apps \
+         etc/systemd/system/zeroos-apps@.service etc/zeroos/apps.sources; do
     [ -e "$T/x/$f" ] && ok "package has /$f" || bad "package is missing /$f"
 done
 # Files other Debian packages own must not be in ours (dpkg would refuse).
@@ -38,10 +35,15 @@ for f in etc/default/gpsd etc/default/earlyoom; do
     [ ! -e "$T/x/$f" ] && ok "package leaves /$f to its owner" || bad "package ships /$f"
 done
 grep -q '^ZeroOS 1.1.0 ' "$T/x/etc/zeroos-release" && ok "release file names the version" || bad "release file"
-# Every file the old image stage installed by hand is in the payload.
+# Every file in files/ is in the payload, or in an installable app (image/apps).
 missing=$(cd "$ROOT/image/stage-zeroos/files" && find . -type f ! -name 'initramfs-*' | while read -r f; do
-    grep -q "$(basename "$f")" "$ROOT/image/stage-zeroos/payload.sh" || echo "$f"; done)
-[ -z "$missing" ] && ok "every file in files/ is in the payload" || bad "not in payload.sh: $missing"
+    grep -q "$(basename "$f")" "$ROOT/image/stage-zeroos/payload.sh" "$ROOT"/image/apps/*.pkg || echo "$f"; done)
+[ -z "$missing" ] && ok "every file in files/ is in the payload or an app" || bad "not in payload.sh or an app: $missing"
+# Installable apps depend on the app ABI this package provides.
+abi=$(sed -n 's/^#define ZS_APP_ABI \([0-9]*\).*/\1/p' "$ROOT/shell/src/ui/app.h")
+dpkg-deb -f "$DEB" Provides | grep -qx "zeroos-app-abi-$abi" && ok "package provides zeroos-app-abi-$abi" || bad "Provides"
+grep -qx /etc/zeroos/apps.sources <(dpkg-deb --ctrl-tarfile "$DEB" | tar -xO ./conffiles) &&
+    ok "apps.sources is kept when edited" || bad "apps.sources is not a conffile"
 
 # --- postinst: /etc/default overrides, kept when edited ------------------
 R=$T/root
@@ -49,20 +51,22 @@ mkdir -p "$R/usr/share/zeroos" "$R/etc/default" "$T/ctl"
 cp -r "$T/x/usr/share/zeroos/overrides" "$R/usr/share/zeroos/"
 dpkg-deb -e "$DEB" "$T/ctl"
 postinst() { ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst"; }
-echo "theirs" > "$R/etc/default/gpsd"
+# A second override (gpsd's moved to the GPS app), to test one file left alone.
+echo "ours" > "$R/usr/share/zeroos/overrides/etc/default/zz-test"
+echo "theirs" > "$R/etc/default/earlyoom"
 postinst > "$T/pi.out"
-cmp -s "$R/etc/default/gpsd" "$R/usr/share/zeroos/overrides/etc/default/gpsd" && ok "postinst: first run installs ours" || bad "postinst: first run"
-grep -qx theirs "$R/etc/default/gpsd.zeroos-old" && ok "postinst: first run backs up the old one" || bad "postinst: no backup"
-[ -f "$R/etc/default/earlyoom" ] && ok "postinst: missing file installed" || bad "postinst: missing file"
+cmp -s "$R/etc/default/earlyoom" "$R/usr/share/zeroos/overrides/etc/default/earlyoom" && ok "postinst: first run installs ours" || bad "postinst: first run"
+grep -qx theirs "$R/etc/default/earlyoom.zeroos-old" && ok "postinst: first run backs up the old one" || bad "postinst: no backup"
+[ -f "$R/etc/default/zz-test" ] && ok "postinst: missing file installed" || bad "postinst: missing file"
 postinst > "$T/pi.out"
 grep -qx "changed:" "$T/pi.out" && ok "postinst: unchanged run changes nothing" || bad "postinst: unchanged run: $(cat "$T/pi.out")"
 echo "# mine" >> "$R/etc/default/earlyoom"
 echo "# new" >> "$R/usr/share/zeroos/overrides/etc/default/earlyoom"
-echo "# new" >> "$R/usr/share/zeroos/overrides/etc/default/gpsd"
+echo "# new" >> "$R/usr/share/zeroos/overrides/etc/default/zz-test"
 postinst > "$T/pi.out"
 tail -1 "$R/etc/default/earlyoom" | grep -qx "# mine" && ok "postinst: edited file kept" || bad "postinst: edited file overwritten"
 tail -1 "$R/etc/default/earlyoom.zeroos-new" | grep -qx "# new" && ok "postinst: new version alongside" || bad "postinst: no .zeroos-new"
-tail -1 "$R/etc/default/gpsd" | grep -qx "# new" && ok "postinst: unedited file updated" || bad "postinst: unedited file not updated"
+tail -1 "$R/etc/default/zz-test" | grep -qx "# new" && ok "postinst: unedited file updated" || bad "postinst: unedited file not updated"
 
 # --- the updater ---------------------------------------------------------
 mkdir -p "$T/bin" "$T/run" "$T/state"

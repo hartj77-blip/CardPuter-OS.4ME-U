@@ -147,7 +147,7 @@ private:
             } else {
                 lv_obj_t* h = label(panel,
                                     ts_.installed ? "Reach your PC, phone and servers from anywhere."
-                                                  : "Tailscale comes with ZeroOS images.",
+                                                  : "Tailscale is missing: reinstall Remote in Apps.",
                                     &zs_font_12, kMuted);
                 lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
                 lv_obj_set_width(h, 136);

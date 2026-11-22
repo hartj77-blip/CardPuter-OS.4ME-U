@@ -17,4 +17,11 @@ polkit.addRule(function(action, subject) {
         units.indexOf(action.lookup("unit")) >= 0) {
         return polkit.Result.YES;
     }
+    // The Apps app: zeroos-apps@<job>.service installs and removes apps
+    // (docs/APPS.md). zeroos-apps checks the job itself.
+    var unit = action.lookup("unit") || "";
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        unit.indexOf("zeroos-apps@") == 0 && unit.slice(-8) == ".service") {
+        return polkit.Result.YES;
+    }
 });

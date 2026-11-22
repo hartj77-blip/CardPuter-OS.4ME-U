@@ -5,11 +5,6 @@ pipewire-pulse
 pipewire-alsa
 wireplumber
 alsa-utils
-sox
-libsox-fmt-all
-ir-keytable
-v4l-utils
-rpicam-apps-lite
 earlyoom
 console-setup
 polkitd
@@ -17,7 +12,6 @@ pkexec
 fonts-noto-cjk
 i2c-tools
 python3-smbus2
-adbd
 labwc
 foot
 fuzzel
@@ -29,15 +23,8 @@ mpv
 mc
 curl
 tmux
-mosh
-freerdp3-wayland
-syncthing
 python3
-gpsd
-gpsd-clients
-mtools
+libspa-0.2-bluetooth
+fbset
 dosfstools
 fdisk
-libspa-0.2-bluetooth
-usbmuxd
-fbset

@@ -1,0 +1,14 @@
+# One Apps store job, as root (docs/APPS.md). ZeroShell's Apps app starts
+# zeroos-apps@install:media.service and the like; the instance is the job,
+# systemd-escaped. Progress goes to /run/zeroos/apps.status.
+[Unit]
+Description=ZeroOS apps: %I
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/zeroos-apps run %I
+TimeoutStartSec=30min
+Nice=10
+IOSchedulingClass=idle

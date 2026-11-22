@@ -2,7 +2,9 @@ name: Release
 
 # Pushing a tag like v0.2.0 publishes that version as an update: the zeroos
 # package and its manifest become a GitHub release, which is where
-# zeroos-update on the device looks (docs/UPDATE.md).
+# zeroos-update on the device looks (docs/UPDATE.md). The installable apps
+# and their index go in the same release, which is where the Apps app looks
+# (docs/APPS.md).
 # The SD card image is separate: run "Build image" for a fresh one.
 # Nothing is published unless all of CI (simulator, screenshots, browser
 # build, device build, update tests) passes on the tagged commit first.
@@ -34,14 +36,21 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$PWD/cmake/aarch64-linux-gnu.cmake
           cmake --build build/device -j"$(nproc)"
           aarch64-linux-gnu-strip build/device/zeroshell
+          aarch64-linux-gnu-strip --strip-unneeded build/device/apps/*.so
       - name: Update tests
-        run: image/tests/update-test.sh
+        run: |
+          image/tests/update-test.sh
+          image/tests/apps-test.sh
       - name: Package
         run: |
           image/package.sh build/device/zeroshell build/update
           cat build/update/zeroos-update.manifest
           # The tag is the version: v0.2.0 must give zeroos_0.2.0_arm64.deb.
           test -f "build/update/zeroos_${GITHUB_REF_NAME#v}_arm64.deb"
+          # The apps, built from the same commit (docs/APPS.md): the Apps app
+          # on a device reads zeroos-apps.index from the newest release.
+          image/apps/build.sh build/device/apps build/apps
+          cat build/apps/zeroos-apps.index
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,4 +58,5 @@ jobs:
           pre=()
           case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease --latest=false) ;; esac
           gh release create "$GITHUB_REF_NAME" build/update/zeroos_*.deb build/update/zeroos-update.manifest \
+            build/apps/zeroos-app-*.deb build/apps/zeroos-apps.index \
             --title "ZeroOS ${GITHUB_REF_NAME#v}" --generate-notes "${pre[@]}"

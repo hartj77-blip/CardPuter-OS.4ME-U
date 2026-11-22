@@ -32,29 +32,17 @@ install -m 0644 "$F/dock/rc.xml" "$F/dock/menu.xml" "$F/dock/autostart" "$F/dock
 install -m 0755 "$F/dock/dock-session"         "$D/usr/lib/zeroos/dock-session"
 install -m 0755 "$F/dock/zeroos-dock" "$F/dock/zeroos-browser" "$F/dock/zeroos-video" "$D/usr/bin/"
 install -m 0644 "$F/dock/zeroos-dock.service"  "$D/etc/systemd/system/"
-# Remote mode: Terminal app (tmux on tty3), Tailscale helpers (docs/REMOTE.md).
-install -m 0644 "$F/remote/zeroos-terminal.service" "$F/remote/zeroos-taildrop.service" \
-                                               "$D/etc/systemd/system/"
+# Terminal app: tmux on tty3 (docs/REMOTE.md).
+install -m 0644 "$F/remote/zeroos-terminal.service" "$D/etc/systemd/system/"
 install -m 0755 "$F/remote/terminal-session"   "$D/usr/lib/zeroos/terminal-session"
 install -m 0644 "$F/remote/tmux.conf"          "$D/etc/zeroos/tmux.conf"
-install -D -m 0644 "$F/remote/tailscaled-zeroos.conf" \
-                   "$D/etc/systemd/system/tailscaled.service.d/zeroos.conf"
-# Sync: Syncthing for Notes, Documents and Recordings (docs/SYNC.md).
-install -m 0755 "$F/sync/zeroos-sync"          "$D/usr/bin/zeroos-sync"
-install -D -m 0644 "$F/sync/syncthing-zeroos.conf" \
-                   "$D/etc/systemd/system/syncthing@.service.d/zeroos.conf"
-# Car: USB stick mode and Bluetooth audio (docs/CAR.md).
-install -m 0755 "$F/car/zeroos-usb-stick"      "$D/usr/lib/zeroos/usb-stick"
-install -m 0644 "$F/car/zeroos-usb-stick.service" "$D/etc/systemd/system/"
-# uinput: BlueZ turns the car's play/skip buttons into key presses with it.
-printf 'uinput\nlibcomposite\n' >              "$D/etc/modules-load.d/zeroos-car.conf"
-# Expansion: LoRa on SPI0 CE1 (GPS: see the overrides below).
-install -D -m 0644 "$F/expansion/meshtasticd-cap-lora-1262.yaml" \
-                   "$D/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml"
-install -D -m 0644 "$F/expansion/meshtasticd-zeroos.conf" \
-                   "$D/etc/systemd/system/meshtasticd.service.d/zeroos.conf"
-# Tethering through a phone, over USB or Bluetooth (docs/TETHER.md).
-install -m 0755 "$F/tether/zeroos-tether"      "$D/usr/bin/zeroos-tether"
+# Everything else (Remote, Sync, Car, GPS, Mesh, Tether...) is an installable
+# app now, with its own files: image/apps/<id>.pkg (docs/APPS.md).
+# The Apps app: zeroos-apps installs and removes them.
+install -m 0755 "$F/apps/zeroos-apps"          "$D/usr/bin/zeroos-apps"
+install -m 0644 "$F/apps/zeroos-apps@.service" "$D/etc/systemd/system/"
+install -m 0644 "$F/apps/apps.sources"         "$D/etc/zeroos/apps.sources"
+install -d "$D/usr/lib/zeroos/apps"
 # Updates over the network or from a PC (docs/UPDATE.md).
 install -m 0755 "$F/update/zeroos-update"      "$D/usr/bin/zeroos-update"
 install -m 0644 "$F/update/zeroos-update.service" "$F/update/zeroos-update-check.service" \
@@ -99,22 +87,11 @@ install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-pan
 # switch it off; held open, nothing ZeroShell draws reaches the screen.
 ln -sf /dev/null "$D/etc/systemd/system/fb_load.service"
 
-# IR Remote's code database: Flipper-IRDB, built by tools/irdb/build_irdb.py
-# (docs/IR.md). image/package.sh and image/build.sh build it; the image's
-# copy travels in files/irdb.
-IRDB=${ZEROOS_IRDB:-$F/irdb}
-if [ -f "$IRDB/index.tsv" ]; then
-    install -d "$D/usr/share/zeroos/ir"
-    cp -r "$IRDB/." "$D/usr/share/zeroos/ir/"
-    find "$D/usr/share/zeroos/ir" -type d -exec chmod 0755 {} + -o -type f -exec chmod 0644 {} +
-else
-    echo "warning: no IR code database at $IRDB; the IR Remote app will only have learned remotes" >&2
-fi
+# (IR Remote's code database travels with the IR Remote app: image/apps/ir.pkg.)
 
 # Overrides: settings files that belong to another Debian package, so ours
 # can't ship them in place. The package's postinst copies this tree over /.
 #   earlyoom: what to kill first when memory runs out (docs/PERFORMANCE.md)
-#   gpsd: GPS on the UART (G14/G15, EXT and Grove)
+# (The GPS app carries its own: image/apps/gps.pkg.)
 O="$D/usr/share/zeroos/overrides"
 install -D -m 0644 "$F/earlyoom"               "$O/etc/default/earlyoom"
-install -D -m 0644 "$F/expansion/gpsd.default" "$O/etc/default/gpsd"
