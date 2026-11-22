@@ -1,7 +1,8 @@
 // Mesh: the Cardputer as a Meshtastic LoRa node (Cap LoRa-1262), for text
 // messages with no phone signal or internet. meshtasticd runs the radio.
-//   Chat page (when the mesh is on): messages on the primary channel; type
-//     and press Enter to send to everyone. Tab: the info page.
+//   Chat page (as soon as the mesh is on): messages on the primary channel;
+//     type and press Enter to send to everyone. The text box takes typing
+//     while the radio is still connecting. Tab: the info page.
 //   Info page: on/off, QR code for the web client (chat from a phone),
 //     open it on the monitor in Dock mode, GPS. Tab or Esc: back to chat.
 // See docs/EXPANSION.md.
@@ -28,6 +29,7 @@ public:
         }
         if (++n_ % 5) return;
         if (chat_ && hal().mesh_seq() != seq_) fill_messages();
+        if (head_ && !(n_ % 10)) update_head();
         if (n_ % 10) return;
         MeshStatus m = hal().mesh();
         if (sig(m) != sig_) rebuild();
@@ -51,17 +53,22 @@ public:
 
 private:
     static std::string sig(const MeshStatus& m) {
-        return std::to_string(m.running) + std::to_string(m.no_radio) + std::to_string(m.connected) + m.web_url;
+        // Not "connected" or the node count: the chat page updates its own
+        // header for those, so a rebuild doesn't interrupt typing.
+        return std::to_string(m.running) + std::to_string(m.no_radio) + std::to_string(m.failing) + m.error +
+               m.web_url;
     }
-    bool can_chat() const { return st_.running && st_.connected && !st_.no_radio; }
+    // The chat page shows whenever the daemon is up, before ZeroShell has
+    // finished connecting to it: typing never waits on the radio.
+    bool can_chat() const { return st_.running && !st_.failing; }
 
     void rebuild() {
         st_ = hal().mesh();
         sig_ = sig(st_);
-        if (st_.running) starting_ = false;
+        if (st_.running || st_.failing) starting_ = false;
         if (ta_) draft_ = lv_textarea_get_text(ta_);
         lv_obj_clean(root_);
-        chat_ = ta_ = nullptr;
+        chat_ = ta_ = head_ = nullptr;
         if (group) lv_group_remove_all_objs(group);
         if (can_chat() && !info_) {
             build_chat();
@@ -77,7 +84,7 @@ private:
         lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_row(panel, 3, 0);
 
-        if (st_.running && !st_.web_url.empty() && !st_.no_radio) {
+        if (st_.running && !st_.web_url.empty() && !st_.no_radio && !st_.failing) {
             lv_obj_t* qr = lv_qrcode_create(panel);
             lv_qrcode_set_size(qr, 84);
             lv_qrcode_set_dark_color(qr, c(0x000000));
@@ -91,13 +98,18 @@ private:
             lv_obj_set_width(a, 136);
         } else {
             const char* head = !st_.installed ? "Not installed"
+                               : st_.failing ? "Radio error"
                                : st_.running && st_.no_radio ? "No radio"
                                : st_.running ? LV_SYMBOL_OK " Mesh on"
                                : starting_   ? "Starting..."
                                              : "Mesh off";
             lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
-            label(panel, head, &zs_font_16, st_.running && st_.no_radio ? kBad : kText);
+            label(panel, head, &zs_font_16, st_.failing || (st_.running && st_.no_radio) ? kBad : kText);
+            std::string err = st_.error.empty()
+                                  ? "The radio service keeps stopping. Power off, reseat the Cap LoRa-1262, try again."
+                                  : st_.error;
             const char* hint = !st_.installed ? "meshtasticd comes with ZeroOS images."
+                               : st_.failing ? err.c_str()
                                : st_.no_radio ? "Plug in the Cap LoRa-1262 with the power off, then turn the mesh on."
                                : st_.running ? "Connect to Wi-Fi to chat from your phone."
                                              : "Text over LoRa radio, miles away, with no signal or internet.";
@@ -151,10 +163,11 @@ private:
     }
 
     void build_chat() {
-        std::string head = st_.my_name.empty() ? std::string("Mesh") : st_.my_name;
-        head += fmt("  |  %d nodes  |  Tab: info", st_.nodes);
-        lv_obj_t* h = label(root_, head.c_str(), &zs_font_12, kMuted);
-        lv_obj_set_pos(h, 8, 2);
+        head_ = label(root_, "", &zs_font_12, kMuted);
+        lv_obj_set_pos(head_, 8, 2);
+        lv_label_set_long_mode(head_, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(head_, kScreenW - 16);
+        update_head();
 
         chat_ = lv_obj_create(root_);
         style_panel(chat_);
@@ -176,16 +189,37 @@ private:
             auto* self = static_cast<MeshApp*>(lv_event_get_user_data(e));
             std::string text = lv_textarea_get_text(self->ta_);
             if (text.empty()) return;
-            if (hal().mesh_send(text)) {
+            MeshStatus m = hal().mesh();
+            if (m.no_radio) {
+                shell_toast("Not sent: no radio found (Tab: info)");
+            } else if (!m.connected) {
+                shell_toast("Not sent yet: radio still connecting");   // the text stays in the box
+            } else if (hal().mesh_send(text)) {
                 lv_textarea_set_text(self->ta_, "");
                 self->fill_messages();
             } else {
-                shell_toast("Not sent: mesh not ready");
+                shell_toast("Not sent: lost the radio, try again");
             }
         }, LV_EVENT_READY, this);
         lv_group_add_obj(group, ta_);
         lv_group_focus_obj(ta_);
         lv_group_set_editing(group, true);
+    }
+
+    void update_head() {
+        MeshStatus m = hal().mesh();
+        std::string h;
+        if (m.no_radio) {
+            h = "No radio found  |  Tab: info";
+            lv_obj_set_style_text_color(head_, c(kBad), 0);
+        } else if (!m.connected) {
+            h = "Connecting to the radio...  |  Tab: info";
+            lv_obj_set_style_text_color(head_, c(kMuted), 0);
+        } else {
+            h = (m.my_name.empty() ? std::string("Mesh") : m.my_name) + fmt("  |  %d nodes  |  Tab: info", m.nodes);
+            lv_obj_set_style_text_color(head_, c(kMuted), 0);
+        }
+        lv_label_set_text(head_, h.c_str());
     }
 
     void fill_messages() {
@@ -214,6 +248,7 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* chat_ = nullptr;
     lv_obj_t* ta_ = nullptr;
+    lv_obj_t* head_ = nullptr;
     MeshStatus st_;
     std::string sig_, draft_;
     bool starting_ = false, dirty_ = false, info_ = false;

@@ -4,6 +4,10 @@ name: Release
 # package and its manifest become a GitHub release, which is where
 # zeroos-update on the device looks (docs/UPDATE.md).
 # The SD card image is separate: run "Build image" for a fresh one.
+# Nothing is published unless all of CI (simulator, screenshots, browser
+# build, device build, update tests) passes on the tagged commit first.
+# A tag with a "-" (v0.3.0-rc1) becomes a pre-release: devices only take
+# "latest", so it reaches nobody until you promote it.
 on:
   push:
     tags: ['v[0-9]*']
@@ -12,7 +16,11 @@ permissions:
   contents: write
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
   release:
+    needs: ci
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -38,5 +46,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          pre=()
+          case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease --latest=false) ;; esac
           gh release create "$GITHUB_REF_NAME" build/update/zeroos_*.deb build/update/zeroos-update.manifest \
-            --title "ZeroOS ${GITHUB_REF_NAME#v}" --generate-notes
+            --title "ZeroOS ${GITHUB_REF_NAME#v}" --generate-notes "${pre[@]}"

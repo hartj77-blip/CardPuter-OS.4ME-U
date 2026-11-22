@@ -34,10 +34,12 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cerrno>
 #include <cmath>
 #include <ctime>
 #include <cstdio>
+#include <climits>
 #include <cstdlib>
 #include <fstream>
 #include <iomanip>
@@ -181,6 +183,20 @@ pid_t spawn_pipe(const std::vector<std::string>& argv, int& fd) {
 #endif
 }
 
+// One line of "nmcli -t" output split on ':', with its "\:" and "\\"
+// escapes undone.
+std::vector<std::string> nmcli_fields(const std::string& line) {
+    std::vector<std::string> f;
+    std::string cur;
+    for (size_t i = 0; i < line.size(); ++i) {
+        if (line[i] == '\\' && i + 1 < line.size()) { cur += line[++i]; continue; }
+        if (line[i] == ':') { f.push_back(cur); cur.clear(); continue; }
+        cur += line[i];
+    }
+    f.push_back(cur);
+    return f;
+}
+
 // True if the child has exited (and reaps it).
 bool exited(pid_t pid) {
 #ifdef __EMSCRIPTEN__
@@ -192,14 +208,29 @@ bool exited(pid_t pid) {
 #endif
 }
 
+// Stops a child from spawn(): the signal goes to its whole process group
+// (spawn() calls setpgid), so "sh -c" wrappers don't leave their own
+// children running. Waits at most ~1 s, then SIGKILLs, so a child that
+// ignores the signal can't freeze the UI.
 void kill_child(pid_t pid, int sig) {
 #ifndef __EMSCRIPTEN__
-    if (pid > 0) {
-        kill(pid, SIGCONT);  // a stopped process can't act on SIGTERM
-        kill(pid, sig);
-        int st;
-        waitpid(pid, &st, 0);
+    if (pid <= 0) return;
+    auto signal_all = [pid](int s) {
+        if (kill(-pid, s) < 0) kill(pid, s);   // no group (setpgid failed): just the child
+    };
+    signal_all(SIGCONT);   // a stopped process can't act on SIGTERM
+    signal_all(sig);
+    int st;
+    for (int i = 0; i < 100; ++i) {   // 100 x 10 ms
+        pid_t r = waitpid(pid, &st, WNOHANG);
+        if (r == pid || (r < 0 && errno == ECHILD)) {
+            if (sig != SIGKILL) kill(-pid, SIGTERM);   // group members the child left behind
+            return;
+        }
+        usleep(10000);
     }
+    signal_all(SIGKILL);
+    waitpid(pid, &st, 0);   // SIGKILL can't be ignored: this returns at once
 #endif
 }
 
@@ -245,9 +276,18 @@ public:
             break;
         }
         // The mesh may still be running from before ZeroShell restarted.
-        mesh_wanted_ = run("systemctl is-active meshtasticd.service 2>/dev/null").rfind("active", 0) == 0;
-        // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
-        // Grove port's, if the kernel exposes it the same way).
+        {
+            std::string st = run("systemctl is-active meshtasticd.service 2>/dev/null");
+            mesh_wanted_ = st.rfind("active", 0) == 0 || st.rfind("activating", 0) == 0;
+            if (mesh_wanted_) mesh_log_checks_ = 0;   // look for "no radio" as if it just started
+        }
+        find_ext5v();
+    }
+
+    // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
+    // Grove port's, if the kernel exposes it the same way).
+    void find_ext5v() {
+        ext5v_.clear();
         for (auto& n : list_dir("/sys/class/leds/")) {
             std::string l = n;
             std::transform(l.begin(), l.end(), l.begin(), ::tolower);
@@ -259,6 +299,7 @@ public:
         // Nobody has asked for the position for 5 s: let gpsd go idle.
         if (gps_fd_ >= 0 && time(nullptr) - gps_want_ > 5) gps_stop();
         mesh_pump();
+        if (visible_pid_ > 0 && exited(visible_pid_)) visible_pid_ = -1;   // reap the pairing window
         // Nobody has looked through the camera for 3 s: turn it off.
         if (scan_pid_ > 0 && time(nullptr) - scan_want_ > 3) scan_stop();
         tether_pump();
@@ -271,7 +312,12 @@ public:
     BatteryInfo battery() override { return bat_cache_; }
     ImuSample imu() override { return imu_cache_; }
     NetStatus net() override {
-        if (net_ticks_ < 20 && net_cache_.ip.empty()) net_cache_ = read_net();
+        // Before poll()'s first 2 s refresh: read it now, but at most once a
+        // second (read_net forks ~7 times; the status bar asks every frame).
+        if (net_ticks_ < 20 && net_cache_.ip.empty() && time(nullptr) != net_early_at_) {
+            net_early_at_ = time(nullptr);
+            net_cache_ = read_net();
+        }
         return net_cache_;
     }
 
@@ -312,14 +358,7 @@ public:
         std::string line;
         while (std::getline(in, line)) {
             // IN-USE:SSID:SIGNAL:SECURITY (SSID colons are escaped as \:)
-            std::vector<std::string> f;
-            std::string cur;
-            for (size_t i = 0; i < line.size(); ++i) {
-                if (line[i] == '\\' && i + 1 < line.size()) { cur += line[++i]; continue; }
-                if (line[i] == ':') { f.push_back(cur); cur.clear(); continue; }
-                cur += line[i];
-            }
-            f.push_back(cur);
+            std::vector<std::string> f = nmcli_fields(line);
             if (f.size() < 4 || f[1].empty()) continue;
             WifiNetwork n;
             n.connected = f[0] == "*";
@@ -332,14 +371,29 @@ public:
     }
 
     bool wifi_connect(const std::string& ssid, const std::string& psk) override {
-        std::string cmd = "nmcli dev wifi connect " + shell_quote(ssid);
+        std::string id = shell_quote(ssid);
+        // A saved profile for this network, and its password, from before
+        // this attempt: a mistyped retry must not lose a working one.
+        bool existed = !trim_nl(run("nmcli -g connection.id connection show id " + id)).empty();
+        std::string old_psk;
+        if (existed && !psk.empty())
+            old_psk = trim_nl(run("nmcli -s -g 802-11-wireless-security.psk connection show id " + id));
+        // --wait bounds the attempt (default 90 s): this runs on the UI thread.
+        std::string cmd = "nmcli --wait 20 dev wifi connect " + id;
         if (!psk.empty()) cmd += " password " + shell_quote(psk);
         if (run(cmd + " && echo OK").find("OK") != std::string::npos) return true;
+        if (psk.empty()) return false;
         // A failed attempt with a typed password must not leave that password
         // saved: NetworkManager would keep retrying it and the next connect
-        // would reuse it instead of asking (M5 launcher fix #62).
-        if (!psk.empty()) run("nmcli connection delete id " + shell_quote(ssid));
+        // would reuse it instead of asking (M5 launcher fix #62). A profile
+        // that was there before gets its old password back instead.
+        if (!existed) run("nmcli connection delete id " + id);
+        else if (!old_psk.empty()) run("nmcli connection modify id " + id + " wifi-sec.psk " + shell_quote(old_psk));
         return false;
+    }
+    static std::string trim_nl(std::string s) {
+        while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
+        return s;
     }
     void set_wifi_enabled(bool on) override { run(std::string("nmcli radio wifi ") + (on ? "on" : "off")); }
     void set_bt_enabled(bool on) override { run(std::string("rfkill ") + (on ? "unblock" : "block") + " bluetooth"); }
@@ -531,7 +585,10 @@ public:
         return rec_;
     }
     bool delete_recording(const std::string& path) override {
-        if (path.rfind(home() + "/Recordings/", 0) != 0) return false;  // only our own files
+        // Only our own files: resolve "..", symlinks first.
+        char real[PATH_MAX], dir[PATH_MAX];
+        if (!realpath(path.c_str(), real) || !realpath((home() + "/Recordings").c_str(), dir)) return false;
+        if (std::string(real).rfind(std::string(dir) + "/", 0) != 0) return false;
         if (pb_.path == path) stop();
         return std::remove(path.c_str()) == 0;
     }
@@ -790,6 +847,9 @@ private:
     // --- Expansion 5 V
     bool ext_power() override { return !ext5v_.empty() && read_long(ext5v_[0] + "brightness") > 0; }
     void set_ext_power(bool on) override {
+        // ext_5v_out sits behind an I2C IO expander whose LEDs can appear
+        // after ZeroShell starts: look again rather than skip the power.
+        if (ext5v_.empty()) find_ext5v();
         for (auto& d : ext5v_) {
             long max = read_long(d + "max_brightness", 1);
             write_str(d + "brightness", on ? std::to_string(max > 0 ? max : 1) : "0");
@@ -812,6 +872,7 @@ private:
                 errno != EINPROGRESS) {
                 close(gps_fd_);
                 gps_fd_ = -1;
+                gps_ = GpsFix{};   // gpsd unreachable: no fix, not the last one seen
             }
             gps_sent_ = false;
             gps_buf_.clear();
@@ -850,6 +911,7 @@ private:
         if (send(gps_fd_, kOff, sizeof kOff - 1, MSG_NOSIGNAL | MSG_DONTWAIT) < 0) {}
         close(gps_fd_);
         gps_fd_ = -1;
+        gps_ = GpsFix{};   // the next look starts from "searching", never a stale fix
     }
     void gps_line(const std::string& js) {
         std::string cls = json_str(js, "class");
@@ -1066,8 +1128,33 @@ private:
         mesh_at_ = now;
         MeshStatus m;
         m.installed = access("/usr/bin/meshtasticd", X_OK) == 0 || access("/usr/sbin/meshtasticd", X_OK) == 0;
-        std::string st = run("systemctl is-active meshtasticd.service");
-        m.running = st.rfind("active", 0) == 0 || st.rfind("activating", 0) == 0;
+        // ActiveState/SubState/NRestarts, so a daemon that keeps crashing
+        // (Restart= puts it in "activating (auto-restart)") isn't shown as on.
+        std::string active, sub;
+        int restarts = 0;
+        std::istringstream show(run("systemctl show meshtasticd.service -p ActiveState -p SubState -p NRestarts 2>/dev/null"));
+        for (std::string line; std::getline(show, line);) {
+            size_t eq = line.find('=');
+            if (eq == std::string::npos) continue;
+            std::string k = line.substr(0, eq), v = line.substr(eq + 1);
+            if (k == "ActiveState") active = v;
+            else if (k == "SubState") sub = v;
+            else if (k == "NRestarts") restarts = std::atoi(v.c_str());
+        }
+        m.running = active == "active" || active == "activating" || active == "reloading";
+        // NRestarts stays up after the daemon recovers, so only a new
+        // restart counts, and only for 30 s: one slow start isn't an error.
+        if (mesh_restarts_ < 0) mesh_restarts_ = restarts;   // baseline after a start
+        if (restarts > mesh_restarts_) mesh_fail_until_ = now + 30;
+        mesh_restarts_ = restarts;
+        m.failing = mesh_wanted_ && (active == "failed" || sub == "auto-restart" || now < mesh_fail_until_);
+        if (m.failing) {
+            if (now - mesh_err_at_ >= 10) {   // the journal is slow: not every refresh
+                mesh_err_at_ = now;
+                mesh_err_ = mesh_last_error();
+            }
+            m.error = mesh_err_;
+        }
         if (m.running) {
             // Without a working radio the daemon falls back to a simulated
             // one and says so in its log (pi is in the adm group). Look three
@@ -1076,10 +1163,12 @@ private:
                 mesh_log_at_ = now;
                 ++mesh_log_checks_;
                 mesh_no_radio_ = !run("journalctl -u meshtasticd -b --no-pager -n 300 2>/dev/null | "
-                                      "grep -m1 -i -E 'simradio|sim radio|radio init failed'").empty();
+                                      // 2.7.x: "SX126x init result -2", "No SX1262 radio"
+                                      "grep -m1 -E 'init result -[0-9]|No [A-Za-z0-9]+ radio|SimRadio|"
+                                      "[Rr]adio init failed'").empty();
             }
             m.no_radio = mesh_no_radio_;
-            NetStatus n = read_net();
+            const NetStatus& n = net_cache_;   // poll() refreshes it; read_net() forks ~7 times
             std::string ip = !n.tailscale_ip.empty() && n.ip.empty() ? n.tailscale_ip : n.ip;
             if (!ip.empty()) {
                 m.web_url = "https://" + ip + ":9443";
@@ -1096,11 +1185,20 @@ private:
         mesh_no_radio_ = false;
         mesh_log_at_ = time(nullptr);   // give it 15 s before reading its log
         mesh_log_checks_ = 0;
+        mesh_err_at_ = 0;
+        mesh_err_.clear();
+        mesh_started_at_ = time(nullptr);
+        mesh_restarts_ = -1;
+        mesh_fail_until_ = 0;
         set_ext_power(true);
+        // Start clean: a unit left "failed" by an earlier try won't restart.
+        run("systemctl reset-failed meshtasticd.service 2>/dev/null");
         run("systemctl --no-block start meshtasticd.service");
         mesh_at_ = 0;
     }
     void mesh_stop() override {
+        mesh_wanted_ = false;   // stop polling systemd and the journal
+        mesh_fail_until_ = 0;
         run("systemctl --no-block stop meshtasticd.service");
         mesh_at_ = 0;
         mesh_close();
@@ -1136,6 +1234,8 @@ private:
             mesh_beat_ = now;
         }
         if (mesh_hello_ && now - mesh_beat_ > 240 && mesh_write(mt::heartbeat())) mesh_beat_ = now;
+        mesh_flush();
+        if (mesh_fd_ < 0) return;
         char buf[2048];
         for (;;) {
             ssize_t n = recv(mesh_fd_, buf, sizeof buf, MSG_DONTWAIT);
@@ -1181,21 +1281,65 @@ private:
         std::snprintf(b, sizeof b, "!%08x", num);
         return b;
     }
+    // The daemon's last error from this run (since mesh_start, else this
+    // boot): ERROR/CRIT lines first, then anything that reads like one.
+    std::string mesh_last_error() {
+        std::string since = mesh_started_at_ ? "--since @" + std::to_string(long(mesh_started_at_) - 1) : "-b";
+        std::istringstream in(run("journalctl -u meshtasticd " + since + " --no-pager -n 200 -o cat 2>/dev/null"));
+        std::string worst, any;
+        for (std::string line; std::getline(in, line);) {
+            if (line.find("ERROR") != std::string::npos || line.find("CRIT") != std::string::npos) worst = line;
+            std::string l = line;
+            std::transform(l.begin(), l.end(), l.begin(), ::tolower);
+            for (const char* k : {"error", "fail", "could not", "cannot", "unable", "no such", "denied"})
+                if (l.find(k) != std::string::npos) any = line;
+        }
+        std::string e = worst.empty() ? any : worst;
+        while (!e.empty() && std::isspace(uint8_t(e.back()))) e.pop_back();
+        if (e.size() > 160) e.resize(160);
+        return e;
+    }
+    // Queue a frame and send what the socket takes now; mesh_pump sends the
+    // rest. A partial send must not drop the tail of a frame: the daemon's
+    // framing would be off until we reconnect.
     bool mesh_write(const std::string& frame) {
-        if (mesh_fd_ < 0) return false;
-        return send(mesh_fd_, frame.data(), frame.size(), MSG_NOSIGNAL | MSG_DONTWAIT) == ssize_t(frame.size());
+        if (mesh_fd_ < 0 || mesh_out_.size() + frame.size() > 16384) return false;
+        mesh_out_ += frame;
+        mesh_flush();
+        return mesh_fd_ >= 0;
+    }
+    void mesh_flush() {
+        while (mesh_fd_ >= 0 && !mesh_out_.empty()) {
+            ssize_t n = send(mesh_fd_, mesh_out_.data(), mesh_out_.size(), MSG_NOSIGNAL | MSG_DONTWAIT);
+            if (n > 0) {
+                mesh_out_.erase(0, size_t(n));
+            } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == ENOTCONN || errno == EINTR)) {
+                break;   // still connecting, or the buffer is full: next pump
+            } else {
+                mesh_close();
+            }
+        }
     }
     void mesh_close() {
         if (mesh_fd_ >= 0) close(mesh_fd_);
         mesh_fd_ = -1;
+        mesh_out_.clear();
         mesh_hello_ = mesh_connected_ = false;
+    }
+    // At most max bytes, not ending inside a UTF-8 character.
+    static std::string utf8_cut(const std::string& s, size_t max) {
+        if (s.size() <= max) return s;
+        size_t n = max;
+        while (n > 0 && (uint8_t(s[n]) & 0xc0) == 0x80) --n;
+        return s.substr(0, n);
     }
     std::vector<MeshMessage> mesh_messages() override { return mesh_log_; }
     bool mesh_send(const std::string& text) override {
         if (!mesh_connected_ || text.empty()) return false;
-        if (!mesh_write(mt::text_message(text.substr(0, 200), mt::kBroadcast, 0, ++mesh_packet_id_))) return false;
+        std::string t = utf8_cut(text, 200);
+        if (!mesh_write(mt::text_message(t, mt::kBroadcast, 0, ++mesh_packet_id_))) return false;
         MeshMessage m;
-        m.text = text.substr(0, 200);
+        m.text = t;
         m.mine = true;
         m.time = long(time(nullptr));
         mesh_log_.push_back(m);
@@ -1303,8 +1447,14 @@ private:
     }
     void bt_set_visible(int seconds) override {
 #ifndef __EMSCRIPTEN__
-        kill_child(visible_pid_, SIGTERM);
-        visible_pid_ = -1;
+        if (visible_pid_ > 0) {
+            // Ends the agent and the timer (the whole group), then does
+            // what the timer would have: hide, and trust what paired.
+            kill_child(visible_pid_, SIGTERM);
+            visible_pid_ = -1;
+            run("bluetoothctl discoverable off");
+            run("bluetoothctl devices Paired | while read -r _ a _; do bluetoothctl trust \"$a\"; done");
+        }
         if (seconds <= 0) return;
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
@@ -1523,11 +1673,11 @@ private:
         std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi"));
         std::string line;
         while (std::getline(in, line)) {
-            if (line.rfind("yes:", 0) == 0) {
-                auto last = line.rfind(':');
+            std::vector<std::string> f = nmcli_fields(line);   // unescapes "\:" in the SSID
+            if (f.size() >= 3 && f[0] == "yes") {
                 n.wifi_connected = true;
-                n.wifi_ssid = line.substr(4, last - 4);
-                n.wifi_signal = std::atoi(line.c_str() + last + 1);
+                n.wifi_ssid = f[1];
+                n.wifi_signal = std::atoi(f[2].c_str());
             }
         }
         std::string ip = run("hostname -I");
@@ -1592,12 +1742,16 @@ private:
     MeshStatus mesh_cache_;
     int mesh_fd_ = -1, mesh_seq_ = 0;
     bool mesh_wanted_ = false, mesh_no_radio_ = false;
-    time_t mesh_log_at_ = 0;
+    time_t mesh_log_at_ = 0, mesh_err_at_ = 0, mesh_fail_until_ = 0;
+    int mesh_restarts_ = -1;
+    std::string mesh_err_;
     int mesh_log_checks_ = 3;   // none until mesh_start
     bool mesh_hello_ = false, mesh_connected_ = false;
     time_t mesh_try_ = 0, mesh_beat_ = 0;
     uint32_t mesh_me_ = 0, mesh_packet_id_ = uint32_t(time(nullptr)) & 0xfffff;
     mt::Stream mesh_in_;
+    std::string mesh_out_;   // frames not yet taken by the socket
+    time_t mesh_started_at_ = 0;
     std::map<uint32_t, std::string> mesh_names_;
     std::vector<MeshMessage> mesh_log_;
     time_t sync_at_ = 0, sync_run_at_ = 0;
@@ -1609,6 +1763,7 @@ private:
     BatteryInfo bat_cache_;
     ImuSample imu_cache_;
     NetStatus net_cache_;
+    time_t net_early_at_ = 0;
     long net_ticks_ = 0;
 };
 

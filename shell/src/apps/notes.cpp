@@ -1,5 +1,5 @@
 // Notes: a plain-text editor. Saves to ~/Notes/notes.txt (or the file opened from
-// Files) automatically when you leave.
+// Files) a few seconds after you stop typing, and when you leave.
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "apps/common.h"
+#include "ui/fileio.h"
 
 namespace zs {
 
@@ -56,7 +57,7 @@ public:
         ss << f.rdbuf();
         text_ = ss.str();
         if (text_.empty() && !f) {
-            text_ = "Welcome to ZeroOS Notes.\n\nType anything. It saves when you leave.\n";
+            text_ = "Welcome to ZeroOS Notes.\n\nType anything. It saves as you go.\n";
         }
         lv_textarea_set_text(ta_, text_.c_str());
         lv_obj_add_event_cb(ta_, on_change, LV_EVENT_VALUE_CHANGED, this);
@@ -65,10 +66,17 @@ public:
         update_status();
     }
 
+    // Autosave 3 s after the last edit, so a crash or flat battery loses
+    // at most a few seconds of typing.
+    void tick() override {
+        if (dirty_ && lv_tick_elaps(edited_at_) > 3000) save();
+    }
+
 private:
     static void on_change(lv_event_t* e) {
         auto* self = static_cast<NotesApp*>(lv_event_get_user_data(e));
         self->dirty_ = true;
+        self->edited_at_ = lv_tick_get();
         self->update_status();
     }
 
@@ -84,17 +92,29 @@ private:
         lv_label_set_text(status_, fmt("%zu words%s", words, dirty_ ? "  *" : "").c_str());
     }
 
+    // Written to a temp file and renamed over the note, so a power cut or a
+    // full card never leaves it half-written. On failure the edits stay
+    // marked unsaved and the next autosave tries again.
     void save() {
         if (!dirty_ || !ta_) return;
-        std::ofstream f(path_);
-        f << lv_textarea_get_text(ta_);
-        dirty_ = false;
+        mode_t mode = 0644;
+        struct stat st;
+        if (stat(path_.c_str(), &st) == 0) mode = st.st_mode & 07777;   // keep the file's permissions
+        if (write_file_atomic(path_, lv_textarea_get_text(ta_), mode)) {
+            dirty_ = false;
+            failed_ = false;
+        } else if (!failed_) {
+            failed_ = true;   // say it once, not on every retry
+            shell_toast("Couldn't save the note (card full or read-only?)");
+        }
+        if (status_) update_status();
     }
 
     std::string path_, text_;
     lv_obj_t* ta_ = nullptr;
     lv_obj_t* status_ = nullptr;
-    bool dirty_ = false;
+    bool dirty_ = false, failed_ = false;
+    uint32_t edited_at_ = 0;
 };
 }  // namespace
 

@@ -2,7 +2,9 @@ name: Build image
 
 # Builds the flashable ZeroOS .img.xz (about 1.5-3 hours: an x86 runner builds
 # the arm64 system under qemu). It runs on pull requests that change the image,
-# and by hand from the Actions tab.
+# and by hand from the Actions tab. Not on shell/** changes: hours of runner
+# time per push, and ZeroShell reaches devices as the update package, which
+# CI builds and tests on every push.
 on:
   pull_request:
     paths:

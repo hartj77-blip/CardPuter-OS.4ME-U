@@ -89,6 +89,7 @@ private:
     Profile profile_ = Profile::Balanced;
     bool low_saver_ = false;     // forced Saver by low battery
     bool shutdown_warned_ = false;
+    uint32_t shutdown_warned_at_ = 0;
     int brightness_ = 80;
     int dim_after_s_ = 30, off_after_s_ = 60, bt_auto_off_min_ = 10;
     bool wifi_sleep_ = false, show_time_left_ = true;

@@ -135,6 +135,8 @@ struct MeshStatus {
     bool installed = false;
     bool running = false;
     bool no_radio = false;    // it fell back to a simulated radio: no module, or wrong pins
+    bool failing = false;     // the daemon exits or keeps restarting (see error)
+    std::string error;        // its last error line from the journal, if any
     std::string web_url;      // Meshtastic web client, e.g. https://192.168.1.20:9443
     std::string api;          // for the phone apps: "192.168.1.20" (TCP 4403)
     bool connected = false;   // ZeroShell is talking to the daemon (chat works)

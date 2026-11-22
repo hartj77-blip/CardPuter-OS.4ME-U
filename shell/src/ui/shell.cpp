@@ -21,8 +21,17 @@ uint32_t g_last_key = 0;
 lv_indev_state_t g_last_state = LV_INDEV_STATE_RELEASED;
 bool g_consumed = false;      // the held key belongs to the shell, not LVGL
 bool g_swallowed = false;     // the held key woke the screen; nothing else sees it
-uint32_t g_press_ms = 0, g_repeat_ms = 0;
+bool g_repeat = false;        // ...and it's a key worth repeating while held
+uint32_t g_press_ms = 0, g_repeat_ms = 0, g_press_app = 0;
+lv_obj_t* g_enter_box = nullptr;   // text box that had focus when Enter went down
 constexpr uint32_t kRepeatDelay = 400, kRepeatEvery = 80;
+
+// Only movement and deleting repeat. Enter, Tab and letters are actions
+// (install, record, save a waypoint): holding one must not do it 10 times.
+bool repeats(uint32_t key) {
+    return key == LV_KEY_UP || key == LV_KEY_DOWN || key == LV_KEY_LEFT || key == LV_KEY_RIGHT ||
+           key == LV_KEY_BACKSPACE || key == LV_KEY_DEL;
+}
 
 // Wraps the keypad driver: on each new press, offer the key to the shell first.
 // Keys the shell consumes never reach LVGL, so the shell repeats them itself
@@ -38,15 +47,39 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         g_swallowed = true;
     } else if (new_press) {
         g_press_ms = g_repeat_ms = lv_tick_get();
+        g_press_app = Shell::get().app_generation();
         g_consumed = Shell::get().handle_key(data->key);
-    } else if (pressed && g_consumed && lv_tick_elaps(g_press_ms) > kRepeatDelay &&
+        g_repeat = g_consumed && repeats(data->key);
+    } else if (pressed && g_repeat && lv_tick_elaps(g_press_ms) > kRepeatDelay &&
                lv_tick_elaps(g_repeat_ms) > kRepeatEvery) {
-        g_repeat_ms = lv_tick_get();
-        Shell::get().handle_key(data->key);
+        // The press opened or closed an app: the rest of it isn't for the new
+        // one (it stays consumed, so LVGL doesn't see it either).
+        if (Shell::get().app_generation() != g_press_app) {
+            g_repeat = false;
+        } else {
+            g_repeat_ms = lv_tick_get();
+            Shell::get().handle_key(data->key);
+        }
     } else if (!pressed) {
         g_consumed = false;
         g_swallowed = false;
+        g_repeat = false;
     }
+    // Enter in a one-line text box fires READY on the press, and the app
+    // usually closes the box then. LVGL sends the release (a click) to
+    // whatever has focus by then: a list row behind the box, which would
+    // connect, open SSH or accept a request nobody chose. If the focus moved
+    // while Enter was down, drop the release.
+    lv_group_t* g = lv_indev_get_group(indev);
+    lv_obj_t* focused = g ? lv_group_get_focused(g) : nullptr;
+    if (new_press && !g_consumed && !g_swallowed && data->key == LV_KEY_ENTER && focused &&
+        lv_obj_check_type(focused, &lv_textarea_class)) {
+        g_enter_box = focused;
+    } else if (g_enter_box && (data->key != LV_KEY_ENTER || focused != g_enter_box)) {
+        if (focused != g_enter_box) lv_indev_wait_release(indev);
+        g_enter_box = nullptr;
+    }
+    if (!pressed) g_enter_box = nullptr;
     if (pressed && (g_consumed || g_swallowed)) data->state = LV_INDEV_STATE_RELEASED;  // LVGL never sees it
 }
 
@@ -258,14 +291,17 @@ void Shell::tick_cb(lv_timer_t* t) {
     if (!power().screen_off() && !s->handoff_ && ++n % 10 == 0) s->update_statusbar();
     if (s->app_) s->app_->tick();
     s->apply_pending();
-    if (s->toast_until_ && lv_tick_get() > s->toast_until_) {
+    if (s->toast_shown_ && lv_tick_elaps(s->toast_since_) > 2000) {   // wrap-safe
         lv_obj_add_flag(s->toast_, LV_OBJ_FLAG_HIDDEN);
-        s->toast_until_ = 0;
+        s->toast_shown_ = false;
     }
 }
 
 void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
-    // Tear down the old app first so its widgets and group go away together.
+    ++app_generation_;
+    // Destroy the old app while its widgets still exist: destructors read
+    // them (Notes saves its text), then the widgets and group go away.
+    app_.reset();
     if (group_) {
         if (keypad_) lv_indev_set_group(keypad_, nullptr);
         lv_group_delete(group_);
@@ -320,7 +356,19 @@ void Shell::toast(const std::string& msg) {
     lv_label_set_text(toast_, msg.c_str());
     lv_obj_remove_flag(toast_, LV_OBJ_FLAG_HIDDEN);
     lv_obj_move_foreground(toast_);
-    toast_until_ = lv_tick_get() + 2000;
+    toast_since_ = lv_tick_get();
+    toast_shown_ = true;
+}
+
+void Shell::prepare_power_off() {
+    // Close the open app (Notes saves) and finish the GPS track, so a flat
+    // battery loses nothing that was on screen. Going home destroys the app
+    // properly (with its widgets), so nothing dangles if power-off fails.
+    if (app_id_ != "home") {
+        app_id_ = "home";
+        switch_to(make_launcher(), "");
+    }
+    track_stop();
 }
 
 void Shell::add_focus(lv_obj_t* obj) {
@@ -331,14 +379,17 @@ bool Shell::handle_key(uint32_t key) {
     bool used = false;
     lv_obj_t* focused = group_ ? lv_group_get_focused(group_) : nullptr;
     bool in_text = focused && lv_obj_check_type(focused, &lv_textarea_class);
-    // The Cardputer has no Esc key on the base layer; ` (top-left) doubles as Back.
-    if (key == '`' && !in_text) key = LV_KEY_ESC;
+    // The Cardputer has no Esc key on the base layer; ` (top-left) doubles as
+    // Back. In a text box it types a `, unless the box is empty: then it's
+    // Back too, so there's always a way out of a password or search box.
+    if (key == '`' && (!in_text || lv_textarea_get_text(focused)[0] == '\0')) key = LV_KEY_ESC;
     if (app_ && app_->on_key(key)) {
         used = true;
     } else if ((key == LV_KEY_UP || key == LV_KEY_DOWN) && group_) {
-        // Up/Down move focus between widgets, except inside multi-line text.
-        lv_obj_t* f = lv_group_get_focused(group_);
-        if (!(f && lv_obj_check_type(f, &lv_textarea_class) && !lv_textarea_get_one_line(f))) {
+        // Up/Down move focus between widgets, but never out of a text box:
+        // a pop-up box would stay on screen with typing going to the list
+        // hidden behind it. (Multi-line boxes move their cursor instead.)
+        if (!in_text) {
             if (key == LV_KEY_UP) lv_group_focus_prev(group_);
             else lv_group_focus_next(group_);
             used = true;
@@ -408,6 +459,7 @@ void shell_open_app(const std::string& id) { Shell::get().open_app(id); }
 void shell_go_home() { Shell::get().go_home(); }
 void shell_add_focus(lv_obj_t* obj) { Shell::get().add_focus(obj); }
 void shell_screen_changed() { Shell::get().screen_changed(); }
+void shell_prepare_power_off() { Shell::get().prepare_power_off(); }
 bool shell_open_terminal(const std::string& command) { return Shell::get().open_terminal(command); }
 bool shell_open_camera() { return Shell::get().open_camera(); }
 

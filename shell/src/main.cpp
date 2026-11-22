@@ -53,6 +53,9 @@ int main(int argc, char** argv) {
     lv_indev_t* keypad = platform_init(theme::kScreenW, theme::kScreenH, zoom);
     Shell::get().start(keypad);
 
-    if (!script.empty()) return platform_run_script(script);
-    return platform_run();
+    int rc = script.empty() ? platform_run() : platform_run_script(script);
+    // Stopped (systemctl stop, an update, SIGTERM): close the open app so
+    // Notes saves, and finish the GPS track, while LVGL is still up.
+    Shell::get().prepare_power_off();
+    return rc;
 }

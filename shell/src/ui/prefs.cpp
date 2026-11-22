@@ -6,6 +6,8 @@
 #include <fstream>
 #include <map>
 
+#include "ui/fileio.h"
+
 namespace zs::prefs {
 namespace {
 
@@ -35,14 +37,11 @@ void save() {
     std::string parent = d.substr(0, d.rfind('/'));
     mkdir(parent.c_str(), 0755);
     mkdir(d.c_str(), 0755);
-    std::string tmp = d + "/settings.conf.tmp";
-    {
-        std::ofstream out(tmp);
-        out << "# ZeroOS settings (written by ZeroShell)\n";
-        for (auto& [k, v] : store()) out << k << '=' << v << '\n';
-    }
-    chmod(tmp.c_str(), 0600);   // it can hold a Jellyfin sign-in token
-    std::rename(tmp.c_str(), (d + "/settings.conf").c_str());
+    std::string text = "# ZeroOS settings (written by ZeroShell)\n";
+    for (auto& [k, v] : store()) text += k + '=' + v + '\n';
+    // 0600: it can hold a Jellyfin sign-in token. On a write error (full or
+    // read-only card) the old settings.conf stays as it was.
+    write_file_atomic(d + "/settings.conf", text, 0600);
 }
 
 }  // namespace

@@ -28,6 +28,9 @@ public:
     }
 
     void tick() override {
+        // Never rebuild under an open box or ID/QR overlay: it would vanish
+        // mid-typing. Closing it sets dirty_, so the refresh comes then.
+        if (input_) return;
         if (dirty_) {
             dirty_ = false;
             rebuild();
@@ -52,8 +55,9 @@ public:
         for (size_t i = 0; i < dev_btns_.size(); ++i) {
             if (dev_btns_[i] != f) continue;
             const SyncDevice& d = st_.devices[i];
-            if (confirm_ != d.id) {
+            if (confirm_ != d.id || lv_tick_elaps(confirm_at_) > 3000) {   // a fresh warning each time
                 confirm_ = d.id;
+                confirm_at_ = lv_tick_get();
                 shell_toast("Del again to stop syncing with " + d.name);
                 return true;
             }
@@ -295,6 +299,7 @@ private:
     lv_obj_t* list_ = nullptr;
     SyncStatus st_;
     std::string sig_, confirm_;
+    uint32_t confirm_at_ = 0;
     std::vector<lv_obj_t*> req_btns_, dev_btns_;
     bool dirty_ = false;
     int n_ = 0;

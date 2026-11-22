@@ -12,7 +12,7 @@ namespace zs::jf {
 namespace {
 
 constexpr int kPage = 200;       // most rows fetched for one list
-constexpr int kTimeoutS = 12;
+constexpr int kTimeoutS = 8;   // these calls run on the UI thread
 
 // ---- a small JSON reader: just enough to walk objects and arrays ----------
 
@@ -91,10 +91,18 @@ private:
                     unsigned cp;
                     if (!hex4(cp)) return false;
                     if (cp >= 0xD800 && cp < 0xDC00 && s_.compare(i_, 2, "\\u") == 0) {
+                        size_t back = i_;
                         unsigned lo;
                         i_ += 2;
                         if (!hex4(lo)) return false;
-                        cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                        if (lo >= 0xDC00 && lo < 0xE000) {
+                            cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                        } else {
+                            i_ = back;   // not a pair: the next escape stands alone
+                            cp = 0xFFFD;
+                        }
+                    } else if (cp >= 0xD800 && cp < 0xE000) {
+                        cp = 0xFFFD;     // a lone surrogate is not a character
                     }
                     utf8(o, cp);
                     break;
@@ -211,7 +219,10 @@ struct Reply {
 // file so a password never shows in the process list.
 Reply http(const std::string& url, const std::string& auth, const std::string* body) {
     Reply r;
-    std::string cmd = "curl -sS -L --max-time " + std::to_string(kTimeoutS) + " --connect-timeout 6" +
+    // --post30x: a 301/302/303 redirect (http -> https) keeps the POST,
+    // instead of curl turning the sign-in into a GET.
+    std::string cmd = "curl -sS -L --post301 --post302 --post303 --max-time " + std::to_string(kTimeoutS) +
+                      " --connect-timeout 4" +
                       " -H 'Accept: application/json' -H " + shell_quote("Authorization: " + auth);
     char tmp[] = "/tmp/zeroos-jf-XXXXXX";
     bool have_tmp = false;

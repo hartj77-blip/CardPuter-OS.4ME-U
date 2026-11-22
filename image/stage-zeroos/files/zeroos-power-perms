@@ -8,6 +8,17 @@
 # so its files are there to open up, and ZeroShell starts with a screen.
 udevadm wait --timeout=30 /dev/fb_lcd 2>/dev/null ||
     echo "zeroos: no /dev/fb_lcd after 30 s (LCD driver not loaded?)" >&2
+# The expansion 5 V (ext_5v_out) hangs off an I2C IO expander whose LED
+# device can appear after the LCD. ZeroShell looks for it once, at start, so
+# without it the GPS and LoRa caps get no power for the whole session. Give
+# it up to 10 s more. (90-zeroos.udev opens it up whenever it appears.)
+i=0
+while [ "$i" -lt 10 ] && ! ls -d /sys/class/leds/*5v* >/dev/null 2>&1; do
+    sleep 1
+    i=$((i + 1))
+done
+ls -d /sys/class/leds/*5v* >/dev/null 2>&1 ||
+    echo "zeroos: no expansion 5 V supply (/sys/class/leds/*5v*); GPS and LoRa caps get no power" >&2
 for f in /sys/devices/system/cpu/cpufreq/policy*/scaling_governor \
          /sys/devices/system/cpu/cpufreq/policy*/scaling_max_freq \
          /sys/class/backlight/*/bl_power \

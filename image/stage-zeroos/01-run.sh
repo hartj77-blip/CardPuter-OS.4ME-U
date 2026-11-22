@@ -9,13 +9,20 @@
 # something to roll back to.
 ./package.sh files/zeroshell "${ROOTFS_DIR}/tmp/zeroos-pkg" "@ZEROOS_VERSION@"
 install -D -m 0644 "${ROOTFS_DIR}"/tmp/zeroos-pkg/zeroos_*.deb "${ROOTFS_DIR}/var/lib/zeroos/update/current.deb"
-install -d -o 1000 -g 1000 "${ROOTFS_DIR}/home/${FIRST_USER_NAME}/Videos" 2>/dev/null || true
-for d in Notes Documents Recordings; do
-    install -d -o 1000 -g 1000 "${ROOTFS_DIR}/home/${FIRST_USER_NAME}/$d" 2>/dev/null || true
+# The folders the apps save into (Notes, Recordings, Sync...). The first user
+# is uid 1000 on pi-gen; a build where it isn't would leave them root-owned.
+for d in Videos Notes Documents Recordings; do
+    install -d -o 1000 -g 1000 "${ROOTFS_DIR}/home/${FIRST_USER_NAME}/$d"
 done
 # Console font for the Terminal app: Terminus 6x12 gives 53 x 14 on 320 x 170.
-sed -i -e 's/^FONTFACE=.*/FONTFACE="Terminus"/' -e 's/^FONTSIZE=.*/FONTSIZE="6x12"/' \
-    "${ROOTFS_DIR}/etc/default/console-setup" 2>/dev/null || true
+CONSOLE_SETUP="${ROOTFS_DIR}/etc/default/console-setup"
+if [ -f "$CONSOLE_SETUP" ]; then
+    sed -i -e 's/^FONTFACE=.*/FONTFACE="Terminus"/' -e 's/^FONTSIZE=.*/FONTSIZE="6x12"/' "$CONSOLE_SETUP"
+    grep -q '^FONTSIZE="6x12"' "$CONSOLE_SETUP" ||
+        echo "zeroos: WARNING: console font not set (no FONTSIZE line); the Terminal app will be the wrong size"
+else
+    echo "zeroos: WARNING: no /etc/default/console-setup; the Terminal app will be the wrong size"
+fi
 # Audio: ZeroShell is a system service, so nothing logs pi in. Lingering starts
 # pi's user session (PipeWire, WirePlumber) at boot; without it volume and mute
 # have no sound server to talk to. M5's image gets this from its launcher.
@@ -79,26 +86,46 @@ sed -i 's/^FLAGS=.*/FLAGS="--no-logs-no-support"/' /etc/default/tailscaled
 systemctl disable tailscaled.service
 systemctl enable zeroos-taildrop.service
 # Meshtastic for the Cap LoRa-1262 (docs/EXPANSION.md), also off at boot.
+# The signing key is checked against the fingerprint pinned in build.sh.
 curl -fsSL https://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/Release.key \
     -o /usr/share/keyrings/meshtastic.asc
+command -v gpg >/dev/null || apt-get install -y -o Acquire::Retries=3 gpg
+mt_fpr=$(gpg --show-keys --with-colons /usr/share/keyrings/meshtastic.asc | awk -F: '$1 == "fpr" {print $10; exit}')
+if [ "$mt_fpr" != "@MESHTASTIC_KEY_FPR@" ]; then
+    echo "zeroos: ERROR: Meshtastic repository key is $mt_fpr, expected @MESHTASTIC_KEY_FPR@" >&2
+    exit 1
+fi
 echo 'deb [signed-by=/usr/share/keyrings/meshtastic.asc] http://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/ /' \
     > /etc/apt/sources.list.d/meshtastic.list
+# The tested build (pinned in build.sh). The repository keeps only its newest
+# build, so when that has moved on take the newest and say so.
 # openSUSE's mirrors are sometimes mid-sync and serve a truncated .deb
-# ("File has unexpected size"), which failed a whole image build once. Retry,
-# and if it still fails, build without it: only the Cap LoRa-1262 needs it.
+# ("File has unexpected size"), which failed a whole image build once: retry.
+# Still failing stops the build (Mesh would say it comes with the image)
+# unless ZEROOS_ALLOW_NO_MESH=1.
 meshtastic_ok=
 for try in 1 2 3; do
     apt-get update -o Acquire::Retries=3 || true
-    if apt-get install -y -o Acquire::Retries=3 meshtasticd; then meshtastic_ok=1; break; fi
+    mt_want=meshtasticd=@MESHTASTICD_VERSION@
+    if ! apt-cache madison meshtasticd | awk '{print $3}' | grep -qxF '@MESHTASTICD_VERSION@'; then
+        echo "zeroos: WARNING: meshtasticd @MESHTASTICD_VERSION@ is gone from the repository; taking the newest (bump MESHTASTICD_VERSION in build.sh)"
+        mt_want=meshtasticd
+    fi
+    if apt-get install -y -o Acquire::Retries=3 "$mt_want"; then meshtastic_ok=1; break; fi
     echo "zeroos: meshtasticd install failed (try $try), retrying in 30 s"
     apt-get clean
     sleep 30
 done
 if [ -n "$meshtastic_ok" ]; then
     systemctl disable meshtasticd.service
-    echo "zeroos: meshtasticd installed: $(dpkg-query -W -f '${Version}' meshtasticd)"
+    # Beta channel: don't let "apt upgrade" swap in an untested build.
+    apt-mark hold meshtasticd
+    echo "zeroos: meshtasticd installed (held): $(dpkg-query -W -f '${Version}' meshtasticd)"
+elif [ "@ZEROOS_ALLOW_NO_MESH@" = 1 ]; then
+    echo "zeroos: WARNING: meshtasticd NOT installed (ZEROOS_ALLOW_NO_MESH=1; Mesh app needs: sudo apt install meshtasticd)"
 else
-    echo "zeroos: WARNING: meshtasticd NOT installed (Mesh app needs: sudo apt install meshtasticd)"
+    echo "zeroos: ERROR: meshtasticd could not be installed after 3 tries (set ZEROOS_ALLOW_NO_MESH=1 to build without it)" >&2
+    exit 1
 fi
 # The camera app and the libraries it names (libcamera, libfmt, cJSON...).
 # If it can't be installed the image is still built: ZeroShell's Camera app
@@ -156,5 +183,7 @@ groupadd -f bluetooth   # normally made by bluez; zeroshell.service names it
 for g in video input audio netdev i2c gpio spi dialout adm bluetooth; do   # adm: read service logs; bluetooth: pair devices
     getent group "$g" >/dev/null && usermod -aG "$g" pi
 done
-update-initramfs -u -k all || true
+# The initramfs picks up modprobe.d (the panel blacklist). It has always been
+# allowed to fail here (qemu chroot), but say so loudly in the build log.
+update-initramfs -u -k all || echo "zeroos: WARNING: update-initramfs failed; the image keeps its old initramfs"
 CHROOT

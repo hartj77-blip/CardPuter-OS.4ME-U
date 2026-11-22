@@ -68,6 +68,13 @@ publishes a GitHub release with two files: `zeroos_0.2.0_arm64.deb` and
 `zeroos-update.manifest`. Devices look at the newest release, so they see it
 the next time someone opens **Update**. The tag is the version.
 
+It first runs all of CI on the tagged commit (simulator, screenshots, browser
+build, device build, update tests) and publishes nothing if any of it fails.
+A tag with a `-`, such as `v0.3.0-rc1`, is published as a pre-release:
+devices only look at the latest full release, so it reaches nobody until you
+mark it as the latest release on GitHub (or install it by hand with
+`tools/push-update.sh`).
+
 Builds between releases get versions such as `0.2.0+3.gabc1234` (three commits
 after v0.2.0), which count as newer than 0.2.0 and older than 0.2.1
 (`image/version.sh`).
@@ -113,12 +120,27 @@ For those, flash a new image from the **Build image** workflow.
 
 ## Trust
 
-The download comes over HTTPS from GitHub and must match the SHA-256 in the
-manifest, which catches a damaged or cut-off download. The manifest comes
-from the same place as the package, so this does not protect against someone
-who controls the release page or, with a plain `http://` `UPDATE_URL`, the
-network in between. Signing the manifest with a key kept off GitHub is the
-next step if that matters.
+The download must match the SHA-256 in the manifest, which catches a
+damaged or cut-off download. The manifest comes from the same place as the
+package, so the checksum says nothing about *who* made it: whoever controls
+the update address, or the network between it and the Cardputer, can serve
+their own package, and its install scripts run as root. So:
+
+- The default address is GitHub over HTTPS: you trust whoever can publish
+  releases on the repository.
+- Plain `http://` is only accepted for your own network: `localhost`,
+  private addresses (`10.*`, `172.16-31.*`, `192.168.*`), Tailscale
+  (`100.64-127.*`, `*.ts.net`) and `*.local`, `*.lan`, `*.home.arpa` names.
+  Anyone on that network could still swap the package. Anything else over
+  `http://` is refused unless `/etc/zeroos/update.conf` also says
+  `ALLOW_HTTP=1`.
+- Not done yet: signing the manifest with a key kept off GitHub, which would
+  make the address and the network not matter.
+
+If an update stops part-way (power cut mid-install), the next update first
+finishes it with `dpkg --configure -a`. If the new package won't install,
+the old one goes back on, and the Update app says which version you're on;
+if even that fails it tells you to run `sudo dpkg --configure -a`.
 
 ## Not yet tested on hardware
 

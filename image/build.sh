@@ -11,7 +11,9 @@
 #
 # Usage: image/build.sh [path/to/zeroshell-arm64]
 # Env:   WIFI_COUNTRY (default US), FIRST_USER_PASS (default raspberry), WORK (build dir),
-#        PIGEN_NATIVE=1 to run pi-gen directly with sudo instead of in Docker
+#        PIGEN_NATIVE=1 to run pi-gen directly with sudo instead of in Docker,
+#        MESHTASTICD_VERSION to try another meshtasticd build,
+#        ZEROOS_ALLOW_NO_MESH=1 to finish the image even if meshtasticd won't install
 # Needs: Docker (or root for native), ~20 GB disk, 1-2 hours. arm64 host is fastest.
 set -euo pipefail
 
@@ -22,6 +24,11 @@ WORK=${WORK:-$ROOT/build/image}
 M5_PIGEN_REPO=https://github.com/CardputerZero/pi-gen.git
 M5_PIGEN_COMMIT=e3b4e323782a59a426b92356248f5bc09a098be1      # 2026-11-13
 DTOVERLAYS_COMMIT=4f7aeee9fc103ebb03d22cac476bb191ecfb321e     # m5stack-linux-dtoverlays main, 2026-11-14
+# meshtasticd from Meshtastic's openSUSE beta repository (docs/EXPANSION.md).
+# The repository keeps only its newest build, so if this one is gone the image
+# takes the newest and says so in the log; bump this after testing it.
+MESHTASTICD_VERSION=${MESHTASTICD_VERSION:-2.7.26.61~obs54e0d8d~beta}   # 2026-11-21
+MESHTASTIC_KEY_FPR=426AA6B0285C2096B70D9FC2528423A469A77D9A          # network OBS Project, expires 2027-08-26
 
 ZEROSHELL_BIN=${1:-$ROOT/build/device/zeroshell}
 if [ ! -x "$ZEROSHELL_BIN" ]; then
@@ -59,7 +66,13 @@ rm -rf stage2/06-zeroos
 cp -r "$HERE/stage-zeroos" stage2/06-zeroos
 install -m 0755 "$ZEROSHELL_BIN" stage2/06-zeroos/files/zeroshell
 ZEROOS_VERSION=${ZEROOS_VERSION:-$("$HERE/version.sh")}
-sed -i -e "s|@WIFI_COUNTRY@|${WIFI_COUNTRY:-US}|g" -e "s|@ZEROOS_VERSION@|${ZEROOS_VERSION}|g" stage2/06-zeroos/01-run.sh
+sed -i -e "s|@WIFI_COUNTRY@|${WIFI_COUNTRY:-US}|g" -e "s|@ZEROOS_VERSION@|${ZEROOS_VERSION}|g" \
+    -e "s|@MESHTASTICD_VERSION@|${MESHTASTICD_VERSION}|g" -e "s|@MESHTASTIC_KEY_FPR@|${MESHTASTIC_KEY_FPR}|g" \
+    -e "s|@ZEROOS_ALLOW_NO_MESH@|${ZEROOS_ALLOW_NO_MESH:-0}|g" stage2/06-zeroos/01-run.sh
+if grep -q '@[A-Z_]*@' stage2/06-zeroos/01-run.sh; then
+    echo "error: placeholders left in 01-run.sh: $(grep -o '@[A-Z_]*@' stage2/06-zeroos/01-run.sh | sort -u | tr '\n' ' ')" >&2
+    exit 1
+fi
 
 IMG_DATE=$(date +%Y-%m-%d)
 cat > config <<CONFIG
