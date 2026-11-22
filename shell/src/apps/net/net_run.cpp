@@ -81,6 +81,14 @@ size_t Job::drain(std::vector<std::string>& out) {
 }
 
 void Job::run_real(const std::vector<std::string>& argv, bool root) {
+#ifdef __EMSCRIPTEN__
+    // The browser demo has no processes (and no posix_spawn); it is always
+    // simulated, so this path is never taken, but it still has to link.
+    (void)argv;
+    (void)root;
+    done_ = Done::Failed;
+    running_ = false;
+#else
     if (argv.empty()) {
         done_ = Done::Failed;
         running_ = false;
@@ -159,6 +167,7 @@ void Job::run_real(const std::vector<std::string>& argv, bool root) {
     else if (WIFEXITED(wstatus) && WEXITSTATUS(wstatus) == 0) done_ = Done::Ok;
     else done_ = Done::Failed;
     running_ = false;
+#endif  // __EMSCRIPTEN__
 }
 
 void Job::cancel() {
