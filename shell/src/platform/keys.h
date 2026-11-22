@@ -65,10 +65,17 @@ public:
     // The key for a code with the modifiers as they are now; 0 = none.
     uint32_t translate(uint16_t code) const;
 
+    // Ctrl was tapped (down and up with no key between) and waits for the
+    // next key, like the keyboard's own Shift, Fn and Sym. Tapping it again
+    // cancels.
+    bool ctrl_pending() const { return ctrl_once_; }
+
 private:
     KeyLayout layout_;
     bool shift_l_ = false, shift_r_ = false, ctrl_l_ = false, ctrl_r_ = false, alt_l_ = false, alt_r_ = false;
     bool caps_ = false;
+    bool ctrl_used_ = false;   // a key went down while Ctrl was held
+    bool ctrl_once_ = false;   // Ctrl tapped: it applies to the next key
     // LVGL's keypad only notices a key going down after everything was up,
     // so only one key is "down" at a time: a second key pressed before the
     // first is let go (normal when typing fast) releases the first.

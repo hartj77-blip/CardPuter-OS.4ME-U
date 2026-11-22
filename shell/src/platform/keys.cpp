@@ -111,7 +111,7 @@ uint32_t KeyTranslator::translate(uint16_t code) const {
     // Ctrl + a letter or Space is a command key (kKeyCtrl). Other Ctrl and
     // Alt combinations are not text, and nothing uses them.
     if (alt_l_ || alt_r_) return 0;
-    if (ctrl_l_ || ctrl_r_) {
+    if (ctrl_l_ || ctrl_r_ || ctrl_once_) {
         if (char c = letter(code)) return ctrl_key(c);
         if (code == K_SPACE) return ctrl_key(' ');
         return 0;
@@ -136,8 +136,15 @@ void KeyTranslator::feed(uint16_t code, int32_t value) {
     switch (code) {
         case K_LEFTSHIFT: shift_l_ = down; return;
         case K_RIGHTSHIFT: shift_r_ = down; return;
-        case K_LEFTCTRL: ctrl_l_ = down; return;
-        case K_RIGHTCTRL: ctrl_r_ = down; return;
+        case K_LEFTCTRL:
+        case K_RIGHTCTRL:
+            // M5's driver makes Shift, Fn and Sym sticky but sends Ctrl as
+            // a plain key; make it sticky here too, so tap Ctrl then Space
+            // works as well as holding it.
+            if (down && !ctrl_l_ && !ctrl_r_) ctrl_used_ = false;
+            (code == K_LEFTCTRL ? ctrl_l_ : ctrl_r_) = down;
+            if (!down && !ctrl_l_ && !ctrl_r_ && !ctrl_used_) ctrl_once_ = !ctrl_once_;
+            return;
         case K_LEFTALT: alt_l_ = down; return;
         case K_RIGHTALT: alt_r_ = down; return;
         case K_CAPSLOCK: if (down) caps_ = !caps_; return;
@@ -145,6 +152,8 @@ void KeyTranslator::feed(uint16_t code, int32_t value) {
     }
     if (down) {
         uint32_t key = translate(code);
+        if (ctrl_l_ || ctrl_r_) ctrl_used_ = true;
+        ctrl_once_ = false;   // a tapped Ctrl is for this key only
         if (!key) return;
         if (held_code_) out_.push_back({held_key_, false});
         out_.push_back({key, true});
@@ -160,6 +169,7 @@ void KeyTranslator::reset() {
     if (held_code_) out_.push_back({held_key_, false});
     held_code_ = 0;
     shift_l_ = shift_r_ = ctrl_l_ = ctrl_r_ = alt_l_ = alt_r_ = false;
+    ctrl_once_ = ctrl_used_ = false;
 }
 
 bool KeyTranslator::next(KeyEvent& e) {

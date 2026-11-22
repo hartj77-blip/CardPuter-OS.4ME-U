@@ -12,6 +12,9 @@ The first two are already here:
 | Hold Esc | Go to the home screen from anywhere, even from a text box. A quick press is still Back |
 | Ctrl + Space | Open or close the taskbar panel from anywhere, even while typing |
 
+Like Shift, Fn and Sym, Ctrl doesn't need holding: tap Ctrl and the status bar shows **Ctrl** until
+you press the next key. Tap it again to cancel. Holding it down works too.
+
 ## Number keys
 
 When you're not typing in a text box, the number keys work as buttons. In a text box they type

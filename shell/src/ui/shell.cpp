@@ -216,6 +216,19 @@ void Shell::build_statusbar() {
 
     sb_icons_ = label(bar, "", &zs_font_12, kText);
     lv_obj_align(sb_icons_, LV_ALIGN_RIGHT_MID, 0, 0);
+
+    // Ctrl tapped and waiting for its key, as the keyboard's LEDs show Shift,
+    // Fn and Sym. Placed when shown, just right of the title.
+    sb_ctrl_ = lv_obj_create(bar);
+    style_plain(sb_ctrl_);
+    lv_obj_set_size(sb_ctrl_, LV_SIZE_CONTENT, 14);
+    lv_obj_set_style_pad_hor(sb_ctrl_, 4, 0);
+    lv_obj_set_style_radius(sb_ctrl_, 3, 0);
+    lv_obj_set_style_bg_color(sb_ctrl_, c(kAccent), 0);
+    lv_obj_set_style_bg_opa(sb_ctrl_, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(sb_ctrl_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_center(label(sb_ctrl_, "Ctrl", &zs_font_12, kOnAccent));
+    lv_obj_add_flag(sb_ctrl_, LV_OBJ_FLAG_HIDDEN);
 }
 
 void Shell::update_statusbar() {
@@ -285,6 +298,15 @@ void Shell::tick_cb(lv_timer_t* t) {
     auto* s = static_cast<Shell*>(lv_timer_get_user_data(t));
     hal().poll();
     power().tick(lv_tick_get());
+    if (platform_ctrl_pending() == lv_obj_has_flag(s->sb_ctrl_, LV_OBJ_FLAG_HIDDEN)) {
+        if (platform_ctrl_pending()) {
+            // After the app's title (home: its workspace pill), whose width varies.
+            bool home = !lv_obj_has_flag(s->sb_home_, LV_OBJ_FLAG_HIDDEN);
+            lv_obj_align_to(s->sb_ctrl_, home ? s->sb_home_ : s->sb_title_, LV_ALIGN_OUT_RIGHT_MID, 6, 0);
+            lv_obj_remove_flag(s->sb_ctrl_, LV_OBJ_FLAG_HIDDEN);
+        }
+        else lv_obj_add_flag(s->sb_ctrl_, LV_OBJ_FLAG_HIDDEN);
+    }
     remote_tick(lv_tick_get());
     sync_tick(lv_tick_get());
     player_tick();

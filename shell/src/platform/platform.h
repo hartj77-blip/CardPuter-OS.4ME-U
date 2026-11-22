@@ -21,6 +21,8 @@ void platform_set_low_power(bool on);
 // forever), so it goes back to text mode while the Terminal has the screen.
 // No-op except on the device.
 void platform_console_handoff(bool away);
+// Ctrl was tapped and waits for the next key (status bar shows it).
+bool platform_ctrl_pending();
 
 // Headless only: run a scripted session (see main.cpp). Returns exit code.
 int platform_run_script(const std::string& script);
