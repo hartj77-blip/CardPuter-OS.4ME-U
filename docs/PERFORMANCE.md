@@ -16,10 +16,17 @@ as they come in.
 | `gpu_mem=32` | `stage-zeroos/01-run.sh` | No 3D desktop to feed; gives the rest back to Linux. |
 | zram swap, zstd, 1.5x RAM | `files/swap.conf`, `files/zram-zeroos.conf` | Idle pages are compressed in RAM (typically 2.5-3x) instead of written to the SD card. Uses Raspberry Pi OS's own `rpi-swap`, so there is only one zram device. |
 | 512 MB SD swap file as zram writeback | `files/swap.conf` (`Mechanism=zram+file`) | Pages that stay idle get moved from zram to the card now and then, which frees RAM with very little card wear. It is also the last-resort safety net. |
-| `vm.swappiness=100`, `vfs_cache_pressure=80`, `min_free_kbytes=8192` | `files/90-zeroos-memory.conf` | Swap to zram early (it is RAM speed), keep file and directory caches, keep a reserve for the display and Wi-Fi drivers. |
+| `vm.swappiness=150`, `page-cluster=0`, `vfs_cache_pressure=80`, `min_free_kbytes=8192` | `files/90-zeroos-memory.conf` | Swap to zram early (it is RAM speed, faster than re-reading files from the card), read swap one page at a time (read-ahead only helps a disk), keep file and directory caches, keep a reserve for the display and Wi-Fi drivers. |
+| `watermark_scale_factor=125`, `watermark_boost_factor=0` | `files/90-zeroos-memory.conf` | Background reclaim starts a little earlier so apps rarely stall reclaiming memory themselves, without the reclaim bursts that churn zram. |
+| MGLRU on, `min_ttl_ms=1000` | `files/zeroos-memory.tmpfiles` | Better choice of what to swap out on small machines (ChromeOS uses it); the last second's working set stays in RAM, so the UI doesn't thrash. Skipped if the kernel lacks it. |
 | earlyoom (4% RAM and 8% swap left) | `files/earlyoom` | Kills the biggest app (browser, player, Python) before the whole system stalls. Never picks ZeroShell, ssh, networking or audio. |
 | Logs on the card, capped at 24 MB | `files/journald.conf` | Small enough to keep card writes low; a failed boot can still be read afterwards. |
-| Services off: apt-daily, man-db, e2scrub, wait-online, eeprom-update, ModemManager, rpi-connect | `stage-zeroos/01-run.sh` | Each costs RAM, CPU at boot, or random background work. Update with `sudo apt upgrade` when you choose. |
+| Services off: apt-daily, man-db, e2scrub, wait-online, eeprom-update, ModemManager, rpi-connect, triggerhappy, rsyslog, dphys-swapfile, rpcbind, raspi-config | `stage-zeroos/01-run.sh` | Each costs RAM, CPU at boot, or random background work. Update with `sudo apt upgrade` when you choose. |
+| `boot_delay=0`, `disable_splash=1`, `display_auto_detect=0` | `stage-zeroos/01-run.sh` (config.txt) | The firmware's default 1 s wait, its rainbow screen, and a probe for a DSI panel this board doesn't have. |
+| CPU at full speed during boot (`cpufreq.default_governor=performance`) | `stage-zeroos/01-run.sh` (cmdline.txt) | Boot work isn't slowed by the governor ramping up. ZeroShell switches to the power profile's governor as soon as it starts. |
+| Dock, Chromium and the desktop start only when asked | `files/dock/zeroos-dock.service` (not enabled) | They cost nothing until you open Dock or plug in a monitor. |
+| LCD driver chain loaded first | `payload.sh` (`modules-load.d/zeroos-lcd.conf`) | The home screen waits for the LCD; left to udev it came up about 15 s in. |
+| UI doesn't wait for the expansion 5 V | `files/zeroos-power-perms` | Used to hold the home screen up to 10 s more; udev and ZeroShell already pick it up whenever it appears. |
 | Removed: armhf, nexmon, plymouth, desktop packages | `stage-zeroos/01-run.sh` | Smaller image, fewer things starting. |
 | ZeroShell instead of a desktop | `shell/` | One small C++ process (LVGL) with a fixed 512 KB UI memory pool. |
 
@@ -81,7 +88,7 @@ System app shows the real number under Memory → This UI.
 | In use at idle (total - available) | **(measure)** | 90-120 MB |
 | Available to apps at idle | **(measure)** | 340-380 MB |
 | Usable memory with zram full | n/a | about 600-750 MB worth of apps |
-| Boot to UI | **(measure)** | under 20 s |
+| Boot to UI | **(measure)** | 10-12 s with the LCD driver loaded early, see "Boot" |
 | Services running | **(measure)** | ~15 |
 | Idle CPU (screen on, Wi-Fi up) | **(measure)** | under 3% |
 | Idle power, screen on | **(measure)** | 0.7-1.0 W, about 6-9 h on the 1750 mAh cell |
@@ -93,6 +100,23 @@ Idle pages also spill to the SD file, so in practice the device behaves like a
 machine with roughly 0.9-1.1 GB of memory for anything that isn't all busy at
 once. Heavy apps that keep everything busy (a browser on a big page) still
 only have the real 512 MB.
+
+## Boot
+
+ZeroShell can't draw until the LCD driver has loaded. Left to udev, that was
+about 15 s into the boot: the driver sits behind the I2C IO expander (which
+drives the backlight) and waited its turn behind every other device. ZeroOS
+now loads that chain first (`/etc/modules-load.d/zeroos-lcd.conf`: I2C bus, IO
+expander, backlight, SPI bus, M5's panel driver), so the screen should be up
+within a few seconds of Linux starting **(measure)**.
+
+One line to time a boot (run it after a restart, before and after an update):
+
+```sh
+systemd-analyze; systemd-analyze critical-chain zeroshell.service | head -12; dmesg | grep -iE 'st7789|m5ioe|backlight|fb[0-9]+:' | head -8
+```
+
+`zeroos-measure` prints the same, with memory, zram, CPU and battery draw.
 
 ## Measuring on the unit
 
@@ -124,8 +148,17 @@ simulator these are marked "simulated".
 ## Things to try once we have numbers
 
 - `RamMultiplier` 1.5 vs 2, and lz4 vs zstd (speed vs ratio).
-- `vm.page-cluster=0` (read one page at a time from zram; often faster).
 - Turn off Bluetooth and the audio stack until first used (saves ~15-20 MB).
 - CPU governor `schedutil` vs `ondemand`, and a lower max clock on battery.
+- Without the initramfs (`auto_initramfs=0`): the firmware wouldn't read and
+  unpack it, likely 1-2 s. Needs a check that the root filesystem and the LCD
+  still come up.
+- If the LCD is still late after loading it early: put the same modules and
+  the panel's settings file in the initramfs.
+- The camera's drivers load on every boot (`dtoverlay=imx219`), also on
+  devices without the Camera app. Loading them only when it is installed
+  would save a few MB and some boot time.
+- PipeWire starts at boot for volume and Bluetooth audio (about 25-35 MB).
+  Starting it on first use would free that until sound is needed.
 - Splitting ZeroShell's hardware work into the `zerod` service (Phase 1), so
   apps outside the shell can share it.

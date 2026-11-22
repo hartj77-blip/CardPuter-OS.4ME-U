@@ -1,9 +1,15 @@
 # Apps
 
-ZeroOS itself is small: it comes with **Apps**, **Dock**, **Files**, **Settings**, **Terminal**,
-**Update** and **Wi-Fi**. Everything else is an app you install from the **Apps** app, downloaded
-from GitHub: Battery, Camera, Car, Clock, Compass, GPS, IR Remote, Media, Mesh, Notes, Remote,
-Sync, System, Tether, ZClaw, and the RF tools from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
+ZeroOS itself is small: it comes with **Apps**, **Settings**, **Update** and **Wi-Fi**, which are
+what a device needs to get online, update itself and install apps. Everything else is an app you
+install from the **Apps** app, downloaded from GitHub: Battery, Camera, Car, Clock, Compass, Dock,
+Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal, Tether and ZClaw.
+
+Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
+with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**
+and press **U** (which that update needs anyway, for the new app ABI). Their system parts stay
+in ZeroOS: the desktop on the monitor (`zeroos-dock`), which Files, Camera, Mesh and Remote also
+use, and the console service behind Terminal. Remote's SSH and mosh need the Terminal app.
 
 Each app brings its own extras with it, so the base image doesn't carry them: Remote brings
 Tailscale, Sync brings Syncthing, Camera brings libcamera and M5Stack's camera program, Mesh brings
@@ -42,8 +48,8 @@ An SD card image can have apps on it from the start: the **Build image** workflo
 ## Where apps come from
 
 A **source** is a GitHub repository whose newest release holds a file called `zeroos-apps.index`
-and the packages it lists. ZeroOS starts with two: this repository and cardputer-zero-rf. Their
-releases publish the apps built from the same commit as the OS. Any other repository that
+and the packages it lists. ZeroOS starts with one: this repository. Its releases publish the
+apps built from the same commit as the OS. Any other repository that
 publishes the same files works too: add it in **Apps > S > Add a GitHub repo**, or add a line to
 `/etc/zeroos/apps.sources` (an `owner/repo`, or any `https://` address that serves the index).
 When two sources offer an app with the same name, the one higher in the list wins.
@@ -92,7 +98,7 @@ CI builds every module for arm64, loads each one in a headless ZeroShell
 (`shell/tools/modules-test.sh`), builds the packages (`image/apps/build.sh`) and tests the installer
 (`image/tests/apps-test.sh`). A release publishes the packages and `zeroos-apps.index`.
 
-In another repository (cardputer-zero-rf does this): add this repository as a submodule, include
+In another repository: add this repository as a submodule, include
 `shell/cmake/ZeroShellApps.cmake`, call `zs_app()` for each app and `zs_apps_build()`, then pack
 the modules with `image/apps/make-app-deb.sh`, which prints the app's block for
 `zeroos-apps.index`. Publish the packages and the index in a GitHub release.
@@ -105,5 +111,7 @@ they are, ZeroShell skips them and the store doesn't offer them.
 - Nothing here has run on a Cardputer yet: the installer is tested against stand-ins for apt and
   GitHub (`image/tests/apps-test.sh`), and the modules in a headless ZeroShell on a PC.
 - A ZeroOS update doesn't update apps by itself; open **Apps** and press **U**.
+- Removing Terminal also removes one-key SSH from Remote (Remote says so); removing Dock leaves
+  Dock mode reachable through Settings' "On HDMI" option.
 - The store shows an app's real icon only once it's installed (until then, a grid).
 - An app's page doesn't show screenshots.

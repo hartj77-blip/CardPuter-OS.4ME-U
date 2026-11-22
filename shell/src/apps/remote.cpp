@@ -13,10 +13,19 @@
 #include "ui/remote.h"
 
 namespace zs {
-void terminal_run(const std::string& cmd);
 
 namespace {
 using namespace theme;
+
+// SSH and mosh run in the Terminal app, which is installed from Apps too.
+void terminal_run(const std::string& cmd) {
+    if (!app_find("terminal")) {
+        shell_toast("SSH needs the Terminal app: get it from Apps");
+        return;
+    }
+    remote_note_use();
+    shell_open_app("terminal", cmd);
+}
 
 const char* os_symbol(const std::string& os) {
     if (os == "windows") return LV_SYMBOL_IMAGE;

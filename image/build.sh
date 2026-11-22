@@ -13,7 +13,7 @@
 # Env:   WIFI_COUNTRY (default US), FIRST_USER_PASS (default raspberry), WORK (build dir),
 #        PIGEN_NATIVE=1 to run pi-gen directly with sudo instead of in Docker,
 #        ZEROOS_APPS="notes media ..." apps to preinstall (packages from image/apps/build.sh,
-#        or ZEROOS_APPS_DIR; e.g. the RF app pack from cardputer-zero-rf)
+#        or ZEROOS_APPS_DIR)
 # Needs: Docker (or root for native), ~20 GB disk, 1-2 hours. arm64 host is fastest.
 set -euo pipefail
 

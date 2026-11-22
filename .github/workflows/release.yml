@@ -5,7 +5,7 @@ name: Release
 # zeroos-update on the device looks (docs/UPDATE.md). The installable apps
 # and their index go in the same release, which is where the Apps app looks
 # (docs/APPS.md).
-# The SD card image is built afterwards (1.5-3 hours) and attached to the same
+# The SD card image is built afterwards (about 10 minutes) and attached to the same
 # release as zeroos-cardputerzero-arm64.img.xz; the update is live before that.
 # Nothing is published unless all of CI (simulator, screenshots, browser
 # build, device build, update tests) passes on the tagged commit first.
