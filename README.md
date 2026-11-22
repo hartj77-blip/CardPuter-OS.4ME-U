@@ -8,6 +8,8 @@ styled after the Ubuntu desktop (top bar, dock, app grid, Yaru dark colours, the
 and one hardware layer that covers every part of the board: battery gauge, motion sensors, IR,
 radios, audio, camera, real-time clock, key LEDs and the expansion ports.
 
+ZeroOS is an unofficial community project. It is not made, endorsed or supported by M5Stack.
+
 ![All screens](docs/screenshots/contact-sheet.png)
 
 *Every screen above is rendered by CI from the real UI code at 320x170, shown at 2x.*
@@ -127,3 +129,9 @@ first, copy `build/device/zeroshell` over, stop the stock launcher
 
 MIT. Builds on [LVGL](https://lvgl.io) (MIT), [quirc](https://github.com/dlbeer/quirc) (ISC), IR codes from [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) (CC0, see docs/IR.md), M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen)
 (BSD-3) and [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays).
+
+Cardputer and M5Stack are trademarks of M5Stack; they are used here only to name the hardware.
+
+## Security
+
+To report a security problem, see [SECURITY.md](SECURITY.md).
