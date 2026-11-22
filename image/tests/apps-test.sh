@@ -102,7 +102,9 @@ exec /usr/bin/id "$@"
 STUB
 cat > "$T/bin/dpkg" <<'STUB'
 #!/bin/sh
-case " $* " in *" --print-architecture "*) echo arm64; exit 0 ;; *" --configure "*) exit 0 ;; esac
+case " $* " in *" --print-architecture "*) echo arm64; exit 0 ;; esac
+# --configure -a fails while $BAD_CONFIGURE exists; "apt-get -f install" mends it.
+case " $* " in *" --configure "*) [ -e "$BAD_CONFIGURE" ] && exit 1; exit 0 ;; esac
 case " $* " in *" --remove "*) echo "dpkg $*" >> "$APT_LOG"; exit 0 ;; esac
 exec /usr/bin/dpkg "$@"
 STUB
@@ -110,6 +112,7 @@ STUB
 cat > "$T/bin/apt-get" <<STUB
 #!/bin/sh
 echo "apt-get \$*" >> "$T/apt.log"
+case " \$* " in *" -f install "*) rm -f "$T/bad-configure"; exit 0 ;; esac
 case " \$* " in *" install "*) [ -e "$T/apt-fail" ] && exit 100 ;; esac
 exit 0
 STUB
@@ -133,7 +136,7 @@ chmod +x "$T/bin"/* "$T/zeroshell"
 printf '# test\nfile://%s/a\nfile://%s/b\n' "$T" "$T" > "$T/sources"
 
 apps() {
-    PATH="$T/bin:$PATH" APT_LOG=$T/apt.log ZEROOS_APPS_SOURCES=$T/sources ZEROOS_APPS_STATE=$T/state ZEROOS_APPS_CACHE=$T/cache \
+    PATH="$T/bin:$PATH" APT_LOG=$T/apt.log BAD_CONFIGURE=$T/bad-configure ZEROOS_APPS_SOURCES=$T/sources ZEROOS_APPS_STATE=$T/state ZEROOS_APPS_CACHE=$T/cache \
         ZEROOS_APPS_RUN=$T/run ZEROOS_APPS_ZEROSHELL=$T/zeroshell ZEROOS_APPS_ROOT=$T/root \
         ZEROOS_APPS_ALLOW_FILE=1 ZEROOS_APPS_ARCH=arm64 \
         "$ROOT/image/stage-zeroos/files/apps/zeroos-apps" "$@" 2>>"$T/log"
@@ -264,6 +267,13 @@ printf 'zeroos-app-notes 1.0.0 zeroos-app-abi-%s\n' "$ABI" > "$T/installed"
 apps install gps
 grep -q 'dpkg --remove' "$T/apt.log" && bad "current app ABI: app taken off" || ok "current app ABI: apps left alone"
 rm -f "$T/state/restore"
+# A package left half installed: repaired first, with nobody typing.
+: > "$T/installed"
+: > "$T/apt.log"
+touch "$T/bad-configure"
+apps install gps
+expect "half-installed package: repaired, install works" state done
+grep -q 'apt-get -f install' "$T/apt.log" && ok "half-installed package: apt repair ran" || bad "half-installed package: no repair"
 
 # --- sources -----------------------------------------------------------------
 apps run add-source:someone/cardputer-apps || true

@@ -249,7 +249,14 @@ drop_stale_apps() {
 
 # apt_put_on <deb>...: install packages and what they depend on.
 apt_put_on() {
-    dpkg --configure -a >&2 || fail "The package system needs repair first: sudo dpkg --configure -a"
+    # Something left half installed (a power cut, an extra that would not set
+    # up): try the usual repair before giving up, since there may be nobody
+    # with a keyboard to do it.
+    if ! dpkg --configure -a >&2; then
+        log "the package system was left half done; repairing"
+        apt-get -f install -y -o Dpkg::Options::=--force-confold >&2 || true
+        dpkg --configure -a >&2 || fail "The package system needs repair first: sudo dpkg --configure -a"
+    fi
     drop_stale_apps
     apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2 &&
         return 0

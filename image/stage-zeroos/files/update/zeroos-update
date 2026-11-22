@@ -23,6 +23,7 @@ STATE_DIR=${ZEROOS_UPDATE_STATE:-/var/lib/zeroos/update}
 RUN_DIR=${ZEROOS_UPDATE_RUN:-/run/zeroos}
 RELEASE=${ZEROOS_RELEASE:-/etc/zeroos-release}
 SETTLE=${ZEROOS_UPDATE_SETTLE:-10}      # seconds ZeroShell must stay up
+APPS_WAIT=${ZEROOS_UPDATE_APPS_WAIT:-900}   # seconds to wait for the Apps app to finish a job
 STATUS=$RUN_DIR/update.status
 
 UPDATE_URL=https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest/download
@@ -203,9 +204,24 @@ install_deb() {
     latest=$ver
 
     status installing 0
-    # Finish anything an earlier run left half-done (power cut mid-dpkg).
-    DEBIAN_FRONTEND=noninteractive dpkg --force-confold --force-confdef --configure -a >&2 ||
-        fail "The package system needs repair first: sudo dpkg --configure -a"
+    # The Apps app may be in the middle of an install (zeroos-apps holds this
+    # lock), and the package system is busy until it has finished. Wait for
+    # it, and keep the lock so Apps starts nothing while we install.
+    exec 8> "$RUN_DIR/apps.lock"
+    if ! flock -n 8; then
+        status installing 0 "Waiting for Apps to finish"
+        flock -w "$APPS_WAIT" 8 || fail "Apps is still installing something. Try again when it has finished"
+    fi
+    # Finish anything an earlier run left half-done (power cut mid-dpkg). A
+    # package that still won't configure (an app's extra, say) is not ours to
+    # mend and must not hold ZeroOS back: this package depends on nothing.
+    if ! DEBIAN_FRONTEND=noninteractive dpkg --force-confold --force-confdef --configure -a >&2; then
+        # Nobody may be able to type the repair (the Terminal is an app too),
+        # so run it here: apt finishes or takes off what was left half done.
+        log "a package was left half installed; repairing"
+        DEBIAN_FRONTEND=noninteractive apt-get -f install -y -o Dpkg::Options::=--force-confold >&2 ||
+            log "the repair did not finish (sudo dpkg --configure -a); updating ZeroOS anyway"
+    fi
     if ! put_on "$deb"; then
         if [ -f "$STATE_DIR/current.deb" ]; then
             put_on "$STATE_DIR/current.deb" ||

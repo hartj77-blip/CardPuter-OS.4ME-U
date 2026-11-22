@@ -108,7 +108,7 @@ mkdir -p "$T/bin" "$T/run" "$T/state"
 # $T/bad-install); --configure -a does nothing; the rest is the real dpkg.
 cat > "$T/bin/dpkg" <<STUB
 #!/bin/sh
-case " \$* " in *" --configure "*) exit 0 ;; esac
+case " \$* " in *" --configure "*) [ -e "$T/bad-configure" ] && exit 1; exit 0 ;; esac
 case " \$* " in *" -i "*)
     for deb; do :; done
     v=\$(dpkg-deb -f "\$deb" Version)
@@ -210,6 +210,29 @@ printf 'Package: other\nVersion: 9\nArchitecture: all\nMaintainer: x\nDescriptio
 dpkg-deb --build "$T/other" "$T/other.deb" >/dev/null
 update install-file "$T/other.deb" || true
 expect "foreign package: refused" state failed
+
+# Another package left half installed (an app's extra that won't set up) is
+# not a reason to refuse a ZeroOS update.
+touch "$T/bad-configure"
+printf '#!/bin/sh\necho "apt-get $*" >> "%s/apt.log"\nexit 1\n' "$T" > "$T/bin/apt-get"
+chmod +x "$T/bin/apt-get"
+update install-file "$T/server-1.1.0/zeroos_1.1.0_$ARCH.deb"
+expect "half-installed other package: still updates" current 1.1.0
+grep -q 'apt-get -f install -y' "$T/apt.log" && ok "half-installed other package: repair tried" || bad "half-installed: no repair"
+rm "$T/bad-configure"
+# The Apps app is in the middle of an install: wait for it, don't fail.
+flock "$T/run/apps.lock" sleep 2 &
+sleep 0.3
+ZEROOS_UPDATE_APPS_WAIT=20 update install-file "$T/server-1.2.0/zeroos_1.2.0_$ARCH.deb"
+expect "Apps busy: waits, then updates" current 1.2.0
+wait
+flock "$T/run/apps.lock" sleep 3 &
+sleep 0.3
+ZEROOS_UPDATE_APPS_WAIT=1 update install-file "$T/server-1.1.0/zeroos_1.1.0_$ARCH.deb" || true
+expect "Apps busy for too long: says so" state failed
+grep -q 'Apps is still installing' "$T/run/update.status" && grep -q '^ZeroOS 1.2.0' "$T/release" &&
+    ok "Apps busy for too long: nothing installed" || bad "Apps busy for too long: $(cat "$T/run/update.status")"
+wait
 
 # --- versions ------------------------------------------------------------
 dpkg --compare-versions 0.1.0 gt "0.0.0+30.gcb85d31" && ok "a release is newer than an untagged build" || bad "version order"
