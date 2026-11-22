@@ -1,6 +1,10 @@
 name: Release
 
-# Pushing a tag like v0.2.0 publishes that version as an update: the zeroos
+# Two ways to start it, same result:
+#   - Actions tab > Release > Run workflow, and type the version (0.4.0).
+#     It tags the newest commit on main v0.4.0 once CI has passed.
+#   - Push a tag like v0.4.0.
+# It publishes that version as an update: the zeroos
 # package and its manifest become a GitHub release, which is where
 # zeroos-update on the device looks (docs/UPDATE.md). The installable apps
 # and their index go in the same release, which is where the Apps app looks
@@ -14,6 +18,11 @@ name: Release
 on:
   push:
     tags: ['v[0-9]*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release from main, such as 0.4.0 (0.4.0-rc1 for a pre-release)
+        required: true
 
 permissions:
   contents: write
@@ -25,10 +34,30 @@ jobs:
   release:
     needs: ci
     runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0   # image/version.sh reads the tag
+      - name: Tag
+        id: tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            # Run workflow: make the tag here, now that CI has passed.
+            [ "$GITHUB_REF" = refs/heads/main ] || { echo "Run this from main."; exit 1; }
+            TAG="v${VERSION#v}"
+            echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' \
+              || { echo "'$VERSION' is not a version like 0.4.0"; exit 1; }
+            git tag "$TAG"   # fails if that version already exists
+            git push origin "$TAG"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
       - name: Install cross compiler
         run: sudo apt-get update && sudo apt-get install -y cmake g++-aarch64-linux-gnu
       - name: Build ZeroShell (arm64)
@@ -47,7 +76,7 @@ jobs:
           image/package.sh build/device/zeroshell build/update
           cat build/update/zeroos-update.manifest
           # The tag is the version: v0.2.0 must give zeroos_0.2.0_arm64.deb.
-          test -f "build/update/zeroos_${GITHUB_REF_NAME#v}_arm64.deb"
+          test -f "build/update/zeroos_${TAG#v}_arm64.deb"
           # The apps, built from the same commit (docs/APPS.md): the Apps app
           # on a device reads zeroos-apps.index from the newest release.
           image/apps/build.sh build/device/apps build/apps
@@ -57,20 +86,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           pre=()
-          case "$GITHUB_REF_NAME" in *-*) pre=(--prerelease --latest=false) ;; esac
+          case "$TAG" in *-*) pre=(--prerelease --latest=false) ;; esac
           files=(build/update/zeroos_*.deb build/update/zeroos-update.manifest
                  build/apps/zeroos-app-*.deb build/apps/zeroos-apps.index)
           # A release made by hand on GitHub (Releases > Draft a new release,
           # which also makes the tag) gets the files added to it.
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "${files[@]}" --clobber
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
           else
-            gh release create "$GITHUB_REF_NAME" "${files[@]}" \
-              --title "ZeroOS ${GITHUB_REF_NAME#v}" --generate-notes "${pre[@]}"
+            gh release create "$TAG" "${files[@]}" \
+              --title "ZeroOS ${TAG#v}" --generate-notes "${pre[@]}"
           fi
 
   image:
     needs: release
     uses: ./.github/workflows/image.yml
     with:
-      release_tag: ${{ github.ref_name }}
+      release_tag: ${{ needs.release.outputs.tag }}
