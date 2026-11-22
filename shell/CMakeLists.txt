@@ -111,6 +111,11 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(ir_test PRIVATE src)
   target_compile_options(ir_test PRIVATE -Wall -Wextra)
   add_test(NAME ir_test COMMAND ir_test)
+  # ZClaw's AI requests and replies (no network).
+  add_executable(zclaw_test tests/zclaw_test.cpp src/apps/zclaw/ai.cpp)
+  target_include_directories(zclaw_test PRIVATE src)
+  target_compile_options(zclaw_test PRIVATE -Wall -Wextra)
+  add_test(NAME zclaw_test COMMAND zclaw_test)
   # A test-pattern libretro core for the Games app (tests/games/testcore.c):
   # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
   add_library(zstest_libretro MODULE tests/games/testcore.c)

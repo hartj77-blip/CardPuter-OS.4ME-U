@@ -26,6 +26,7 @@ public:
     }
 
     bool on_key(uint32_t key) override {
+        if (pw_page_) return password_key(key);
         if (!pw_page_ && (key == 'r' || key == 'R')) {
             show_list();
             shell_toast("Rescanned");
@@ -83,25 +84,56 @@ private:
         lv_obj_set_size(pw_page_, kScreenW, kContentH);
         lv_obj_t* t = label(pw_page_, ("Password for " + n.ssid).c_str(), &zs_font_14);
         lv_obj_set_pos(t, 10, 10);
-        ta_ = lv_textarea_create(pw_page_);
-        lv_textarea_set_one_line(ta_, true);
-        lv_textarea_set_password_mode(ta_, true);
-        lv_obj_set_size(ta_, kScreenW - 20, 36);
-        lv_obj_set_pos(ta_, 10, 40);
-        lv_obj_set_style_bg_color(ta_, c(kSurface), 0);
-        lv_obj_set_style_border_color(ta_, c(kAccent), 0);
-        lv_obj_add_event_cb(ta_, on_submit, LV_EVENT_READY, this);
-        shell_add_focus(ta_);
-        // ` types a character here; it only means Back while the box is empty.
-        lv_obj_t* h = label(pw_page_, "Enter to connect\nEsc to go back (or ` with the box empty)", &zs_font_12, kMuted);
-        lv_obj_set_pos(h, 10, 86);
+        // A plain line of text, not a text box: shown as typed (easier to get
+        // right on a small keyboard), no cursor to move, no scrolling.
+        lv_obj_t* box = lv_obj_create(pw_page_);
+        style_plain(box);
+        lv_obj_set_size(box, kScreenW - 20, 30);
+        lv_obj_set_pos(box, 10, 36);
+        lv_obj_set_style_bg_color(box, c(kSurface), 0);
+        lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_color(box, c(kAccent), 0);
+        lv_obj_set_style_border_width(box, 2, 0);
+        lv_obj_set_style_radius(box, 4, 0);
+        lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
+        pw_label_ = label(box, "", &zs_font_16, 0xffffff);
+        lv_obj_set_width(pw_label_, kScreenW - 36);
+        lv_label_set_long_mode(pw_label_, LV_LABEL_LONG_CLIP);
+        lv_obj_align(pw_label_, LV_ALIGN_LEFT_MID, 6, 0);
+        pw_.clear();
+        show_typed();
+        lv_obj_t* h = label(pw_page_, "Type the password, then Enter to connect.\nBackspace deletes. Esc goes back.",
+                            &zs_font_12, kMuted);
+        lv_obj_set_pos(h, 10, 76);
     }
 
-    static void on_submit(lv_event_t* e) {
-        auto* self = static_cast<WifiApp*>(lv_event_get_user_data(e));
-        self->pw_ = lv_textarea_get_text(self->ta_);
-        lv_async_call(connect_cb, self);
+    // What's typed, with a cursor; only the end of it if it's too long to fit.
+    void show_typed() {
+        const int room = kScreenW - 40;
+        std::string shown = pw_ + "_";
+        size_t from = 0;
+        auto width = [](const std::string& t) {
+            return lv_text_get_width(t.c_str(), uint32_t(t.size()), &zs_font_16, 0);
+        };
+        if (width(shown) > room)
+            while (from + 1 < shown.size() && width("..." + shown.substr(from)) > room) ++from;
+        lv_label_set_text(pw_label_, (from ? "..." + shown.substr(from) : shown).c_str());
     }
+
+    bool password_key(uint32_t key) {
+        if (key == LV_KEY_ENTER) {
+            lv_async_call(connect_cb, this);
+        } else if (key == LV_KEY_BACKSPACE || key == LV_KEY_DEL) {
+            if (!pw_.empty()) pw_.pop_back();
+        } else if (key >= 32 && key < 127) {
+            if (pw_.size() < 63) pw_ += char(key);   // WPA passwords are at most 63 characters
+        } else {
+            return key != LV_KEY_ESC;   // Esc: back to the list
+        }
+        show_typed();
+        return true;
+    }
+
     static void show_password_cb(void* p) { static_cast<WifiApp*>(p)->show_password(); }
     static void connect_cb(void* p) {
         auto* s = static_cast<WifiApp*>(p);
@@ -117,7 +149,7 @@ private:
 
     lv_obj_t* root_ = nullptr;
     lv_obj_t* pw_page_ = nullptr;
-    lv_obj_t* ta_ = nullptr;
+    lv_obj_t* pw_label_ = nullptr;
     std::vector<WifiNetwork> nets_;
     int pick_ = -1;
     std::string pw_;

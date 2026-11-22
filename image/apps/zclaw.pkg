@@ -1,0 +1,5 @@
+# ZClaw (docs/ZCLAW.md): an AI assistant. Claude, ChatGPT, Gemini, OpenRouter,
+# Groq, Mistral, Ollama or any OpenAI-compatible server, with your own key.
+# Requests go through curl, which is part of ZeroOS: nothing else to install.
+NAME="ZClaw"
+SUMMARY="AI assistant: Claude, ChatGPT, Gemini, Ollama and more"

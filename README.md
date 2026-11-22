@@ -67,6 +67,7 @@ image, and can be removed like any other app.
 | IR Remote | Universal remote for TVs, projectors, audio equipment, air conditioners and lights. About 2,000 remotes, and it can learn buttons from your own ([guide](docs/IR.md)) |
 | Media | Music player, Jellyfin streaming and voice recordings ([guide](docs/JELLYFIN.md)) |
 | Notes | Simple text notes |
+| ZClaw | AI assistant. Chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/ZCLAW.md)) |
 | Remote | Tailscale: reach your other devices, SSH, remote desktop and file sharing ([guide](docs/REMOTE.md)) |
 | Sync | Keep notes, documents and recordings in step with your PC and phone using Syncthing ([guide](docs/SYNC.md)) |
 | Tether | Get online through your phone over Wi-Fi, USB or Bluetooth ([guide](docs/TETHER.md)) |
@@ -100,7 +101,8 @@ and then use the Update app.
 
 There are two ways to get online:
 
-- On the device: open the Wi-Fi app, pick your network and type the password.
+- On the device: open the Wi-Fi app, pick your network and type the password. The password shows
+  as you type it, Backspace deletes, and Enter connects.
 - Before the first start: in Raspberry Pi Imager, fill in your Wi-Fi name and password in the
   settings it offers before writing the card. ZeroOS applies them on the first boot.
 
@@ -174,6 +176,7 @@ For developers:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Hardware notes](docs/HARDWARE.md)
+- [Hardware test checklist](docs/HARDWARE-TEST.md): one line per app to try on a real Cardputer
 - [Roadmap](docs/ROADMAP.md)
 
 ## Run it on a PC
@@ -194,6 +197,20 @@ There is also a browser version (WebAssembly). Building it needs [Emscripten](ht
 ```sh
 web/build.sh build/zeroos-simulator.html
 ```
+
+## Tests
+
+Every pull request opens each app with the keyboard, with and without hardware, and installs each
+app with `apt` on Debian arm64. To run the keyboard tests on Linux:
+
+```sh
+cmake -S shell -B build/device-native -DZS_BACKEND=device && cmake --build build/device-native -j
+gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
+python3 shell/tests/device/device_test.py build/device-native/zeroshell build/fakedev.so
+python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so
+```
+
+To check a real Cardputer by hand, use the [hardware test checklist](docs/HARDWARE-TEST.md).
 
 ## Build from source
 
@@ -226,7 +243,7 @@ tools/push-update.sh cardputer.local
 See [Updates](docs/UPDATE.md) for details.
 
 Every change is built and tested by the [CI](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/ci.yml)
-workflow. Tagged versions are published by the
+workflow. A pull request can only be merged into `main` once all five CI checks pass. Tagged versions are published by the
 [Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml) workflow.
 
 ## Security
