@@ -111,6 +111,10 @@ const MockApp kMockApps[] = {
     {"battery", "Battery", "Time left, power draw and power profile", "", 40, nullptr},
     {"clock", "Clock", "Clock and stopwatch", "", 30, nullptr},
     {"sysmon", "System", "CPU, memory and what uses it", "", 50, nullptr},
+    {"dev", "Dev Tools", "Projects with one-key run, micro editor, REPLs, Git and a serial monitor",
+     "git, micro, make, gcc, libc6-dev, python3, lua5.4, bc, sqlite3", 180, nullptr},
+    {"games", "Games", "Play NES, Game Boy and GBA games (more consoles with downloadable cores)",
+     "libretro-nestopia, libretro-gambatte, libretro-mgba, alsa-utils, curl, unzip", 140, nullptr},
 };
 
 void mock_init() {
@@ -119,6 +123,7 @@ void mock_init() {
     // Everything the simulator has built in counts as installed.
     for (auto& a : app_registry())
         if (!a.base) g_mock_installed[a.id] = "0.4.0";
+    if (app_find("code")) g_mock_installed["dev"] = "0.4.0";   // a pack: its apps have their own ids
     if (g_mock_installed.count("clock")) g_mock_installed["clock"] = "0.3.2";   // so one app shows an update
     g_mock_refreshed = lv_tick_get();
 }

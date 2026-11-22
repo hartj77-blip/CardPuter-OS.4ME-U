@@ -1,0 +1,9 @@
+# Games (docs/GAMES.md): plays games for classic consoles on the built-in
+# screen with libretro emulator cores, the same cores RetroArch uses.
+NAME="Games"
+SUMMARY="Play NES, Game Boy and GBA games (more consoles with downloadable cores)"
+# Debian's libretro cores for NES (Nestopia), Game Boy / Color (Gambatte) and
+# Game Boy Advance (mGBA); alsa-utils (aplay) for the sound; curl and unzip to
+# download more cores (SNES, Mega Drive, PC Engine, PlayStation...) into
+# ~/Games/cores from libretro's nightly builds, from the Games app.
+DEPENDS="libretro-nestopia, libretro-gambatte, libretro-mgba, alsa-utils, curl, unzip"

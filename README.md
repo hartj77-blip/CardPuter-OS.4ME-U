@@ -78,6 +78,8 @@ image, and can be removed like any other app.
 | Battery | Time left, power use and power profiles ([guide](docs/PERFORMANCE.md)) |
 | Clock | Clock and stopwatch |
 | System | CPU and memory use |
+| Dev Tools | Four apps for writing code on the keyboard: Code (projects, the micro editor, run with one key), REPL, Git and a Serial monitor for Arduino and ESP32 boards ([guide](docs/DEV.md)) |
+| Games | Play your own NES, Game Boy and GBA games, plus SNES, Mega Drive, PC Engine, PlayStation and more with downloadable libretro cores ([guide](docs/GAMES.md)) |
 
 ## Install
 
@@ -165,6 +167,8 @@ For a full report on memory, CPU and battery use, run `zeroos-measure`. See
 - [Dock](docs/DOCK.md): the desktop on a monitor
 - [GPS and LoRa](docs/EXPANSION.md): expansion modules
 - [Battery and performance](docs/PERFORMANCE.md): power saving and memory
+- [Dev Tools](docs/DEV.md): coding, Git and serial on the device
+- [Games](docs/GAMES.md): classic console games with libretro cores
 
 For developers:
 
