@@ -42,6 +42,17 @@ CMDLINE_TXT="${ROOTFS_DIR}/boot/firmware/cmdline.txt"
 # Smaller GPU split: no desktop, so give RAM back to Linux (owner report: gpu_mem=32 works).
 grep -q '^gpu_mem=' "$CONFIG_TXT" && sed -i 's/^gpu_mem=.*/gpu_mem=32/' "$CONFIG_TXT" || echo 'gpu_mem=32' >> "$CONFIG_TXT"
 
+# Faster boot (docs/PERFORMANCE.md, "Boot"):
+#   boot_delay=0: the firmware otherwise waits 1 s before loading the kernel.
+#   disable_splash=1: skip the firmware's rainbow screen (there is no logo now).
+#   display_auto_detect=0: no DSI panel on this board; don't probe for one.
+set_config() {
+    grep -q "^$1=" "$CONFIG_TXT" && sed -i "s/^$1=.*/$1=$2/" "$CONFIG_TXT" || echo "$1=$2" >> "$CONFIG_TXT"
+}
+set_config boot_delay 0
+set_config disable_splash 1
+set_config display_auto_detect 0
+
 # Wi-Fi regulatory domain (M5 ships AE); quiet boot without Plymouth.
 sed -i -e 's/cfg80211.ieee80211_regdom=[A-Z]*//' -e 's/ splash//' -e 's/ plymouth.ignore-serial-consoles//' "$CMDLINE_TXT"
 sed -i '1 s/$/ cfg80211.ieee80211_regdom=@WIFI_COUNTRY@/' "$CMDLINE_TXT"
@@ -53,6 +64,9 @@ sed -i -e 's/console=serial0,[0-9]* *//' -e 's/console=ttyS0,[0-9]* *//' -e 's/c
 # starts, minutes on a first boot. 90-zeroos.udev covers a monitor at boot.
 sed -i -e 's/ *fbcon=map:[^ ]*//' -e 's/ quiet//' "$CMDLINE_TXT"
 grep -q '^enable_uart=' "$CONFIG_TXT" && sed -i 's/^enable_uart=.*/enable_uart=1/' "$CONFIG_TXT" || echo 'enable_uart=1' >> "$CONFIG_TXT"
+# Boot at full CPU speed. ZeroShell sets the governor for the chosen power
+# profile as soon as it starts (ui/power.cpp), so this only lasts the boot.
+sed -i -e 's/ *cpufreq.default_governor=[^ ]*//' -e '1 s/$/ cpufreq.default_governor=performance/' "$CMDLINE_TXT"
 
 # Keyboard symbol layer system-wide, not only under M5's launcher (owner report).
 KMAP=/usr/share/keymaps/tca8418_keypad_m5stack_keymap.map
@@ -109,9 +123,17 @@ disable_if_present() {
 #   rpi-eeprom-update: the CM0 has no bootloader EEPROM
 #   rpi-connect / rpi-connect-wayvnc: Raspberry Pi's remote access (Tailscale replaces it)
 #   ModemManager: no modem
+#   triggerhappy: hotkey daemon; ZeroShell reads the keyboard itself
+#   rsyslog: a second copy of every log line on the card (journald keeps one)
+#   dphys-swapfile: old swap file service; rpi-swap does zram + file swap now
+#   systemd-networkd-wait-online: NetworkManager runs the network, not networkd
+#   rpcbind: only old NFS (v3) needs it, and its socket still starts it then
+#   raspi-config: only resets the CPU governor at boot; ZeroShell sets it
 disable_if_present apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_all.timer \
     e2scrub_reap.service NetworkManager-wait-online.service rpi-eeprom-update.service \
-    ModemManager.service
+    ModemManager.service triggerhappy.service triggerhappy.socket rsyslog.service \
+    dphys-swapfile.service systemd-networkd-wait-online.service \
+    rpcbind.service raspi-config.service
 systemctl --global disable rpi-connect.service rpi-connect-wayvnc.service 2>/dev/null || true
 # adbd (in M5's package list) is enabled by its package: at every boot it sets
 # up a USB gadget and offers a root shell to whatever the USB port is plugged
