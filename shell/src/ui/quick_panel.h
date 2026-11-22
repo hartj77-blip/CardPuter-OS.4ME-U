@@ -1,9 +1,9 @@
-// The taskbar panel: press 2 (away from a text box) and a row of tiles drops
+// The taskbar panel: press 2 (away from a text box), or Ctrl + Space anywhere, and a row of tiles drops
 // from the status bar. Each tile has a number key:
 //   3 Wi-Fi  4 Bluetooth  5 Volume  6 Brightness  7 Battery  8 Clock  9 Settings
 // Left/Right move between tiles, Up/Down change volume or brightness, Enter
 // (or the tile's number) switches Wi-Fi/Bluetooth/mute or opens the app.
-// Esc or 2 closes it.
+// Esc, 2 or Ctrl + Space closes it.
 #pragma once
 
 #include <cstdint>

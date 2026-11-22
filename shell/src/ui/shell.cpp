@@ -29,9 +29,11 @@ bool g_consumed = false;      // the held key belongs to the shell, not LVGL
 bool g_swallowed = false;     // the held key woke the screen; nothing else sees it
 bool g_repeat = false;        // ...and it's a key worth repeating while held
 bool g_as_enter = false;      // a number key that picked an item: LVGL sees Enter
+bool g_esc_held = false;      // Esc is down: held long enough, it goes home
 uint32_t g_press_ms = 0, g_repeat_ms = 0, g_press_app = 0;
 lv_obj_t* g_enter_box = nullptr;   // text box that had focus when Enter went down
 constexpr uint32_t kRepeatDelay = 400, kRepeatEvery = 80;
+constexpr uint32_t kHoldHomeMs = 600;   // hold Esc this long: home (docs/UX.md)
 
 // Only movement and deleting repeat. Enter, Tab and letters are actions
 // (install, record, save a waypoint): holding one must not do it 10 times.
@@ -59,6 +61,15 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         g_consumed = Shell::get().handle_key(data->key);
         g_as_enter = Shell::get().take_press_as_enter();
         g_repeat = g_consumed && repeats(Shell::get().last_key());
+        // Esc (or ` standing in for it) did Back on the press; held on, it
+        // goes all the way home.
+        g_esc_held = Shell::get().last_key() == LV_KEY_ESC;
+    } else if (pressed && g_esc_held && lv_tick_elaps(g_press_ms) > kHoldHomeMs) {
+        g_esc_held = false;
+        Shell::get().hold_home();
+        // The rest of the press is the shell's: nothing on the home screen
+        // sees an Esc release.
+        g_consumed = true;
     } else if (pressed && g_repeat && lv_tick_elaps(g_press_ms) > kRepeatDelay &&
                lv_tick_elaps(g_repeat_ms) > kRepeatEvery) {
         // The press opened or closed an app: the rest of it isn't for the new
@@ -74,6 +85,7 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         g_consumed = false;
         g_swallowed = false;
         g_repeat = false;
+        g_esc_held = false;
         g_as_enter = false;
     }
     // 3..9 picked an item and focused it: the rest of the press is an Enter
@@ -371,6 +383,14 @@ std::string Shell::take_app_arg() {
 
 void Shell::go_home() { pending_ = "home"; }
 
+void Shell::hold_home() {
+    if (handoff_) return;   // the terminal or camera has the screen
+    if (quick_panel_is_open()) quick_panel_close();
+    number_hints_hide();
+    if (app_id_ != "home") go_home();
+    apply_pending();
+}
+
 void Shell::apply_pending() {
     if (pending_.empty()) return;
     std::string id;
@@ -441,10 +461,17 @@ bool Shell::handle_key(uint32_t key) {
     // Whatever was asked for, the number badges have done their job (0
     // itself shows or hides them).
     if (key != '0') number_hints_hide();
-    if (panel && quick_panel_key(key)) {
+    if (key == ctrl_key(' ')) {
+        // Ctrl + Space: the taskbar panel, from anywhere, text box or not.
+        if (panel) quick_panel_close();
+        else quick_panel_open();
+        used = true;
+    } else if (panel && quick_panel_key(key)) {
         used = true;
     } else if (!panel && app_ && app_->on_key(key)) {
         used = true;
+    } else if (is_ctrl_key(key)) {
+        used = true;   // a Ctrl key nobody took: never to a widget (a text box would type it)
     } else if (is_shell_key(key)) {
         system_key(key);
         used = true;   // never to a widget: a text box would type it
