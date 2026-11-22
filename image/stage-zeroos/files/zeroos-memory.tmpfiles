@@ -1,0 +1,6 @@
+# ZeroOS: multi-generation LRU (MGLRU) picks which pages to swap out better
+# than the old LRU on small-memory machines (it is what ChromeOS uses), and
+# min_ttl_ms keeps the last second's working set in RAM so the UI never
+# thrashes. "w-": skipped quietly on a kernel built without it.
+w- /sys/kernel/mm/lru_gen/enabled - - - - y
+w- /sys/kernel/mm/lru_gen/min_ttl_ms - - - - 1000

@@ -9,7 +9,7 @@
 #      ZEROOS_FILES: the folder payload() takes files from
 # Needs: dpkg-deb (no root).
 #
-# Other repositories (cardputer-zero-rf) use this too, from their copy of
+# Other repositories can use this too, from their copy of
 # this repository.
 set -euo pipefail
 umask 022

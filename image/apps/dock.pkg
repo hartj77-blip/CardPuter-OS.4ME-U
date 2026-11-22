@@ -1,0 +1,6 @@
+# Dock (docs/DOCK.md): start the desktop on an HDMI monitor. The desktop
+# itself (zeroos-dock, labwc, waybar) stays in the zeroos package: Files,
+# Camera, Mesh and Remote open things on the monitor with it, and the
+# Settings option "On HDMI: start Dock mode" works without this app.
+NAME="Dock"
+SUMMARY="Desktop on an HDMI monitor: browser, video, terminal, files"

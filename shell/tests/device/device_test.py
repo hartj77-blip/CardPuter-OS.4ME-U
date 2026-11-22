@@ -27,7 +27,7 @@ SYM = {"!": 26, "@": 27, "#": 39, "-": 71, "_": 70, "?": 93, ".": 91, ",": 90, "
 
 
 class Device:
-    def __init__(self, binary, shim, shots):
+    def __init__(self, binary, shim, shots, hal="--mock", env_extra=None):
         self.shots = shots
         self.dir = tempfile.mkdtemp(prefix="zs-device-")
         self.fb = os.path.join(self.dir, "fb")
@@ -36,13 +36,14 @@ class Device:
             f.write(bytes(W * H * 2))
         os.mkfifo(self.kb)
         env = dict(os.environ, LD_PRELOAD=shim, ZS_FRAMEBUFFER=self.fb, ZS_KEYBOARD=self.kb, HOME=self.dir)
+        env.update(env_extra or {})
         # A device build makes the installable apps (Notes among them) as modules
         # next to the binary; load them from there, as if they were installed.
         apps = os.path.join(os.path.dirname(os.path.abspath(binary)), "apps")
-        if os.path.isdir(apps):
+        if os.path.isdir(apps) and "ZS_APP_DIR" not in env:
             env["ZS_APP_DIR"] = apps
         self.log = open(os.path.join(self.dir, "log"), "w")
-        self.proc = subprocess.Popen([binary, "--mock"], env=env, stdin=subprocess.DEVNULL,
+        self.proc = subprocess.Popen([binary, hal], env=env, stdin=subprocess.DEVNULL,
                                      stdout=self.log, stderr=subprocess.STDOUT)
         self.out = os.open(self.kb, os.O_WRONLY)   # blocks until ZeroShell opens the keyboard
 
@@ -171,6 +172,7 @@ def main():
         saved = open(note).read() if os.path.exists(note) else ""
         want = text + "fastrollover"
         check("typed text is in the note", want in saved, f"wanted {want!r} in {saved!r}")
+
     finally:
         rc = d.stop()
     check("stops cleanly on SIGTERM", rc == 0, f"exit {rc}")

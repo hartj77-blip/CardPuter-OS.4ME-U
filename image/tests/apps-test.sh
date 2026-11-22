@@ -182,6 +182,22 @@ grep -q 'damaged' "$T/run/apps.status" && ok "install, damaged download: says so
 grep -q 'apt-get install' "$T/apt.log" && bad "install, damaged download: still installed" || ok "install, damaged download: nothing installed"
 cp "$T/notes.good" "$T/a/zeroos-app-notes_1.0.0_arm64.deb"
 
+# A new release replaces the files the saved catalog names (a 404 on the
+# device): the install fetches the lists again and gets the new version.
+cp -r "$T/a" "$T/a.old"
+rm -f "$T/a"/zeroos-app-notes_* "$T/a/zeroos-apps.index"
+mk a notes 1.1.0
+mk a gps 1.0.0
+cat_has version=1.0.0 && ok "new release: catalog is still the old one" || bad "new release: setup"
+: > "$T/apt.log"
+apps run install:notes
+expect "install after a new release: done" state done
+grep -q "apt-get install .*zeroos-app-notes_1.1.0_arm64.deb" "$T/apt.log" &&
+    ok "install after a new release: gets the new version" || bad "install after a new release: $(cat "$T/apt.log")"
+rm -rf "$T/a"; mv "$T/a.old" "$T/a"
+apps run refresh
+: > "$T/apt.log"
+
 touch "$T/apt-fail"
 apps run install:notes || true
 expect "install, apt fails: failed" state failed
@@ -215,6 +231,17 @@ echo "zeroos-app-notes 2.0.0" > "$T/installed"
 : > "$T/apt.log"
 apps run upgrade
 grep -q 'apt-get install' "$T/apt.log" && bad "upgrade, up to date: installed anyway" || ok "upgrade, up to date: nothing to do"
+# Apps that used to be built in (the zeroos package lists them in restore):
+# upgrade installs the ones that aren't installed and are on offer, once.
+printf 'file://%s/a\n' "$T" > "$T/sources"   # a offers notes and gps 1.0.0
+echo "zeroos-app-notes 1.0.0" > "$T/installed"
+echo "notes gps nowhere" > "$T/state/restore"
+: > "$T/apt.log"
+apps run upgrade
+expect "upgrade, restore: done" state done
+grep -q "zeroos-app-gps_1.0.0_arm64.deb" "$T/apt.log" && ok "upgrade, restore: installs what was built in" || bad "upgrade, restore: $(cat "$T/apt.log")"
+grep -q "zeroos-app-notes_" "$T/apt.log" && bad "upgrade, restore: reinstalled an installed app" || ok "upgrade, restore: leaves installed apps alone"
+[ -e "$T/state/restore" ] && bad "upgrade, restore: list left behind" || ok "upgrade, restore: only once"
 
 # --- sources -----------------------------------------------------------------
 apps run add-source:someone/cardputer-apps || true
