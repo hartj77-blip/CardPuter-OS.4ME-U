@@ -1,0 +1,13 @@
+# Router mode (docs/ROUTER.md): if it was on when the Cardputer shut down,
+# turn it on again.
+[Unit]
+Description=ZeroOS router mode: resume after a restart
+After=NetworkManager.service
+ConditionPathExists=/var/lib/zeroos/router.mode
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/zeroos/router boot
+
+[Install]
+WantedBy=multi-user.target

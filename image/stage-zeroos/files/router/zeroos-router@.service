@@ -1,0 +1,15 @@
+# Router mode (docs/ROUTER.md): a computer on the Ethernet port (%i =
+# ethernet) or on the right-hand USB-C port (%i = usb) goes online through
+# Tailscale's exit node. ZeroShell's Router app starts and stops it;
+# zeroos-router-boot.service turns it on again after a restart.
+[Unit]
+Description=ZeroOS router mode over %i
+After=NetworkManager.service tailscaled.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/zeroos/router start %i
+ExecStop=/usr/lib/zeroos/router stop %i
+TimeoutStartSec=2min

@@ -54,6 +54,7 @@ show time-left estimates in the status bar.
 - Keyboard shortcuts everywhere, readable fonts, split views in the terminal.
 - Note and file sync over Wi-Fi *(done in software; see [SYNC.md](SYNC.md))*.
 - Phone as a hotspot, over Wi-Fi, USB or Bluetooth *(done in software; see [TETHER.md](TETHER.md))*.
+- Portable router: a laptop on Ethernet or USB-C goes online through a Tailscale exit node *(done in software; see [ROUTER.md](ROUTER.md))*.
 - Camera with QR code scanning *(done in software; see [CAMERA.md](CAMERA.md))*.
 - IR universal remote (done in software: Flipper-IRDB codes, universal power/volume, learning; docs/IR.md). Needs a hardware check.
 - Motion sensor: wake on pickup, sleep when placed face down *(done in software; see [PERFORMANCE.md](PERFORMANCE.md#battery))*.

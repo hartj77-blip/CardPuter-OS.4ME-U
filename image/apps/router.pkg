@@ -1,0 +1,17 @@
+# Router (docs/ROUTER.md): a laptop on the Ethernet port or the USB-C port
+# goes online through the Cardputer's Tailscale exit node, with a kill switch.
+# Tailscale itself comes with Remote, which Router needs.
+NAME="Router"
+SUMMARY="Share your Tailscale exit node with a laptop over Ethernet or USB-C"
+DEPENDS="python3, nftables, dnsmasq-base"
+ENABLE="zeroos-router-boot.service"
+STOP_ON_REMOVE="zeroos-router@ethernet.service zeroos-router@usb.service"
+payload() {
+    install -D -m 0755 "$F/router/zeroos-router" "$D/usr/lib/zeroos/router"
+    install -D -m 0644 "$F/router/zeroos-router@.service" "$D/etc/systemd/system/zeroos-router@.service"
+    install -D -m 0644 "$F/router/zeroos-router-boot.service" "$D/etc/systemd/system/zeroos-router-boot.service"
+    install -D -m 0644 "$F/router/91-zeroos-router.rules" "$D/etc/polkit-1/rules.d/91-zeroos-router.rules"
+    # The USB network adapter is a configfs gadget.
+    install -d "$D/etc/modules-load.d"
+    echo libcomposite > "$D/etc/modules-load.d/zeroos-router.conf"
+}

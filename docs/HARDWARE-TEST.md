@@ -27,6 +27,7 @@ If something freezes or crashes, connect over SSH and run `journalctl -u zeroshe
 - [ ] **IR Remote**: Universal > pick a TV brand, point at a TV, it turns off; learn one button from a real remote and send it back.
 - [ ] **GPS** (needs the Cap LoRa-1262 or a Grove GPS): outdoors, a fix within a few minutes. With no module: "No GPS found" after a few seconds.
 - [ ] **Mesh** (needs the Cap LoRa-1262): turn it on, your node name shows, a message reaches a phone running Meshtastic. Without the cap: should say no radio, not hang.
+- [ ] **Router**: see the checklist in [ROUTER.md](ROUTER.md#not-checked-on-a-device-yet): a laptop on Ethernet, then on USB-C, browses through the exit node; with the exit node off, nothing loads.
 - [ ] **Tether**: share your phone's internet over USB or Bluetooth; Wi-Fi off, a page still loads in Terminal (`curl -I example.com`).
 - [ ] **Remote**: sign in to Tailscale with the link or QR, your other devices are listed, SSH to one opens.
 - [ ] **Sync**: shows a device ID; pair with Syncthing on your PC, a note syncs across.

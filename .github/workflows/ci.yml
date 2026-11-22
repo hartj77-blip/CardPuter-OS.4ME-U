@@ -136,6 +136,8 @@ jobs:
         run: image/tests/update-test.sh
       - name: App install tests
         run: image/tests/apps-test.sh
+      - name: Router mode tests
+        run: image/tests/router-test.sh
       - name: Package
         run: image/package.sh build/device/zeroshell build/update
       - name: Package the apps

@@ -71,6 +71,7 @@ image, and can be removed like any other app.
 | Remote | Tailscale: reach your other devices, SSH, remote desktop and file sharing ([guide](docs/REMOTE.md)) |
 | Sync | Keep notes, documents and recordings in step with your PC and phone using Syncthing ([guide](docs/SYNC.md)) |
 | Tether | Get online through your phone over Wi-Fi, USB or Bluetooth ([guide](docs/TETHER.md)) |
+| Router | Plug in a laptop over Ethernet or USB-C and it goes online through your Tailscale exit node, with a kill switch ([guide](docs/ROUTER.md)) |
 | Camera | Photos, a gallery and a QR code reader that can join Wi-Fi networks. Needs a model with a camera ([guide](docs/CAMERA.md)) |
 | GPS | Position, saved places and track recording. Needs a GPS module ([guide](docs/EXPANSION.md)) |
 | Mesh | Text messages over LoRa with Meshtastic. Needs the Cap LoRa-1262 ([guide](docs/EXPANSION.md)) |
@@ -172,6 +173,7 @@ For a full report on memory, CPU and battery use, run `zeroos-measure`. See
 - [Remote](docs/REMOTE.md): Tailscale, SSH and file sharing
 - [Sync](docs/SYNC.md): syncing notes and files
 - [Tether](docs/TETHER.md): getting online through your phone
+- [Router](docs/ROUTER.md): a portable router for your laptop, through a Tailscale exit node
 - [Media and Jellyfin](docs/JELLYFIN.md): music from your server
 - [Car](docs/CAR.md): music in the car
 - [Camera](docs/CAMERA.md): photos and QR codes

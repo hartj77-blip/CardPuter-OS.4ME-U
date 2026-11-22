@@ -1,0 +1,405 @@
+#!/usr/bin/python3 -I
+"""ZeroOS router mode (docs/ROUTER.md): share the Cardputer's Tailscale exit
+node with a computer plugged into it.
+
+  zeroos-router start ethernet|usb   as root, from zeroos-router@<mode>.service
+  zeroos-router stop ethernet|usb    as root, the same service's ExecStop
+  zeroos-router boot                 as root: turn on the mode that was on at shutdown
+  zeroos-router nodes                as pi: Tailscale's state and the exit nodes
+
+The computer is on its own small network (a LAN), on one of:
+  ethernet   the Ethernet port (eth0), switch on Host
+  usb        the right-hand USB-C port as a USB network adapter (NCM gadget),
+             switch on Slave: one cable gives the Cardputer power and the
+             computer its network
+NetworkManager's "shared" mode hands the computer an address and DNS
+(dnsmasq). Everything the computer sends goes through tailscale0 and on to
+the exit node, or nowhere: a kill switch drops anything that would leave
+another way (Wi-Fi, a phone), so a dropped tunnel never leaks.
+
+start and stop write the state for ZeroShell's Router app to $STATE as
+key=value lines: state (on|error), mode, lan, address, error. start always
+exits 0 so the service stays active and its stop can clean up; a failure is
+the error= line.
+
+nodes prints tab-separated lines:
+  state   BackendState            Running, NeedsLogin, Stopped... or Missing
+  node    IP NAME ONLINE(0/1) SELECTED(0/1) LOCATION
+"""
+import hashlib
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+ENV = os.environ.get
+STATE = ENV("ZEROOS_ROUTER_STATE", "/run/zeroos/router.state")
+MODE_FILE = ENV("ZEROOS_ROUTER_MODE_FILE", "/var/lib/zeroos/router.mode")
+DNSMASQ = ENV("ZEROOS_ROUTER_DNSMASQ", "/etc/NetworkManager/dnsmasq-shared.d/zeroos-router.conf")
+SYS = ENV("ZEROOS_ROUTER_SYS", "")          # tests: a folder standing in for / (sys, proc)
+GADGET = SYS + "/sys/kernel/config/usb_gadget/zeroos-net"
+STICK = SYS + "/sys/kernel/config/usb_gadget/zeroos-stick"   # Car's USB stick mode
+CON = "zeroos-router"                       # the NetworkManager connection
+TABLE = "zeroos-router"                     # the nftables table
+TS = "tailscale0"
+RULE_PRIORITY = "5200"                      # before Tailscale's own rules (5210+)
+
+# Each mode's LAN. Different subnets, so a leftover lease never confuses.
+MODES = {
+    "ethernet": {"lan": "eth0", "address": "10.42.0.1", "subnet": "10.42.0.0/24"},
+    "usb": {"lan": "usb0", "address": "10.43.0.1", "subnet": "10.43.0.0/24"},
+}
+
+# dnsmasq (started by NetworkManager for the shared connection): answer the
+# computer's DNS through Tailscale's resolver, which follows the exit node,
+# never through the Wi-Fi's own DNS server; 1.1.1.1 is reached through the
+# exit node too, as a fallback. MTU 1280 is tailscale0's: the computer
+# then never sends a packet too big for the tunnel.
+DNSMASQ_CONF = """# ZeroOS router mode (zeroos-router). Removed when router mode is off.
+no-resolv
+server=100.100.100.100
+server=1.1.1.1
+dhcp-option=option:mtu,1280
+"""
+
+
+def out(*fields):
+    print("\t".join(str(f).replace("\t", " ").replace("\n", " ") for f in fields), flush=True)
+
+
+def run(*args, timeout=30):
+    """Run a command; (ok, stdout)."""
+    try:
+        p = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+        return p.returncode == 0, p.stdout
+    except (OSError, subprocess.SubprocessError):
+        return False, ""
+
+
+def read(path):
+    try:
+        with open(path) as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+def write(path, text):
+    with open(path, "w") as f:
+        f.write(text)
+
+
+def write_atomic(path, text):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    tmp = path + ".tmp"
+    write(tmp, text)
+    os.replace(tmp, path)
+
+
+def remove(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+def say(mode, state, error=""):
+    m = MODES[mode]
+    lines = [f"state={state}", f"mode={mode}", f"lan={m['lan']}", f"address={m['address']}"]
+    if error:
+        lines.append("error=" + error.replace("\n", " "))
+    write_atomic(STATE, "\n".join(lines) + "\n")
+
+
+class Failed(Exception):
+    pass
+
+
+# ---- Tailscale -----------------------------------------------------------
+
+def ts_status():
+    ok, js = run("tailscale", "status", "--json", timeout=15)
+    if not ok and not js:
+        return None
+    try:
+        return json.loads(js)
+    except ValueError:
+        return None
+
+
+def ts_exit_node_set():
+    """True if Tailscale's settings name an exit node (online or not)."""
+    ok, js = run("tailscale", "debug", "prefs", timeout=15)
+    try:
+        p = json.loads(js) if ok else {}
+    except ValueError:
+        p = {}
+    if p.get("ExitNodeID") or p.get("ExitNodeIP"):
+        return True
+    st = ts_status() or {}
+    if st.get("ExitNodeStatus"):
+        return True
+    return any(peer.get("ExitNode") for peer in (st.get("Peer") or {}).values())
+
+
+def ensure_tailscale():
+    if not run("sh", "-c", "command -v tailscale")[0]:
+        raise Failed("Tailscale is missing: install Remote in Apps")
+    run("systemctl", "start", "tailscaled.service", timeout=60)
+    state = ""
+    for _ in range(20):          # tailscaled takes a few seconds to answer
+        state = (ts_status() or {}).get("BackendState", "")
+        if state and state != "NoState":
+            break
+        time.sleep(1)
+    if state == "Stopped":       # turned off with "tailscale down"
+        run("tailscale", "up", "--timeout=20s", timeout=30)
+        state = (ts_status() or {}).get("BackendState", "")
+    if state in ("NeedsLogin", "NeedsMachineAuth"):
+        raise Failed("Sign in to Tailscale in Remote first")
+    if not state:
+        raise Failed("Tailscale isn't answering")
+    if not ts_exit_node_set():
+        raise Failed("Pick an exit node first")
+
+
+def nodes():
+    st = ts_status()
+    if st is None:
+        have = run("sh", "-c", "command -v tailscale")[0]
+        out("state", "Stopped" if have else "Missing")
+        return
+    out("state", st.get("BackendState", ""))
+    rows = []
+    for p in (st.get("Peer") or {}).values():
+        if not p.get("ExitNodeOption"):
+            continue
+        ips = [ip for ip in p.get("TailscaleIPs") or [] if ":" not in ip]
+        if not ips:
+            continue
+        name = (p.get("DNSName") or p.get("HostName") or "").split(".")[0] or p.get("HostName", "")
+        loc = p.get("Location") or {}
+        place = ", ".join(x for x in (loc.get("City"), loc.get("Country")) if x)
+        rows.append((not p.get("ExitNode"), bool(place), not p.get("Online"), name.lower(),
+                     ips[0], name, int(bool(p.get("Online"))), int(bool(p.get("ExitNode"))), place))
+    # The one in use, then your own machines (online first), then Mullvad's.
+    for r in sorted(rows):
+        out("node", *r[4:])
+
+
+# ---- USB network adapter (configfs gadget) -------------------------------
+
+def machine_bytes():
+    mid = read(SYS + "/etc/machine-id") or read("/etc/machine-id") or "zeroos"
+    return hashlib.sha256(mid.encode()).digest()
+
+
+def mac(tag):
+    # Locally administered, unicast, the same on every boot (the computer
+    # then keeps its settings for this adapter).
+    b = bytearray(hashlib.sha256(machine_bytes() + tag).digest()[:6])
+    b[0] = (b[0] & 0xFC) | 0x02
+    return ":".join(f"{x:02x}" for x in b)
+
+
+def udc():
+    try:
+        names = sorted(os.listdir(SYS + "/sys/class/udc"))
+    except OSError:
+        names = []
+    return names[0] if names else ""
+
+
+def gadget_start():
+    run("modprobe", "libcomposite")
+    port = udc()
+    if not port:
+        raise Failed("No USB device port: set the switch on the left to Slave")
+    if read(STICK + "/UDC"):
+        raise Failed("Car's USB stick mode is using the port: turn it off first")
+    gadget_stop()
+    g = GADGET
+    try:
+        os.makedirs(g + "/strings/0x409", exist_ok=True)
+        os.makedirs(g + "/configs/c.1/strings/0x409", exist_ok=True)
+        os.makedirs(g + "/functions/ncm.usb0", exist_ok=True)
+        write(g + "/idVendor", "0x1d6b")       # Linux Foundation
+        write(g + "/idProduct", "0x0104")      # multifunction composite gadget
+        write(g + "/bcdDevice", "0x0110")      # not Car's stick (0x0100): its own driver match
+        write(g + "/bcdUSB", "0x0200")
+        # Interface association: Windows 11, macOS and Linux all bind NCM by class.
+        write(g + "/bDeviceClass", "0xEF")
+        write(g + "/bDeviceSubClass", "0x02")
+        write(g + "/bDeviceProtocol", "0x01")
+        write(g + "/strings/0x409/manufacturer", "ZeroOS")
+        write(g + "/strings/0x409/product", "Cardputer Router")
+        write(g + "/strings/0x409/serialnumber", machine_bytes().hex()[:16])
+        write(g + "/configs/c.1/strings/0x409/configuration", "Network")
+        write(g + "/configs/c.1/MaxPower", "500")
+        write(g + "/functions/ncm.usb0/host_addr", mac(b"host"))
+        write(g + "/functions/ncm.usb0/dev_addr", mac(b"dev"))
+        link = g + "/configs/c.1/ncm.usb0"
+        if not os.path.lexists(link):
+            os.symlink(g + "/functions/ncm.usb0", link)
+        write(g + "/UDC", port)
+    except OSError as e:
+        gadget_stop()
+        raise Failed("Couldn't set up the USB port") from e
+    name = read(g + "/functions/ncm.usb0/ifname")
+    return name if name and not name.startswith("(") else "usb0"
+
+
+def gadget_stop():
+    g = GADGET
+    if not os.path.isdir(g):
+        return
+    try:
+        write(g + "/UDC", "")
+    except OSError:
+        pass
+    remove(g + "/configs/c.1/ncm.usb0")
+    for d in ("configs/c.1/strings/0x409", "configs/c.1", "functions/ncm.usb0", "strings/0x409", ""):
+        try:
+            os.rmdir(os.path.join(g, d) if d else g)
+        except OSError:
+            pass
+
+
+# ---- The LAN, the kill switch -------------------------------------------
+
+def nft_rules(lan, subnet):
+    # Priority -10: before NetworkManager's shared-mode rules, which would
+    # otherwise forward the computer's traffic out of Wi-Fi as well. A drop
+    # in any base chain is final.
+    return f"""table inet {TABLE} {{
+    chain forward {{
+        type filter hook forward priority -10; policy accept;
+        iifname "{lan}" oifname "{TS}" tcp flags & (syn | rst) == syn tcp option maxseg size set rt mtu
+        iifname "{lan}" oifname != "{TS}" counter drop
+        oifname "{lan}" iifname != "{TS}" counter drop
+    }}
+    chain postrouting {{
+        type nat hook postrouting priority 100; policy accept;
+        oifname "{TS}" ip saddr {subnet} masquerade
+    }}
+}}
+"""
+
+
+def sysctl(path, value):
+    try:
+        write(SYS + "/proc/sys/" + path, value)
+    except OSError:
+        pass
+
+
+def lan_down(mode):
+    m = MODES[mode]
+    run("nmcli", "connection", "delete", CON)
+    while run("ip", "rule", "del", "to", m["subnet"], "lookup", "main", "priority", RULE_PRIORITY)[0]:
+        pass
+    run("nft", "delete", "table", "inet", TABLE)
+    remove(DNSMASQ)
+    if mode == "usb":
+        gadget_stop()
+
+
+def lan_up(mode):
+    m = MODES[mode]
+    lan, subnet = m["lan"], m["subnet"]
+    # The kill switch goes in first: nothing can leak while the rest is set up.
+    if not nft_load(nft_rules(lan, subnet))[0]:
+        raise Failed("Couldn't set up the firewall (nftables)")
+    if mode == "usb":
+        lan = gadget_start()
+        if lan != m["lan"]:
+            m["lan"] = lan
+            run("nft", "delete", "table", "inet", TABLE)
+            if not nft_load(nft_rules(lan, subnet))[0]:
+                raise Failed("Couldn't set up the firewall (nftables)")
+    sysctl("net/ipv4/ip_forward", "1")
+    # Loose reverse-path checks: replies come back on tailscale0 from
+    # addresses the main routing table would send out of Wi-Fi.
+    for i in (lan, TS):
+        sysctl(f"net/ipv4/conf/{i}/rp_filter", "2")
+    # The computer's own subnet stays local; Tailscale's exit-node routing
+    # would otherwise send our answers to it (DHCP, DNS) into the tunnel.
+    run("ip", "rule", "add", "to", subnet, "lookup", "main", "priority", RULE_PRIORITY)
+    write_atomic(DNSMASQ, DNSMASQ_CONF)
+    run("nmcli", "connection", "delete", CON)
+    run("nmcli", "device", "set", lan, "managed", "yes")
+    ok, _ = run("nmcli", "connection", "add", "type", "ethernet", "con-name", CON, "ifname", lan,
+                "ipv4.method", "shared", "ipv4.addresses", m["address"] + "/24",
+                "ipv6.method", "disabled", "connection.autoconnect", "yes",
+                "connection.autoconnect-priority", "999")
+    if not ok:
+        raise Failed("Couldn't set up the network (NetworkManager)")
+    # Comes up now if a cable is in; otherwise NetworkManager brings it up
+    # as soon as one is (autoconnect).
+    run("nmcli", "--wait", "10", "connection", "up", CON, timeout=20)
+
+
+def nft_load(rules):
+    try:
+        p = subprocess.run(["nft", "-f", "-"], input=rules, capture_output=True, text=True, timeout=15)
+        if p.returncode != 0:
+            sys.stderr.write(p.stderr)
+        return p.returncode == 0, p.stdout
+    except (OSError, subprocess.SubprocessError):
+        return False, ""
+
+
+def other(mode):
+    return "usb" if mode == "ethernet" else "ethernet"
+
+
+def start(mode):
+    if run("systemctl", "is-active", "--quiet", f"zeroos-router@{other(mode)}.service")[0]:
+        say(mode, "error", f"Router is already on over {'USB' if other(mode) == 'usb' else 'Ethernet'}")
+        return
+    write_atomic(MODE_FILE, mode + "\n")      # on again after a restart
+    try:
+        lan_down(mode)
+        ensure_tailscale()
+        lan_up(mode)
+    except Failed as e:
+        lan_down(mode)
+        say(mode, "error", str(e))
+        print(f"zeroos-router: {e}", file=sys.stderr)
+        return
+    say(mode, "on")
+
+
+def stop(mode):
+    lan_down(mode)
+    remove(STATE)
+    # Turned off by hand: stays off. Shutting down: comes back after boot.
+    _, sys_state = run("systemctl", "is-system-running")
+    if sys_state.strip() != "stopping":
+        remove(MODE_FILE)
+
+
+def boot():
+    mode = read(MODE_FILE)
+    if mode in MODES:
+        run("systemctl", "start", "--no-block", f"zeroos-router@{mode}.service")
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else ""
+    if cmd == "nodes":
+        nodes()
+    elif cmd == "boot":
+        boot()
+    elif cmd in ("start", "stop") and len(argv) > 2 and argv[2] in MODES:
+        (start if cmd == "start" else stop)(argv[2])
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

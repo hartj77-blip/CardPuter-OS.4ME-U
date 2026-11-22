@@ -96,5 +96,8 @@ STEPS+=",esc,key:s,wait:300,shot:73-apps-sources.ppm"
 STEPS+=",down,down,enter,wait:300,type:someone/cardputer-apps,shot:74-apps-add-source.ppm,esc,esc"
 STEPS+=",open:zclaw,wait:300,shot:75-zclaw-settings.ppm,enter,wait:300,shot:76-zclaw-providers.ppm"
 STEPS+=",esc,wait:200,tab,wait:300,type:What is 2+2?,enter,wait:800,shot:77-zclaw-chat.ppm"
+STEPS+=",open:router,wait:300,shot:78-router.ppm"
+STEPS+=",down,down,enter,wait:300,down,down,down,shot:79-router-exit-nodes.ppm,esc"
+STEPS+=",up,up,enter,wait:5000,shot:80-router-sharing.ppm,enter,wait:300"
 (cd "$OUT" && HOME="$DEMO" TZ=UTC "$BIN" --script "$STEPS")
 python3 "$HERE/ppm2png.py" "$OUT"

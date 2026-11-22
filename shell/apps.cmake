@@ -14,6 +14,7 @@ zs_app(camera   "Camera"    ZS_ICON_CAMERA       0x2f6f8f make_camera_app   SOUR
 zs_app(car      "Car"       ZS_ICON_CAR          0x1e88a8 make_car_app      SOURCES src/apps/car.cpp)
 zs_app(wifi     "Wi-Fi"     LV_SYMBOL_WIFI       0x0073e5 make_wifi_app     SOURCES src/apps/wifi.cpp BASE)
 zs_app(tether   "Tether"    ZS_ICON_PHONE        0x26a269 make_tether_app   SOURCES src/apps/tether.cpp)
+zs_app(router   "Router"    ZS_ICON_LAPTOP       0x3d6e9e make_router_app   SOURCES src/apps/router.cpp)
 zs_app(ir       "IR Remote" LV_SYMBOL_POWER      0xc7162b make_ir_app       SOURCES src/apps/ir_remote.cpp)
 zs_app(gps      "GPS"       ZS_ICON_PIN          0x0e8420 make_gps_app      SOURCES src/apps/gps.cpp)
 zs_app(mesh     "Mesh"      ZS_ICON_CHAT         0x12a182 make_mesh_app     SOURCES src/apps/mesh.cpp)
