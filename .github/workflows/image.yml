@@ -1,12 +1,13 @@
 name: Build image
 
-# Builds the flashable ZeroOS .img.xz (about 1.5-3 hours: an x86 runner builds
-# the arm64 system under qemu). It runs on pull requests that change the image,
-# by hand from the Actions tab, and from the Release workflow for every tag,
-# which attaches the image to that release (so .../releases/latest/download/
-# zeroos-cardputerzero-arm64.img.xz is always the newest image). Not on shell/** changes: hours of runner
-# time per push, and ZeroShell reaches devices as the update package, which
-# CI builds and tests on every push.
+# Builds the flashable ZeroOS .img.xz. It runs on GitHub's arm64 runner (free
+# for public repositories), so pi-gen builds the arm64 system natively instead
+# of under qemu: about 10 minutes (it was 1.5-3 hours). It runs on pull
+# requests that change the image, by hand from the Actions tab, and from the
+# Release workflow for every tag, which attaches the image to that release (so
+# .../releases/latest/download/zeroos-cardputerzero-arm64.img.xz is always the
+# newest image). Not on shell/** changes: ZeroShell reaches devices as the
+# update package, which CI builds and tests on every push.
 on:
   workflow_call:
     inputs:
@@ -43,7 +44,7 @@ concurrency:
 
 jobs:
   image:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 300
     permissions:
       contents: write   # only used to upload to a release
@@ -60,12 +61,14 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake g++-aarch64-linux-gnu \
+          # Native arm64 host: plain g++ is the aarch64 compiler (it also
+          # provides the aarch64-linux-gnu-* names the toolchain file uses).
+          sudo apt-get install -y cmake g++ \
             coreutils quilt parted debootstrap zerofree zip dosfstools libarchive-tools \
             libcap2-bin grep rsync xz-utils file git curl bc gpg pigz xxd arch-test \
             qemu-user-static kmod binfmt-support e2fsprogs
-          sudo update-binfmts --enable qemu-aarch64 || true
-          ls /proc/sys/fs/binfmt_misc/
+          uname -m
+          command -v aarch64-linux-gnu-g++ aarch64-linux-gnu-strip
       - name: Check package names (fast fail, ~3 min)
         # A trixie arm64 container with Raspberry Pi's repository resolves our
         # package list before the hour-long base build starts.
@@ -100,6 +103,9 @@ jobs:
           WIFI_COUNTRY: ${{ inputs.wifi_country || 'US' }}
           ZEROOS_APPS: ${{ inputs.apps }}
           PIGEN_NATIVE: 1
+          # xz -3 with all cores: much faster than pi-gen's default -6 for a
+          # slightly bigger download.
+          COMPRESSION_LEVEL: 3
         run: image/build.sh build/device/zeroshell
       - name: Image contents check
         run: |
