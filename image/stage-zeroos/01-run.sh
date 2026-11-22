@@ -119,6 +119,24 @@ systemctl --global disable rpi-connect.service rpi-connect-wayvnc.service 2>/dev
 systemctl disable adbd.service 2>/dev/null || true
 rm -f /etc/systemd/system/multi-user.target.wants/adbd.service
 
+# Every image has the same password, so the first login (SSH, the Terminal
+# app or a console) asks for a new one. The marker holds the password hash
+# the image was built with; password-check removes it, and the sshd setting,
+# once pi's password is anything else. Not an expired password (chage -d 0):
+# the Terminal, Dock and pi's user session start through PAM, which refuses
+# an expired account.
+install -d -m 0755 /var/lib/zeroos
+( umask 077; printf '%s %s\n' pi "$(awk -F: '$1 == "pi" {print $2}' /etc/shadow)" > /var/lib/zeroos/default-password )
+grep -q '^pi [^ ]' /var/lib/zeroos/default-password || { echo "zeroos: ERROR: no password hash for pi" >&2; exit 1; }
+cat > /etc/ssh/sshd_config.d/10-zeroos-default-password.conf <<'SSHD'
+# ZeroOS: removed once pi's password is changed from the default.
+ForceCommand /usr/lib/zeroos/first-password ssh
+ExposeAuthInfo yes
+SSHD
+grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' /etc/ssh/sshd_config ||
+    echo "zeroos: WARNING: sshd_config has no sshd_config.d include; SSH won't ask for a new password"
+systemctl enable zeroos-password-check.service zeroos-password-check.path
+
 groupadd -f spi   # /dev/spidev* stays root-only without it (owner report)
 groupadd -f bluetooth   # normally made by bluez; zeroshell.service names it
 for g in video input audio netdev i2c gpio spi dialout adm bluetooth; do   # adm: read service logs; bluetooth: pair devices
