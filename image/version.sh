@@ -4,9 +4,10 @@
 #   3 commits after v1.2.3     -> 1.2.3+3.gabc1234
 #   no release tag yet         -> 0.0.0+<commits>.gabc1234
 # ".dirty" is added when files are changed but not committed.
+# Apps-only releases (v1.2.3+apps.1) don't count: ZeroOS itself is still 1.2.3.
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-d=$(git -C "$ROOT" describe --tags --match 'v[0-9]*' --long --dirty 2>/dev/null || true)
+d=$(git -C "$ROOT" describe --tags --match 'v[0-9]*' --exclude 'v*+apps*' --long --dirty 2>/dev/null || true)
 if [ -n "$d" ]; then
     dirty=""; case "$d" in *-dirty) dirty=.dirty; d=${d%-dirty} ;; esac
     sha=${d##*-}; d=${d%-*}; n=${d##*-}; tag=${d%-*}

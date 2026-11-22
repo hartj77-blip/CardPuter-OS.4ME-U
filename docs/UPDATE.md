@@ -121,6 +121,9 @@ devices only look at the latest full release, so it reaches nobody until you
 mark it as the latest release on GitHub (or install it by hand with
 `tools/push-update.sh`).
 
+To publish only some apps, or apps without a new ZeroOS, see
+[Releasing only some apps](APPS.md#releasing-only-some-apps).
+
 Builds between releases get versions such as `0.2.0+3.gabc1234` (three commits
 after v0.2.0), which count as newer than 0.2.0 and older than 0.2.1
 (`image/version.sh`).

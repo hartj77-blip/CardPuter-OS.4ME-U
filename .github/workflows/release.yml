@@ -15,13 +15,29 @@ name: Release
 # build, device build, update tests) passes on the tagged commit first.
 # A tag with a "-" (v0.3.0-rc1) becomes a pre-release: devices only take
 # "latest", so it reaches nobody until you promote it.
+#
+# Only some apps (docs/APPS.md, "Releasing only some apps"): "Apps" lists
+# the apps to publish from main; every other app stays as it was in the
+# previous release, and an app that was never released stays unpublished.
+# "Apps only" publishes those apps and nothing else: the ZeroOS update and
+# the SD card image are copied from the previous release, unchanged, and the
+# version is made for you (0.4.0 -> 0.4.0+apps.1 -> 0.4.0+apps.2).
 on:
   push:
-    tags: ['v[0-9]*']
+    tags: ['v[0-9]*', '!v*\+apps*']   # \+ is a plain +: apps-only tags come from this workflow
   workflow_dispatch:
     inputs:
+      what:
+        description: What to release
+        type: choice
+        options: [Everything, Apps only]
+        default: Everything
       version:
-        description: Version to release from main, such as 0.4.0 (0.4.0-rc1 for a pre-release)
+        description: Version to release from main, such as 0.4.0 (0.4.0-rc1 for a pre-release). Leave empty for Apps only
+        required: false
+      apps:
+        description: Apps to publish from main ("all", or ids such as "router notes"); the others stay as they were
+        default: all
         required: true
 
 permissions:
@@ -44,10 +60,31 @@ jobs:
         id: tag
         env:
           VERSION: ${{ inputs.version }}
+          WHAT: ${{ inputs.what || 'Everything' }}
+          APPS: ${{ inputs.apps || 'all' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+          APPS_ONLY=false
+          [ "$WHAT" = "Apps only" ] && APPS_ONLY=true
+          echo "APPS_ONLY=$APPS_ONLY" >> "$GITHUB_ENV"
+          echo "APPS=$(echo $APPS)" >> "$GITHUB_ENV"
+          # The release devices have now: apps not being released come from it.
+          PREV=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          echo "PREV=$PREV" >> "$GITHUB_ENV"
+          if [ "$APPS_ONLY" = true ]; then
+            [ "$GITHUB_REF" = refs/heads/main ] || { echo "Run this from main."; exit 1; }
+            [ -n "$PREV" ] || { echo "Apps only needs an earlier release to keep ZeroOS from."; exit 1; }
+            [ "$APPS" != all ] || echo "Releasing every app on its own: ZeroOS stays at ${PREV#v}."
+            # v0.4.0 -> v0.4.0+apps.1, v0.4.0+apps.1 -> v0.4.0+apps.2
+            base=${PREV%%+apps.*}; n=0
+            case "$PREV" in *+apps.*) n=${PREV##*+apps.} ;; esac
+            TAG="$base+apps.$((n + 1))"
+            git tag "$TAG"
+            git push origin "$TAG"
+          elif [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
             # Run workflow: make the tag here, now that CI has passed.
             [ "$GITHUB_REF" = refs/heads/main ] || { echo "Run this from main."; exit 1; }
+            [ -n "$VERSION" ] || { echo "Type the version to release, such as 0.4.0."; exit 1; }
             TAG="v${VERSION#v}"
             echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' \
               || { echo "'$VERSION' is not a version like 0.4.0"; exit 1; }
@@ -72,35 +109,69 @@ jobs:
           image/tests/update-test.sh
           image/tests/apps-test.sh
           image/tests/router-test.sh
+          image/tests/release-apps-test.sh
       - name: Package
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          image/package.sh build/device/zeroshell build/update
+          if [ "$APPS_ONLY" = true ]; then
+            # ZeroOS stays as it is: the previous release's update package,
+            # manifest and SD card image, unchanged (devices see no update,
+            # and the README's "latest" download link keeps working).
+            mkdir -p build/update
+            gh release download "$PREV" -D build/update -p 'zeroos_*.deb' -p zeroos-update.manifest
+            gh release download "$PREV" -D build/update -p 'zeroos-cardputerzero-arm64.img.xz*' \
+              || echo "::warning::$PREV has no SD card image yet: the README's download link will 404 until the next full release"
+          else
+            ZEROOS_VERSION=${TAG#v} image/package.sh build/device/zeroshell build/update
+            # The tag is the version: v0.2.0 must give zeroos_0.2.0_arm64.deb.
+            test -f "build/update/zeroos_${TAG#v}_arm64.deb"
+          fi
           cat build/update/zeroos-update.manifest
-          # The tag is the version: v0.2.0 must give zeroos_0.2.0_arm64.deb.
-          test -f "build/update/zeroos_${TAG#v}_arm64.deb"
           # The apps, built from the same commit (docs/APPS.md): the Apps app
           # on a device reads zeroos-apps.index from the newest release.
-          image/apps/build.sh build/device/apps build/apps
+          ZEROOS_VERSION=${TAG#v} image/apps/build.sh build/device/apps build/apps-built
+          if [ "$APPS" = all ] && [ "$APPS_ONLY" = false ]; then
+            mv build/apps-built build/apps
+          else
+            # Only the listed apps are new; the rest come from $PREV as they were.
+            [ -n "$PREV" ] || { echo "Releasing only some apps needs an earlier release."; exit 1; }
+            mkdir -p build/apps-prev
+            gh release download "$PREV" -D build/apps-prev -p 'zeroos-app-*.deb' -p zeroos-apps.index
+            if [ "$APPS_ONLY" = true ]; then
+              # Devices keep their ZeroOS, so the apps must fit its app ABI.
+              new=$(sed -n 's/^abi=//p' build/apps-built/zeroos-apps.index | head -1)
+              old=$(sed -n 's/^abi=//p' build/apps-prev/zeroos-apps.index | head -1)
+              [ "$new" = "$old" ] || { echo "main has app ABI $new, devices on ${PREV#v} have $old: release Everything."; exit 1; }
+            fi
+            image/apps/merge-index.py build/apps-built build/apps-prev build/apps $APPS
+          fi
           cat build/apps/zeroos-apps.index
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          shopt -s nullglob   # an apps-only release may have no image to carry
           pre=()
           case "$TAG" in *-*) pre=(--prerelease --latest=false) ;; esac
           files=(build/update/zeroos_*.deb build/update/zeroos-update.manifest
                  build/apps/zeroos-app-*.deb build/apps/zeroos-apps.index)
+          [ "$APPS_ONLY" = true ] && files+=(build/update/zeroos-cardputerzero-arm64.img.xz*)
           # A release made by hand on GitHub (Releases > Draft a new release,
           # which also makes the tag) gets the files added to it.
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${files[@]}" --clobber
           else
+            title="ZeroOS ${TAG#v}"
+            [ "$APPS_ONLY" = true ] && title="Apps: $APPS (ZeroOS ${PREV#v})"
             gh release create "$TAG" "${files[@]}" \
-              --title "ZeroOS ${TAG#v}" --generate-notes "${pre[@]}"
+              --title "$title" --generate-notes "${pre[@]}"
           fi
 
   image:
     needs: release
+    # Apps only keeps the previous release's image.
+    if: inputs.what != 'Apps only'
     uses: ./.github/workflows/image.yml
     with:
       release_tag: ${{ needs.release.outputs.tag }}

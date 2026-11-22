@@ -104,6 +104,41 @@ CI builds every module for arm64, loads each one in a headless ZeroShell
 (`shell/tools/modules-test.sh`), builds the packages (`image/apps/build.sh`) and tests the installer
 (`image/tests/apps-test.sh`). A release publishes the packages and `zeroos-apps.index`.
 
+## Releasing only some apps
+
+Merging an app into `main` publishes nothing: devices only see what is in a
+**release**. A release normally publishes ZeroOS and every app on `main`
+together. To publish some apps and hold others back (merged but not
+finished), use the two choices on **Actions > Release > Run workflow**:
+
+| What | Apps | Result |
+| --- | --- | --- |
+| Everything | `all` | ZeroOS and every app from `main` (as before) |
+| Everything | `router notes` | ZeroOS, plus new builds of Router and Notes. Every other app stays as it was in the previous release; one that was never released stays unpublished |
+| Apps only | `router` | Only Router is new. ZeroOS stays as it is: the previous release's update and SD card image are copied over, so devices see no ZeroOS update |
+
+An apps-only release gets its version by itself: after `0.4.0` comes
+`0.4.0+apps.1`, then `0.4.0+apps.2`; the next full release (`0.4.1`) is newer
+than all of them. The apps listed get that version, so devices with them
+installed see an update (Apps > U); the rest keep theirs, so nothing else
+changes on the device.
+
+Limits:
+
+- When `ZS_APP_ABI` changes, release **Everything** with `all`: apps built
+  for the old ABI can't run on the new ZeroOS, and an apps-only release can't
+  carry an app built for an ABI the devices' ZeroOS doesn't have. The workflow
+  stops and says so rather than publishing either.
+- An app that uses something new in ZeroShell itself (not just in its own
+  files) needs that ZeroOS on the device: release Everything.
+- The SD card image of an Everything release with a list still preinstalls
+  this commit's Terminal, Files and Dock.
+
+`image/apps/merge-index.py` does the merge; `image/tests/release-apps-test.sh`
+tests it.
+
+## Apps in another repository
+
 In another repository: add this repository as a submodule, include
 `shell/cmake/ZeroShellApps.cmake`, call `zs_app()` for each app and `zs_apps_build()`, then pack
 the modules with `image/apps/make-app-deb.sh`, which prints the app's block for
