@@ -375,6 +375,10 @@ upgrade_all() {
             n=$((n + 1))
         done
         rm -f -- "$STATE_DIR/restore"
+        # What the old builds brought along and nothing needs now (extras of
+        # apps that no longer exist): give the space back. Everything a
+        # restored app needs is still depended on, so it stays.
+        apt-get autoremove --purge -y >&2 || log "autoremove failed; old extras may be left"
     fi
     app=""
     status done 100 "$n app(s) updated"
