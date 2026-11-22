@@ -19,8 +19,11 @@ the IR Remote app and the hardware layer share, with no LVGL in it so it is unit
   build time: `sim` (SDL2 window), `device` (the LCD's framebuffer, found via `/dev/fb_lcd` + evdev keyboard), `headless` (renders to
   files, drives CI screenshots and smoke tests).
 - **Key routing.** The shell wraps the keypad driver, so every key press goes first to the current
-  app's `on_key()`, then to shell keys (Esc = back, Up/Down = move focus), and only then to the
-  focused LVGL widget. This is how an app can use letters as shortcuts while text fields still type.
+  app's `on_key()`, then to shell keys (Esc = back, Up/Down = move focus, the Fn layer's volume,
+  brightness and media keys, and away from a text box the number keys of [KEYS.md](KEYS.md)), and
+  only then to the focused LVGL widget. This is how an app can use letters as shortcuts while text
+  fields still type. A screen that needs no typing calls `shell_set_fn_layer(true)` (the home screen
+  does): its plain letters then arrive as their Fn keys (`fn_layer_key()` in `platform/keys.h`).
 - **Apps** implement `zs::App` (`build`, `tick`, `on_key`, `on_back`) and are listed in
   `shell/apps.cmake`. Base apps are compiled into ZeroShell; on the device every other app is a module
   (`/usr/lib/zeroos/apps/<id>.so`) that `apps/registry.cpp` loads, installed as a package by the Apps

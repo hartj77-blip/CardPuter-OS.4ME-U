@@ -1,9 +1,15 @@
 // Home screen, after Ubuntu's: wallpaper, a dock of favourites down the left
 // edge and the app grid in pages of ten beside it.
-// Arrows move, Enter opens, 1-5 open the dock's apps (Ubuntu's Super+1..5),
-// typing a letter jumps to the next app that starts with it.
+// Nothing here is typed, so the keyboard's Fn layer is on without Fn held:
+// f/z/x/c (or the arrows) move, Enter opens, k/n go to the first/last app,
+// l/m to the page before/after. 3-9 open the dock's apps (as Ubuntu's
+// Super+1..9), 0 shows which is which. Shift + a letter jumps to the next
+// app that starts with it. 1 and 2 are the shell's (ui/numkeys.h).
+#include <algorithm>
 #include <cctype>
 
+#include "platform/keys.h"
+#include "ui/numkeys.h"
 #include "ui/shell.h"
 #include "ui/theme.h"
 
@@ -22,11 +28,12 @@ constexpr int kCellH = 66;
 constexpr int kGridY = 3;
 constexpr int kDotsY = kGridY + kRows * kCellH + 5;
 
-// The dock's favourites, top to bottom.
-// The first four installed of these, then Settings. Missing ones (not
+// The dock's favourites, top to bottom, on keys 3 to 9.
+// The first six installed of these, then Settings. Missing ones (not
 // installed) are skipped, so Apps fills in on a fresh ZeroOS.
-const char* const kFavourites[] = {"terminal", "files", "notes", "remote", "apps"};
-constexpr int kDockSlots = 5;
+const char* const kFavourites[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
+constexpr int kDockSlots = kNumberSlots;
+constexpr int kDockIcon = 17;
 constexpr int kFavCount = int(sizeof kFavourites / sizeof kFavourites[0]);
 
 // A Yaru-style icon: a white glyph on a coloured rounded square.
@@ -55,6 +62,7 @@ void style_highlight(lv_obj_t* o, int radius) {
 class Launcher : public App {
 public:
     void build(lv_obj_t* root) override {
+        shell_set_fn_layer(true);
         // Wallpaper: aubergine fading up from the bottom left, like Ubuntu's.
         lv_obj_set_style_bg_color(root, c(kAubergine), 0);
         lv_obj_set_style_bg_grad_color(root, c(kAubergineLight), 0);
@@ -79,10 +87,10 @@ public:
                 if (apps[i].id != fav) continue;
                 const int f = int(dock_.size());
                 lv_obj_t* slot = lv_obj_create(dock);
-                style_highlight(slot, 7);
-                lv_obj_set_size(slot, 28, 28);
-                lv_obj_set_pos(slot, (kDockW - 28) / 2, f * pitch + (pitch - 28) / 2);
-                lv_obj_center(app_icon(slot, apps[i], 22));
+                style_highlight(slot, 5);
+                lv_obj_set_size(slot, kDockIcon + 4, kDockIcon + 4);
+                lv_obj_set_pos(slot, (kDockW - kDockIcon - 4) / 2, f * pitch + (pitch - kDockIcon - 4) / 2);
+                lv_obj_center(app_icon(slot, apps[i], kDockIcon));
                 dock_.push_back(slot);
                 dock_app_.push_back(int(i));
             }
@@ -128,8 +136,21 @@ public:
 
     bool on_key(uint32_t key) override {
         int n = int(cells_.size());
-        if (key >= '1' && key < uint32_t('1' + dock_.size())) {
-            shell_open_app(app_registry()[dock_app_[key - '1']].id);
+        if (key >= '3' && key <= '9') {
+            size_t f = key - '3';
+            if (f < dock_.size()) shell_open_app(app_registry()[dock_app_[f]].id);
+            return true;
+        }
+        if (key == '0') {
+            if (number_hints_shown()) {
+                number_hints_hide();
+            } else {
+                for (size_t f = 0; f < dock_.size(); ++f) {
+                    lv_area_t a;
+                    lv_obj_get_coords(dock_[f], &a);
+                    number_badge(int(f) + 3, a.x2 - 4, a.y1 - 3);
+                }
+            }
             return true;
         }
         if (in_dock_) return dock_key(key);
@@ -160,9 +181,20 @@ public:
             case '\r':
                 shell_open_app(app_registry()[sel_].id);
                 return true;
+            case LV_KEY_HOME: select(0); return true;
+            case LV_KEY_END: select(n - 1); return true;
+            case kKeyPageUp:
+            case kKeyPageDown: {
+                int page = sel_ / kPerPage + (key == kKeyPageDown ? 1 : -1);
+                page = (page + pages_) % pages_;
+                select(std::min(page * kPerPage + sel_ % kPerPage, n - 1));
+                return true;
+            }
             default:
                 break;
         }
+        // Shift + a letter (a plain one is a Fn key here: the shell turned it
+        // into that key already).
         if (key < 128 && std::isalpha(int(key))) {
             int lower = std::tolower(int(key));
             for (int i = 1; i <= n; ++i) {

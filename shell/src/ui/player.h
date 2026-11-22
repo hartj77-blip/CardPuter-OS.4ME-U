@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "hal/hal.h"
+
 namespace zs {
 
 struct QueueItem {
@@ -24,6 +26,8 @@ bool player_step(int dir);
 void player_stop();
 // What is playing or paused, or nullptr.
 const QueueItem* player_current();
+// A play/pause or skip button: a headset's, or the keyboard's Fn layer.
+void player_media_key(MediaKey k);
 // From the shell's timer: moves on when a track ends, and obeys play/skip
 // buttons on a Bluetooth car stereo or headset.
 void player_tick();

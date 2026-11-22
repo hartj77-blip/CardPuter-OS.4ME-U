@@ -12,6 +12,9 @@ enum : uint16_t {
     K_RIGHTSHIFT = 54, K_LEFTALT = 56, K_SPACE = 57, K_CAPSLOCK = 58, K_KPENTER = 96,
     K_RIGHTCTRL = 97, K_RIGHTALT = 100, K_HOME = 102, K_UP = 103, K_LEFT = 105, K_RIGHT = 106,
     K_END = 107, K_DOWN = 108, K_DELETE = 111, K_NEXT = 0x197, K_PREVIOUS = 0x19c,
+    K_F1 = 59, K_F10 = 68, K_F11 = 87, K_F12 = 88, K_PAGEUP = 104, K_PAGEDOWN = 109, K_MUTE = 113,
+    K_VOLUMEDOWN = 114, K_VOLUMEUP = 115, K_NEXTSONG = 163, K_PLAYPAUSE = 164, K_PREVIOUSSONG = 165,
+    K_BRIGHTNESSDOWN = 224, K_BRIGHTNESSUP = 225,
 };
 
 const char kRowQ[] = "qwertyuiop", kRowA[] = "asdfghjkl", kRowZ[] = "zxcvbnm";
@@ -53,7 +56,21 @@ uint32_t navigation(uint16_t code) {
         case K_PREVIOUS: return kKeyPrev;
         case K_HOME: return kKeyHome;
         case K_END: return kKeyEnd;
-        default: return 0;
+        case K_PAGEUP: return kKeyPageUp;
+        case K_PAGEDOWN: return kKeyPageDown;
+        case K_PLAYPAUSE: return kKeyPlayPause;
+        case K_PREVIOUSSONG: return kKeyPrevTrack;
+        case K_NEXTSONG: return kKeyNextTrack;
+        case K_MUTE: return kKeyMute;
+        case K_VOLUMEDOWN: return kKeyVolumeDown;
+        case K_VOLUMEUP: return kKeyVolumeUp;
+        case K_BRIGHTNESSDOWN: return kKeyBrightnessDown;
+        case K_BRIGHTNESSUP: return kKeyBrightnessUp;
+        case K_F11: return kKeyF1 + 10;
+        case K_F12: return kKeyF1 + 11;
+        default:
+            if (code >= K_F1 && code <= K_F10) return kKeyF1 + (code - K_F1);
+            return 0;
     }
 }
 
@@ -64,6 +81,30 @@ char letter(uint16_t code) {
     return 0;
 }
 }  // namespace
+
+uint32_t fn_layer_key(uint32_t ch) {
+    switch (ch) {
+        case 'q': return kKeyPlayPause;
+        case 'w': return kKeyPrevTrack;
+        case 'e': return kKeyNextTrack;
+        case 'u': return kKeyBrightnessDown;
+        case 'i': return kKeyBrightnessUp;
+        case 'o': return kKeyF1 + 10;
+        case 'p': return kKeyF1 + 11;
+        case 'a': return kKeyMute;
+        case 's': return kKeyVolumeDown;
+        case 'd': return kKeyVolumeUp;
+        case 'f': return kKeyUp;
+        case 'k': return kKeyHome;
+        case 'l': return kKeyPageUp;
+        case 'z': return kKeyLeft;
+        case 'x': return kKeyDown;
+        case 'c': return kKeyRight;
+        case 'n': return kKeyEnd;
+        case 'm': return kKeyPageDown;
+        default: return 0;
+    }
+}
 
 uint32_t KeyTranslator::translate(uint16_t code) const {
     if (uint32_t nav = navigation(code)) return nav;
