@@ -78,6 +78,21 @@ grep -qx "terminal files dock" "$A/restore" 2>/dev/null && ok "postinst, update:
 rm -f "$A/restore"
 ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.2.0 > /dev/null
 [ ! -e "$A/restore" ] && ok "postinst, next update: not again" || bad "postinst, next update: listed them again"
+# The apps' own repository goes first in the sources, once.
+S=$R/etc/zeroos/apps.sources
+mkdir -p "$R/etc/zeroos"
+printf '# mine\nhartj77-blip/CardPuter-OS.4ME-U\nsomeone/apps\n' > "$S"
+rm -f "$A/.apps-repo-added"
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.3.4 > /dev/null
+[ "$(grep -v '^#' "$S" | tr '\n' ' ')" = "hartj77-blip/CardPuter-Apps.4ME-U hartj77-blip/CardPuter-OS.4ME-U someone/apps " ] &&
+    ok "postinst: an edited sources list gets the apps repository first" || { bad "postinst: apps repository not added"; cat "$S"; }
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.3.5 > /dev/null
+[ "$(grep -c 'CardPuter-Apps' "$S")" = 1 ] && ok "postinst: not added twice" || bad "postinst: apps repository added twice"
+echo "someone/apps" > "$S"
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.3.5 > /dev/null
+! grep -q 'CardPuter-Apps' "$S" && ok "postinst: taking the apps repository out sticks" || bad "postinst: apps repository came back"
+grep -v '^#' "$T/x/etc/zeroos/apps.sources" | head -1 | grep -qx 'hartj77-blip/CardPuter-Apps.4ME-U' &&
+    ok "a new install reads the apps repository first" || bad "apps.sources: the apps repository is not first"
 
 # --- the Terminal's console goes on the LCD ---------------------------------
 # Whichever framebuffer the LCD is (fb1 with a monitor at boot), and with or
