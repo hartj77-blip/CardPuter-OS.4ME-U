@@ -53,7 +53,20 @@ if command -v systemd-analyze >/dev/null; then
     echo
     echo "Slowest units:"
     systemd-analyze blame 2>/dev/null | head -10
+    echo
+    echo "What the home screen waited for:"
+    systemd-analyze critical-chain zeroshell.service 2>/dev/null | tail -n +3 | head -15
     echo '```'
+    # The LCD driver is the usual floor for boot-to-UI: ZeroShell can't
+    # draw until it has loaded. Kernel timestamps show when each piece came up.
+    lcd=$(dmesg 2>/dev/null | grep -iE 'st7789|m5ioe|backlight|fb[0-9]+:|mipi.dbi' | head -8)
+    if [ -n "$lcd" ]; then
+        echo
+        echo "LCD driver (kernel time, seconds since power on):"
+        echo '```'
+        echo "$lcd"
+        echo '```'
+    fi
 else
     echo "systemd-analyze not available."
 fi

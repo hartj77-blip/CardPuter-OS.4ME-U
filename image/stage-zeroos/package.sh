@@ -89,6 +89,9 @@ if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
     udevadm control --reload || true
+    # Memory tuning (docs/PERFORMANCE.md) applies now, not at the next reboot.
+    sysctl -q -p /etc/sysctl.d/90-zeroos-memory.conf || true
+    systemd-tmpfiles --create /etc/tmpfiles.d/zeroos-memory.conf 2>/dev/null || true
     # New settings take effect now, not at the next reboot.
     case $changed in *etc/default/earlyoom*) systemctl try-restart earlyoom.service || true ;; esac
 fi

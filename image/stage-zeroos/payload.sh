@@ -22,6 +22,7 @@ install -m 0644 "$F/90-zeroos.udev"            "$D/etc/udev/rules.d/90-zeroos.ru
 install -m 0644 "$F/swap.conf"                 "$D/etc/rpi/swap.conf.d/80-zeroos.conf"
 install -m 0644 "$F/zram-zeroos.conf"          "$D/etc/systemd/zram-generator.conf.d/30-zeroos.conf"
 install -m 0644 "$F/90-zeroos-memory.conf"     "$D/etc/sysctl.d/90-zeroos-memory.conf"
+install -D -m 0644 "$F/zeroos-memory.tmpfiles" "$D/etc/tmpfiles.d/zeroos-memory.conf"
 install -m 0644 "$F/journald.conf"             "$D/etc/systemd/journald.conf.d/90-zeroos.conf"
 install -m 0644 "$F/zeroos-cloud-init-once.service" "$D/etc/systemd/system/"
 install -m 0755 "$F/zeroos-measure"            "$D/usr/bin/zeroos-measure"
@@ -60,6 +61,15 @@ install -D -m 0644 "$F/50-zeroos-default-volume.conf" \
                    "$D/etc/wireplumber/wireplumber.conf.d/50-zeroos-default-volume.conf"
 # /dev/i2c-* for the Grove port and i2c-tools (M5 loads this in a script we drop).
 echo i2c-dev >                                 "$D/etc/modules-load.d/zeroos.conf"
+# LCD early (docs/PERFORMANCE.md, "Boot"): the home screen can't draw until
+# the LCD driver is up, and left to udev that was about 15 s into the boot,
+# queued behind every other device. Load its chain first, in order: the I2C
+# bus, M5's IO expander on it (it drives the backlight), the backlight, the
+# SPI bus, then M5's panel driver (by name, never the kernel's: see
+# modprobe-zeroos-panel.conf). A name this board lacks is skipped with a log
+# line and udev loads the rest as before.
+printf '%s\n' i2c_bcm2835 m5ioe1 pwm_bl_m5stack spi_bcm2835 panel_mipi_dbi_m \
+                                             > "$D/etc/modules-load.d/zeroos-lcd.conf"
 # ZeroShell restores brightness itself. systemd-backlight would save the level at
 # shutdown (0 if the screen was off) and put it back at boot; M5 masks it too.
 ln -sf /dev/null "$D/etc/systemd/system/systemd-backlight@backlight:backlight.service"

@@ -70,6 +70,22 @@ Individual apps may have additional shortcuts, which are displayed on screen. Fo
 
 Use the Apps app to install more apps and Update to install newer versions of ZeroOS.
 
+Speed and memory
+
+ZeroOS is tuned for the Cardputer Zero's 512 MB of RAM and small battery:
+
+Fast start: The screen's driver loads first, the CPU runs at full speed until the home screen is up, and services a pocket computer doesn't need are switched off.
+More room for apps: Memory that isn't in use is compressed (zram), so apps that wouldn't fit still run. If memory runs out, the biggest app is closed before the device freezes.
+Nothing heavy until you use it: The HDMI desktop and its browser use no memory until you open Dock or plug in a monitor.
+
+To time a boot, run this in the Terminal app or over SSH after a restart:
+
+sh
+systemd-analyze; systemd-analyze critical-chain zeroshell.service | head -12
+
+
+For a full report on memory, CPU and battery use, run zeroos-measure. See Battery and performance for details.
+
 Documentation
 Apps – Installing apps and creating your own
 Updates – Updating ZeroOS over the network
