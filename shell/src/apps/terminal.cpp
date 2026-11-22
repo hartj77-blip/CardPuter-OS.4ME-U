@@ -44,8 +44,10 @@ public:
         }, LV_EVENT_CLICKED, this);
         shell_add_focus(b);
 
+        // Opening the app opens the terminal; this page is what you come
+        // back to (Alt+` or exit), with the button to go in again.
         std::string cmd = shell_app_arg();
-        if (!cmd.empty()) open(cmd == "shell" ? "" : cmd);
+        open(cmd == "shell" ? "" : cmd);
     }
 
     bool on_back() override {
