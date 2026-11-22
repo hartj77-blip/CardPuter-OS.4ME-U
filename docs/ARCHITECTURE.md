@@ -10,6 +10,9 @@ ZeroOS is five layers. Each one only talks to the layer below it, so apps never 
 | 2. Linux services | NetworkManager, BlueZ, PipeWire, libcamera, systemd | Debian packages |
 | 1. Base image | Raspberry Pi OS trixie arm64, pinned 6.18.39 kernel, M5 board drivers | `image/` |
 
+IR codes (`shell/src/ir/`: Flipper `.ir` files, protocol encoders, the code database) are a small library
+the IR Remote app and the hardware layer share, with no LVGL in it so it is unit tested on its own (docs/IR.md).
+
 ## ZeroShell
 
 - **LVGL 9.2** (pinned), 16-bit color, the Ubuntu typeface (`shell/src/fonts/`, made by `shell/tools/fonts.sh`). One binary, three backends chosen at

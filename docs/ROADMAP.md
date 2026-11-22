@@ -55,7 +55,7 @@ show time-left estimates in the status bar.
 - Note and file sync over Wi-Fi *(done in software; see [SYNC.md](SYNC.md))*.
 - Phone as a hotspot, over Wi-Fi, USB or Bluetooth *(done in software; see [TETHER.md](TETHER.md))*.
 - Camera with QR code scanning *(done in software; see [CAMERA.md](CAMERA.md))*.
-- IR universal remote (started: IR Remote app).
+- IR universal remote (done in software: Flipper-IRDB codes, universal power/volume, learning; docs/IR.md). Needs a hardware check.
 - Motion sensor: wake on pickup, sleep when placed face down *(done in software; see [PERFORMANCE.md](PERFORMANCE.md#battery))*.
 - Updates over the network (Wi-Fi, Ethernet, tethered phone), with rollback *(done in software; see [UPDATE.md](UPDATE.md))*.
 - Expansion ports for GPS or LoRa modules, with GPS track recording *(done in software; see [EXPANSION.md](EXPANSION.md))*.

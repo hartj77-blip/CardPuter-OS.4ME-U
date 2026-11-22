@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "hal/jellyfin.h"
+#include "ir/ir.h"
 
 namespace zs {
 
@@ -183,12 +184,6 @@ struct TetherStatus {
     std::string busy, busy_mac;
     std::string passkey;               // while pairing: the phone shows the same number
     std::string error;                 // why the last action failed
-};
-
-struct IrCode {
-    std::string name;
-    std::string protocol;   // nec, rc5, sony12, raw...
-    unsigned scancode = 0;
 };
 
 // A Bluetooth speaker, headset or car stereo.
@@ -456,10 +451,12 @@ public:
     enum class Led { Shift, Fn, Sym, Status1, Status2, Status3 };
     virtual void set_led(Led led, bool on) = 0;
 
-    // Infrared
-    virtual bool ir_send(const IrCode& code) = 0;
-    // Blocks up to timeout_ms waiting for one IR frame. Returns false on timeout.
-    virtual bool ir_learn(IrCode& out, int timeout_ms) = 0;
+    // Infrared (rc-core: gpio-ir-tx and gpio-ir-recv). ir/ir.h encodes
+    // codes into waves. Send blocks until the LED is done (tens of ms).
+    virtual bool ir_send(const ir::Wave& wave) = 0;
+    // Blocks up to timeout_ms waiting for one IR message from a remote; fills
+    // in its mark/space timings (us). Returns false on timeout or no receiver.
+    virtual bool ir_learn(std::vector<uint32_t>& timings, int timeout_ms) = 0;
 
     virtual void power_off() = 0;
     virtual void reboot() = 0;

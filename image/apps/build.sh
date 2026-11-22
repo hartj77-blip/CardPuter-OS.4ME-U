@@ -6,8 +6,9 @@
 # Usage: image/apps/build.sh [modules-dir] [out-dir]
 #   modules-dir: the arm64 device build's apps/ (default build/device/apps)
 # Env:   ZEROOS_VERSION (default: image/version.sh)
+#        ZEROOS_IRDB: a built IR code database (default: build it from Flipper-IRDB)
 #        ZEROOS_APP_KEYS: a folder with tailscale.gpg and meshtastic.asc (tests; skips the download)
-# Needs: dpkg-deb, curl, gpg (for the Tailscale and Meshtastic repository keys).
+# Needs: dpkg-deb, curl, gpg (for the Tailscale and Meshtastic repository keys), python3, git.
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../.." && pwd)
@@ -31,6 +32,12 @@ else
         https://download.opensuse.org/repositories/network:/Meshtastic:/beta/Debian_13/Release.key
     fpr=$(gpg --show-keys --with-colons "$KEYS/meshtastic.asc" | awk -F: '$1 == "fpr" {print $10; exit}')
     [ "$fpr" = "$MESHTASTIC_KEY_FPR" ] || { echo "error: Meshtastic key is $fpr, expected $MESHTASTIC_KEY_FPR" >&2; exit 1; }
+fi
+
+# IR Remote's code database (docs/IR.md), from Flipper-IRDB.
+export ZEROOS_IRDB=${ZEROOS_IRDB:-$ROOT/build/irdb}
+if [ ! -f "$ZEROOS_IRDB/index.tsv" ]; then
+    python3 -I "$ROOT/tools/irdb/build_irdb.py" --fetch --cache "$ROOT/build/irdb-src" --out "$ZEROOS_IRDB"
 fi
 
 mkdir -p "$OUT"

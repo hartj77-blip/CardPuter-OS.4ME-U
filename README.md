@@ -35,7 +35,7 @@ saved spots, track recording to GPX), **Mesh** (Meshtastic text messaging over L
 **Car** (USB stick mode for a car stereo; Bluetooth audio with the car's play and skip buttons), **Camera**
 (M5's camera app: viewfinder, photos, gallery; plus a QR code reader that joins Wi-Fi networks; full model
 only), **Tether** (online through your phone over Wi-Fi, USB or Bluetooth), **Notes**, **Media** (music player,
-music from a Jellyfin server, voice notes), **IR Remote** (send + learn), **Compass** (with spirit level),
+music from a Jellyfin server, voice notes), **IR Remote** (a universal remote: about 2,000 remotes from Flipper-IRDB to browse and search, "send every Power code" for TVs, projectors, audio, ACs, fans and lights, and your own remotes learned button by button, in the Flipper Zero's file format), **Compass** (with spirit level),
 **Battery** (time left, power draw, power profile), **Clock** (with stopwatch), **System** monitor (CPU and
 where the memory goes), and the radio apps from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
 
@@ -53,7 +53,7 @@ cmake --build build/sim -j
 
 Keys: arrows move, **Enter** opens, **Esc** or **`** goes back, letters jump to an app on the home screen.
 On the home screen, **Left** from the first column moves into the dock, and **1** to **5** open the dock's apps.
-Inside apps: **R** rescans Wi-Fi (and records a GPS track), **L** learns an IR code, **Space** pauses music or runs the stopwatch, **N** skips a track, **R** records a voice note. Notes save when you leave.
+Inside apps: **R** rescans Wi-Fi (and records a GPS track), **L** learns an IR button, **A** adds one, **S** saves a remote, **Space** pauses music or runs the stopwatch, **N** skips a track, **R** records a voice note. Notes save when you leave.
 
 Or build the browser version (same code, WebAssembly, one HTML file with on-screen keys):
 
@@ -99,11 +99,12 @@ first, copy `build/device/zeroshell` over, stop the stock launcher
 - [docs/SYNC.md](docs/SYNC.md): Sync for Notes, Documents and Recordings
 - [docs/EXPANSION.md](docs/EXPANSION.md): GPS and LoRa modules on the expansion ports, track recording
 - [docs/CAMERA.md](docs/CAMERA.md): the Camera app and QR codes
+- [docs/IR.md](docs/IR.md): IR Remote, the universal remote and its code database
 - [docs/TETHER.md](docs/TETHER.md): getting online through your phone
 - [docs/DOCK.md](docs/DOCK.md): Dock mode, the desktop on an HDMI monitor
 - [docs/PERFORMANCE.md](docs/PERFORMANCE.md): memory and battery tuning, measurements, and `zeroos-measure`
 
 ## License
 
-MIT. Builds on [LVGL](https://lvgl.io) (MIT), [quirc](https://github.com/dlbeer/quirc) (ISC), M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen)
+MIT. Builds on [LVGL](https://lvgl.io) (MIT), [quirc](https://github.com/dlbeer/quirc) (ISC), IR codes from [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) (CC0, see docs/IR.md), M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen)
 (BSD-3) and [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays).

@@ -395,8 +395,8 @@ bool Shell::handle_key(uint32_t key) {
     bool used = false;
     lv_obj_t* focused = group_ ? lv_group_get_focused(group_) : nullptr;
     bool in_text = focused && lv_obj_check_type(focused, &lv_textarea_class);
-    // The Cardputer has no Esc key on the base layer; ` (top-left) doubles as
-    // Back. In a text box it types a `, unless the box is empty: then it's
+    // Esc (top-left) is Back. ` doubles as Back for keyboards without an
+    // Esc key. In a text box it types a `, unless the box is empty: then it's
     // Back too, so there's always a way out of a password or search box.
     if (key == '`' && (!in_text || lv_textarea_get_text(focused)[0] == '\0')) key = LV_KEY_ESC;
     if (app_ && app_->on_key(key)) {

@@ -87,6 +87,8 @@ install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-pan
 # switch it off; held open, nothing ZeroShell draws reaches the screen.
 ln -sf /dev/null "$D/etc/systemd/system/fb_load.service"
 
+# (IR Remote's code database travels with the IR Remote app: image/apps/ir.pkg.)
+
 # Overrides: settings files that belong to another Debian package, so ours
 # can't ship them in place. The package's postinst copies this tree over /.
 #   earlyoom: what to kill first when memory runs out (docs/PERFORMANCE.md)

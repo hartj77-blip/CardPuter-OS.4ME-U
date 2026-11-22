@@ -133,6 +133,7 @@ public:
             return true;
         }
         if (in_dock_) return dock_key(key);
+        if (n == 0) return false;   // no apps at all (a build with every app a module)
         int col = sel_ % kCols;
         switch (key) {
             case LV_KEY_RIGHT: select((sel_ + 1) % n); return true;
@@ -213,6 +214,7 @@ private:
     }
 
     void select(int i) {
+        if (cells_.empty()) return;
         if (sel_ >= 0 && sel_ < int(cells_.size())) lv_obj_remove_state(cells_[sel_], LV_STATE_USER_1);
         sel_ = i;
         lv_obj_add_state(cells_[sel_], LV_STATE_USER_1);

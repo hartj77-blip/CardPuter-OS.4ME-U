@@ -1,0 +1,39 @@
+Filetype: IR signals file
+Version: 1
+# TCL Roku TVs (NECext)
+#
+name: Power
+type: parsed
+protocol: NECext
+address: EA C7 00 00
+command: 17 E8 00 00
+#
+name: Vol_up
+type: parsed
+protocol: NECext
+address: EA C7 00 00
+command: 0F F0 00 00
+#
+name: Vol_dn
+type: parsed
+protocol: NECext
+address: EA C7 00 00
+command: 10 EE 00 00
+#
+name: Mute
+type: parsed
+protocol: NECext
+address: EA C7 00 00
+command: 20 EB 00 00
+#
+name: Home
+type: parsed
+protocol: NECext
+address: EA C7 00 00
+command: 03 FC 00 00
+#
+name: Back
+type: parsed
+protocol: NECext
+address: EA C7 00 00
+command: 04 FB 00 00
