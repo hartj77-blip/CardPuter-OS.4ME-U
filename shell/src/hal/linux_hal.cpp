@@ -1032,7 +1032,10 @@ private:
     void gps_line(const std::string& js) {
         std::string cls = json_str(js, "class");
         if (cls == "DEVICES" || cls == "DEVICE") {
-            gps_.device = js.find("\"path\"") != std::string::npos;
+            // /etc/default/gpsd names /dev/serial0 whether or not a GPS is
+            // plugged in, so a path alone means nothing. gpsd adds "driver"
+            // once a receiver actually talks (a second or two).
+            gps_.device = js.find("\"driver\"") != std::string::npos;
         } else if (cls == "TPV") {
             gps_.device = true;
             gps_.mode = int(json_num(js, "mode", 0));
