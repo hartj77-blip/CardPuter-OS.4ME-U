@@ -85,6 +85,21 @@ for f in $(find . -type f | sed 's|^\./||' | sort); do
     { grep -v " /$f\$" "$SUMS" || true; echo "$new /$f"; } > "$SUMS.tmp"
     mv -f "$SUMS.tmp" "$SUMS"
 done
+# Terminal, Files and Dock were built into ZeroShell before; now they are
+# apps (docs/APPS.md). A device updated from such a version gets them back:
+# the Apps app's update-all (U) installs what this list names, once.
+case "${1:-}:${2:-}" in
+    configure:?*)
+        if [ ! -e "$ROOT/var/lib/zeroos/apps/.restored-builtins" ]; then
+            mkdir -p "$ROOT/var/lib/zeroos/apps"
+            echo "terminal files dock" > "$ROOT/var/lib/zeroos/apps/restore"
+            touch "$ROOT/var/lib/zeroos/apps/.restored-builtins"
+        fi ;;
+    configure:)
+        # A new install (the image): its apps are preinstalled instead.
+        mkdir -p "$ROOT/var/lib/zeroos/apps"
+        touch "$ROOT/var/lib/zeroos/apps/.restored-builtins" ;;
+esac
 if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true

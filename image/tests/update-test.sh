@@ -67,6 +67,17 @@ postinst > "$T/pi.out"
 tail -1 "$R/etc/default/earlyoom" | grep -qx "# mine" && ok "postinst: edited file kept" || bad "postinst: edited file overwritten"
 tail -1 "$R/etc/default/earlyoom.zeroos-new" | grep -qx "# new" && ok "postinst: new version alongside" || bad "postinst: no .zeroos-new"
 tail -1 "$R/etc/default/zz-test" | grep -qx "# new" && ok "postinst: unedited file updated" || bad "postinst: unedited file not updated"
+# Terminal, Files and Dock became apps: an update brings them back (once);
+# a new install (the image) preinstalls them instead.
+A=$R/var/lib/zeroos/apps
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure > /dev/null
+[ ! -e "$A/restore" ] && [ -e "$A/.restored-builtins" ] && ok "postinst, new install: nothing to restore" || bad "postinst, new install: restore list"
+rm -f "$A/.restored-builtins"
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.1.0 > /dev/null
+grep -qx "terminal files dock" "$A/restore" 2>/dev/null && ok "postinst, update: lists the former built-in apps" || bad "postinst, update: no restore list"
+rm -f "$A/restore"
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.2.0 > /dev/null
+[ ! -e "$A/restore" ] && ok "postinst, next update: not again" || bad "postinst, next update: listed them again"
 
 # --- the updater ---------------------------------------------------------
 mkdir -p "$T/bin" "$T/run" "$T/state"

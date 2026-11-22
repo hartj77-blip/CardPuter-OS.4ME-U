@@ -215,6 +215,17 @@ echo "zeroos-app-notes 2.0.0" > "$T/installed"
 : > "$T/apt.log"
 apps run upgrade
 grep -q 'apt-get install' "$T/apt.log" && bad "upgrade, up to date: installed anyway" || ok "upgrade, up to date: nothing to do"
+# Apps that used to be built in (the zeroos package lists them in restore):
+# upgrade installs the ones that aren't installed and are on offer, once.
+printf 'file://%s/a\n' "$T" > "$T/sources"   # a offers notes and gps 1.0.0
+echo "zeroos-app-notes 1.0.0" > "$T/installed"
+echo "notes gps nowhere" > "$T/state/restore"
+: > "$T/apt.log"
+apps run upgrade
+expect "upgrade, restore: done" state done
+grep -q "zeroos-app-gps_1.0.0_arm64.deb" "$T/apt.log" && ok "upgrade, restore: installs what was built in" || bad "upgrade, restore: $(cat "$T/apt.log")"
+grep -q "zeroos-app-notes_" "$T/apt.log" && bad "upgrade, restore: reinstalled an installed app" || ok "upgrade, restore: leaves installed apps alone"
+[ -e "$T/state/restore" ] && bad "upgrade, restore: list left behind" || ok "upgrade, restore: only once"
 
 # --- sources -----------------------------------------------------------------
 apps run add-source:someone/cardputer-apps || true

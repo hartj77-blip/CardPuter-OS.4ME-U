@@ -16,9 +16,11 @@ on:
         required: false
         default: ''
       apps:
+        # Terminal, Files and Dock come from the store too, but every release
+        # image has them ready, as it did when they were built in.
         type: string
         required: false
-        default: ''
+        default: 'terminal files dock'
   pull_request:
     paths:
       - image/**
@@ -35,7 +37,7 @@ on:
         required: false
       apps:
         description: Apps to preinstall, space-separated (e.g. "notes media"); empty for the bare OS
-        default: ''
+        default: 'terminal files dock'
         required: false
 
 concurrency:

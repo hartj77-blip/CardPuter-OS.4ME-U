@@ -1,0 +1,5 @@
+# Terminal (docs/REMOTE.md): a Linux console on the built-in screen, in tmux.
+# Its service (zeroos-terminal.service, terminal-session, tmux.conf) stays in
+# the zeroos package: SSH from the Remote app and first-login use it too.
+NAME="Terminal"
+SUMMARY="Linux terminal on the built-in screen, in tmux"

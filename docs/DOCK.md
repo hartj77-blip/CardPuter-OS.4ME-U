@@ -7,7 +7,8 @@ own keyboard.
 
 ## Using it
 
-1. Plug a monitor into the HDMI port. ZeroShell opens the **Dock** app.
+1. Plug a monitor into the HDMI port. ZeroShell opens the **Dock** app (installed from **Apps**;
+   the SD card image has it already).
 2. Press **Start Dock mode**. The desktop appears on the monitor after a few
    seconds.
 3. The built-in screen shows "Docked" and turns itself off after a minute.
