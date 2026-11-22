@@ -3,8 +3,7 @@
 ZeroOS itself is small: it comes with **Apps**, **Settings**, **Update** and **Wi-Fi**, which are
 what a device needs to get online, update itself and install apps. Everything else is an app you
 install from the **Apps** app, downloaded from GitHub: Battery, Camera, Car, Clock, Compass, Dock,
-Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal, Tether, and the RF
-tools from [cardputer-zero-rf](https://github.com/hartj77-blip/cardputer-zero-rf).
+Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal and Tether.
 
 Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
 with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**
@@ -49,8 +48,8 @@ An SD card image can have apps on it from the start: the **Build image** workflo
 ## Where apps come from
 
 A **source** is a GitHub repository whose newest release holds a file called `zeroos-apps.index`
-and the packages it lists. ZeroOS starts with two: this repository and cardputer-zero-rf. Their
-releases publish the apps built from the same commit as the OS. Any other repository that
+and the packages it lists. ZeroOS starts with one: this repository. Its releases publish the
+apps built from the same commit as the OS. Any other repository that
 publishes the same files works too: add it in **Apps > S > Add a GitHub repo**, or add a line to
 `/etc/zeroos/apps.sources` (an `owner/repo`, or any `https://` address that serves the index).
 When two sources offer an app with the same name, the one higher in the list wins.
@@ -99,7 +98,7 @@ CI builds every module for arm64, loads each one in a headless ZeroShell
 (`shell/tools/modules-test.sh`), builds the packages (`image/apps/build.sh`) and tests the installer
 (`image/tests/apps-test.sh`). A release publishes the packages and `zeroos-apps.index`.
 
-In another repository (cardputer-zero-rf does this): add this repository as a submodule, include
+In another repository: add this repository as a submodule, include
 `shell/cmake/ZeroShellApps.cmake`, call `zs_app()` for each app and `zs_apps_build()`, then pack
 the modules with `image/apps/make-app-deb.sh`, which prints the app's block for
 `zeroos-apps.index`. Publish the packages and the index in a GitHub release.
