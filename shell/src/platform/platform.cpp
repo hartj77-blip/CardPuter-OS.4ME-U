@@ -56,6 +56,7 @@ int platform_run_script(const std::string&) {
 }
 
 void platform_set_low_power(bool) {}
+void platform_console_handoff(bool) {}
 
 #elif ZS_BACKEND_DEVICE
 namespace {
@@ -225,6 +226,8 @@ lv_indev_t* platform_init(int, int, int) {
     g_keypad = in;
     return in;
 }
+
+void platform_console_handoff(bool away) { tty_graphics(!away); }
 
 void platform_set_low_power(bool on) {
     // Screen off: stop the 30 Hz keyboard and redraw timers so the CPU can
@@ -396,6 +399,7 @@ int platform_run() {
 
 int platform_run_script(const std::string&) { return 2; }
 void platform_set_low_power(bool) {}
+void platform_console_handoff(bool) {}
 
 #else
 // ---------------------------------------------------------------- headless
@@ -527,6 +531,7 @@ int platform_run_script(const std::string& script) {
     return failures ? 1 : 0;
 }
 void platform_set_low_power(bool) {}
+void platform_console_handoff(bool) {}
 
 #endif
 

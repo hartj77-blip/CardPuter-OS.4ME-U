@@ -283,6 +283,7 @@ void Shell::tick_cb(lv_timer_t* t) {
         // Nobody is looking: don't leave the sensor running with the screen off.
         if (s->handoff_camera_ && power().screen_off()) hal().camera_close();
         if (!(s->handoff_camera_ ? hal().camera_active() : hal().terminal_active())) {
+            if (!s->handoff_camera_) platform_console_handoff(false);
             s->handoff_ = s->handoff_camera_ = false;
             power().set_handoff(false);
             s->screen_changed();
@@ -427,7 +428,11 @@ bool Shell::handle_key(uint32_t key) {
 }
 
 bool Shell::open_terminal(const std::string& command) {
-    if (!hal().terminal_open(command)) return false;
+    platform_console_handoff(true);
+    if (!hal().terminal_open(command)) {
+        platform_console_handoff(false);
+        return false;
+    }
     handoff_ = true;
     handoff_since_ = lv_tick_get();
     power().set_handoff(true);
