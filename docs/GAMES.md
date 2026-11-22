@@ -73,9 +73,9 @@ before the system one.
 On a full-size keyboard, X and Z are A and B too. Hold several keys at once: Games reads the
 keyboard directly, so you can run and jump.
 
-**Gamepads** work as well: USB, or Bluetooth. Pair a Bluetooth one once in the Terminal: turn on
-Bluetooth in **Settings**, put the gamepad in pairing mode, then run `bluetoothctl`, and in it
-`scan on`, then `pair`, `trust` and `connect` with the gamepad's address. Buttons follow the usual
+**Gamepads** work as well: USB, or Bluetooth. Pair a Bluetooth one once: put it in pairing mode,
+open **Bluetooth** (on the home screen, or Settings > Bluetooth devices), press **S** to scan and
+**Enter** on the gamepad. It reconnects by itself after that. Buttons follow the usual
 layout, the d-pad or left stick moves, and Home/Guide opens the menu. A gamepad that connects
 mid-game is picked up within a couple of seconds.
 

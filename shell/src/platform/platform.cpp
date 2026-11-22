@@ -61,7 +61,6 @@ void platform_console_handoff(bool) {}
 #elif ZS_BACKEND_DEVICE
 namespace {
 lv_indev_t* g_keypad = nullptr;
-int g_kb_fd = -1;
 bool g_low_power = false;
 volatile std::sig_atomic_t g_quit = 0;
 int g_saved_kbmode = -1;   // tty1's keyboard mode before we turned it off
@@ -85,24 +84,6 @@ bool is_builtin_name(const char* name) {
     return std::strstr(name, "tca8418") || std::strstr(name, "TCA8418") || std::strstr(name, "keypad");
 }
 
-std::string find_keyboard() {
-    if (const char* env = std::getenv("ZS_KEYBOARD")) return env;
-    std::string fallback;
-    for (int i = 0; i < 16; ++i) {
-        std::string path = "/dev/input/event" + std::to_string(i);
-        int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
-        if (fd < 0) continue;
-        char name[128] = {0};
-        ioctl(fd, EVIOCGNAME(sizeof name - 1), name);
-        unsigned long keys[KEY_MAX / (8 * sizeof(long)) + 1] = {0};
-        ioctl(fd, EVIOCGBIT(EV_KEY, sizeof keys), keys);
-        close(fd);
-        bool has_a = keys[KEY_A / (8 * sizeof(long))] & (1UL << (KEY_A % (8 * sizeof(long))));
-        if (is_builtin_name(name)) return path;
-        if (has_a && fallback.empty()) fallback = path;
-    }
-    return fallback;   // empty: no keyboard yet (its driver can load after we start)
-}
 
 // The built-in keyboard's Sym layer sends its own key codes (keys.h); any
 // other keyboard is read as a US one. ZS_KEYMAP=us|cardputer overrides.
@@ -125,40 +106,102 @@ static_assert(kKeyUp == LV_KEY_UP && kKeyDown == LV_KEY_DOWN && kKeyRight == LV_
 
 // We read the keyboard ourselves: LVGL's own evdev driver only passes on
 // arrows, Enter, Esc and a few more, and drops every letter and digit.
-KeyTranslator g_translator;
+// Every keyboard is read: the built-in one, and any USB or Bluetooth keyboard
+// plugged in or connected later (looked for every couple of seconds). Each
+// has its own translator, so modifiers held on one don't leak to another.
+struct Keyboard {
+    int fd = -1;
+    std::string path;
+    bool builtin = false;
+    KeyTranslator tr;
+};
+std::vector<Keyboard> g_kbs;
 uint32_t g_cur_key = 0;
 lv_indev_state_t g_cur_state = LV_INDEV_STATE_RELEASED;
+uint32_t g_last_scan = 0;
+constexpr uint32_t kRescanMs = 2000;
 
-bool open_keyboard() {
-    std::string kb = find_keyboard();
-    if (kb.empty()) return false;
-    g_kb_fd = open(kb.c_str(), O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
-    if (g_kb_fd < 0) {
-        std::fprintf(stderr, "zeroshell: cannot open keyboard %s: %s\n", kb.c_str(), std::strerror(errno));
+bool has_key(const unsigned long* bits, int code) {
+    return bits[code / (8 * sizeof(long))] & (1UL << (code % (8 * sizeof(long))));
+}
+
+bool open_keyboard_at(const std::string& path, bool forced) {
+    for (auto& k : g_kbs)
+        if (k.path == path) return true;
+    int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_NOCTTY | O_CLOEXEC);
+    if (fd < 0) return false;
+    char name[128] = {0};
+    ioctl(fd, EVIOCGNAME(sizeof name - 1), name);
+    unsigned long keys[KEY_MAX / (8 * sizeof(long)) + 1] = {0};
+    ioctl(fd, EVIOCGBIT(EV_KEY, sizeof keys), keys);
+    bool builtin = is_builtin_name(name);
+    // A keyboard has letters. Media remotes, power buttons and gamepads don't
+    // (the HAL reads media keys; Games reads gamepads).
+    if (!forced && !builtin && !(has_key(keys, KEY_A) && has_key(keys, KEY_Z))) {
+        close(fd);
         return false;
     }
-    std::printf("zeroshell: keyboard %s\n", kb.c_str());
-    g_translator = KeyTranslator(keyboard_layout(g_kb_fd));
+    Keyboard k;
+    k.fd = fd;
+    k.path = path;
+    k.builtin = builtin || forced;
+    k.tr = KeyTranslator(keyboard_layout(fd));
+    std::printf("zeroshell: keyboard %s (%s)\n", path.c_str(), name);
     std::fflush(stdout);
+    g_kbs.push_back(std::move(k));
     return true;
+}
+
+// Open keyboards that aren't open yet. True if at least one is open.
+bool open_keyboards() {
+    g_last_scan = lv_tick_get();
+    if (const char* env = std::getenv("ZS_KEYBOARD")) return open_keyboard_at(env, true);
+    for (int i = 0; i < 32; ++i) open_keyboard_at("/dev/input/event" + std::to_string(i), false);
+    return !g_kbs.empty();
+}
+
+// A keyboard that went away (Bluetooth off, USB unplugged). False if it was
+// the built-in one: then systemd restarts us to open it afresh.
+bool close_keyboard(size_t i) {
+    bool builtin = g_kbs[i].builtin;
+    std::printf("zeroshell: keyboard %s gone\n", g_kbs[i].path.c_str());
+    std::fflush(stdout);
+    close(g_kbs[i].fd);
+    g_kbs.erase(g_kbs.begin() + long(i));
+    return !builtin;
 }
 
 void keyboard_read_cb(lv_indev_t*, lv_indev_data_t* data) {
     input_event ev;
-    while (g_kb_fd >= 0 && read(g_kb_fd, &ev, sizeof ev) == ssize_t(sizeof ev)) {
-        if (ev.type == EV_KEY) g_translator.feed(ev.code, ev.value);
-        else if (ev.type == EV_SYN && ev.code == SYN_DROPPED) g_translator.reset();
+    for (size_t i = 0; i < g_kbs.size();) {
+        Keyboard& k = g_kbs[i];
+        ssize_t n;
+        while ((n = read(k.fd, &ev, sizeof ev)) == ssize_t(sizeof ev)) {
+            if (ev.type == EV_KEY) k.tr.feed(ev.code, ev.value);
+            else if (ev.type == EV_SYN && ev.code == SYN_DROPPED) k.tr.reset();
+        }
+        if (n < 0 && errno == ENODEV && !k.builtin) {
+            close_keyboard(i);
+            g_cur_state = LV_INDEV_STATE_RELEASED;   // a key it held must not stay down
+            continue;
+        }
+        ++i;
     }
     // One press or release per read; LVGL reads again while more wait, so
     // fast typing is not lost.
     KeyEvent e;
-    if (g_translator.next(e)) {
-        g_cur_key = e.key;
-        g_cur_state = e.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+    for (auto& k : g_kbs) {
+        if (k.tr.next(e)) {
+            g_cur_key = e.key;
+            g_cur_state = e.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+            break;
+        }
     }
+    bool more = false;
+    for (auto& k : g_kbs) more = more || k.tr.pending();
     data->key = g_cur_key;
     data->state = g_cur_state;
-    data->continue_reading = g_translator.pending();
+    data->continue_reading = more;
 }
 }  // namespace
 
@@ -217,7 +260,7 @@ lv_indev_t* platform_init(int, int, int) {
     install_quit_handlers();
     lv_display_t* d = lv_linux_fbdev_create();
     lv_linux_fbdev_set_file(d, fb.c_str());
-    if (!open_keyboard()) std::fprintf(stderr, "zeroshell: no keyboard yet, will keep looking\n");
+    if (!open_keyboards()) std::fprintf(stderr, "zeroshell: no keyboard yet, will keep looking\n");
     lv_indev_t* in = lv_indev_create();
     lv_indev_set_type(in, LV_INDEV_TYPE_KEYPAD);
     lv_indev_set_read_cb(in, keyboard_read_cb);
@@ -259,28 +302,34 @@ int platform_run() {
         // waking every few ms. Awake, keys are also read on LVGL's own timer.
         uint32_t cap = g_low_power ? 500 : 33;   // 500: pickup wake reads the IMU while off
         if (ms == LV_NO_TIMER_READY || ms > cap) ms = cap;
-        if (g_kb_fd >= 0) {
-            pollfd p{g_kb_fd, POLLIN, 0};
-            if (poll(&p, 1, int(ms)) > 0) {
-                if (p.revents & (POLLERR | POLLHUP | POLLNVAL)) {
-                    // The keyboard went away (driver unbound): poll() would
-                    // return at once forever. Exit; systemd restarts us and
-                    // we open the keyboard afresh.
-                    std::fprintf(stderr, "zeroshell: keyboard lost, restarting\n");
-                    return 1;
+        if (!g_kbs.empty()) {
+            std::vector<pollfd> ps;
+            for (auto& k : g_kbs) ps.push_back({k.fd, POLLIN, 0});
+            if (poll(ps.data(), ps.size(), int(ms)) > 0) {
+                bool keys = false;
+                for (size_t i = ps.size(); i-- > 0;) {
+                    if (ps[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+                        // Gone (driver unbound, Bluetooth disconnected):
+                        // poll() would return at once forever. Another
+                        // keyboard just goes; the built-in one is opened
+                        // afresh by restarting (systemd).
+                        if (!close_keyboard(i)) {
+                            std::fprintf(stderr, "zeroshell: keyboard lost, restarting\n");
+                            return 1;
+                        }
+                        g_cur_state = LV_INDEV_STATE_RELEASED;
+                    } else if (ps[i].revents & POLLIN) {
+                        keys = true;
+                    }
                 }
-                if (g_keypad) lv_indev_read(g_keypad);
+                if (keys && g_keypad) lv_indev_read(g_keypad);
             }
         } else {
-            // No keyboard at start (driver not loaded yet): look again
-            // about once a second.
             usleep(ms * 1000);
-            static uint32_t last_try = 0;
-            if (lv_tick_elaps(last_try) >= 1000) {
-                last_try = lv_tick_get();
-                open_keyboard();
-            }
         }
+        // A keyboard connected since (Bluetooth, USB), or the built-in one's
+        // driver loading after we started. Not while the screen is off.
+        if (!g_low_power && lv_tick_elaps(g_last_scan) >= (g_kbs.empty() ? 1000u : kRescanMs)) open_keyboards();
     }
     std::printf("zeroshell: stopping\n");
     return 0;
