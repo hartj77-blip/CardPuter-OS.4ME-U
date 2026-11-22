@@ -57,6 +57,7 @@ int platform_run_script(const std::string&) {
 
 void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
+bool platform_ctrl_pending() { return false; }
 
 #elif ZS_BACKEND_DEVICE
 namespace {
@@ -177,7 +178,12 @@ void keyboard_read_cb(lv_indev_t*, lv_indev_data_t* data) {
         Keyboard& k = g_kbs[i];
         ssize_t n;
         while ((n = read(k.fd, &ev, sizeof ev)) == ssize_t(sizeof ev)) {
-            if (ev.type == EV_KEY) k.tr.feed(ev.code, ev.value);
+            if (ev.type == EV_KEY) {
+                // ZS_KEYLOG=1 in zeroshell.service: every raw key in the journal.
+                static const bool keylog = std::getenv("ZS_KEYLOG") != nullptr;
+                if (keylog) std::printf("zeroshell: key %s code %d value %d\n", k.path.c_str(), ev.code, ev.value), std::fflush(stdout);
+                k.tr.feed(ev.code, ev.value);
+            }
             else if (ev.type == EV_SYN && ev.code == SYN_DROPPED) k.tr.reset();
         }
         if (n < 0 && errno == ENODEV && !k.builtin) {
@@ -268,6 +274,12 @@ lv_indev_t* platform_init(int, int, int) {
     // stock-image problem); the image masks getty@tty1 to prevent that.
     g_keypad = in;
     return in;
+}
+
+bool platform_ctrl_pending() {
+    for (auto& k : g_kbs)
+        if (k.tr.ctrl_pending()) return true;
+    return false;
 }
 
 void platform_console_handoff(bool away) {
@@ -458,6 +470,7 @@ int platform_run() {
 int platform_run_script(const std::string&) { return 2; }
 void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
+bool platform_ctrl_pending() { return false; }
 
 #else
 // ---------------------------------------------------------------- headless
@@ -606,6 +619,7 @@ int platform_run_script(const std::string& script) {
 }
 void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
+bool platform_ctrl_pending() { return false; }
 
 #endif
 

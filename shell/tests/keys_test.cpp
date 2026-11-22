@@ -112,6 +112,17 @@ int main() {
               k(ctrl_key('c')) + "c");
         check("ctrl space", typed(t, {{CTRL, 1}, {57, 1}, {57, 0}, {CTRL, 0}}), k(ctrl_key(' ')));
         check("ctrl digit", typed(t, {{CTRL, 1}, {2, 1}, {2, 0}, {CTRL, 0}}), "");
+        // M5's driver sends Ctrl as a plain key, so tapping it makes it
+        // sticky here: the next key only, and a second tap cancels it.
+        check("ctrl tapped then space", typed(t, {{CTRL, 1}, {CTRL, 0}, {57, 1}, {57, 0}, {30, 1}, {30, 0}}),
+              k(ctrl_key(' ')) + "a");
+        check("ctrl tapped twice", typed(t, {{CTRL, 1}, {CTRL, 0}, {CTRL, 1}, {CTRL, 0}, {30, 1}, {30, 0}}), "a");
+        t.feed(CTRL, 1);
+        t.feed(CTRL, 0);
+        check("ctrl pending after a tap", std::to_string(t.ctrl_pending()), "1");
+        check("tapped ctrl then esc", typed(t, taps({1, 30})), "<27>a");
+        check("ctrl held is not left pending", typed(t, {{CTRL, 1}, {46, 1}, {46, 0}, {CTRL, 0}}) + std::to_string(t.ctrl_pending()),
+              k(ctrl_key('c')) + "0");
     }
     {
         // A held key is released once, and only by its own release.

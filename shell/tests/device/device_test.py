@@ -181,6 +181,22 @@ def main():
         time.sleep(0.6)
         check("held esc goes home", "zeroshell: open home" in d.read_log()[log_before:], d.read_log()[log_before:])
         d.shot("5-home-again")
+        # Tapping Ctrl (M5's driver sends it as a plain key) waits for the
+        # next key: the status bar says Ctrl, and Space then opens the panel.
+        # Compare rows below the status bar only (the clock can tick).
+        body = slice(W * 2 * 20, W * 2 * 80)
+        home_body, home_bar = d.frame()[body], d.frame()[:W * 2 * 20]
+        d.tap(KEY["ctrl"])
+        time.sleep(0.4)
+        d.shot("6-ctrl-tapped")
+        check("tapped ctrl shows in the status bar", d.frame()[:W * 2 * 20] != home_bar)
+        d.tap(KEY["space"])
+        time.sleep(0.4)
+        d.shot("7-panel-from-tapped-ctrl")
+        check("tap ctrl, then space opens the panel", d.frame()[body] != home_body)
+        d.tap(KEY["esc"])
+        time.sleep(0.4)
+        check("esc closes the panel", d.frame()[body] == home_body)
         note = os.path.join(d.dir, "Notes", "notes.txt")
         saved = open(note).read() if os.path.exists(note) else ""
         want = text + "fastrollover"
