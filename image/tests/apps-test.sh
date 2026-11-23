@@ -270,6 +270,30 @@ printf 'zeroos-app-notes 1.0.0 zeroos-app-abi-%s\n' "$ABI" > "$T/installed"
 apps install gps
 grep -q 'dpkg --remove' "$T/apt.log" && bad "current app ABI: app taken off" || ok "current app ABI: apps left alone"
 rm -f "$T/state/restore"
+# A renamed app: its package takes over the old one's, and update-all swaps
+# it in for whoever has the old one.
+mkdir -p "$T/c"
+echo "not really a module" > "$T/mods/ai.so"
+printf 'NAME="AI"\nSUMMARY="Chat"\nREPLACES="zclaw"\n' > "$T/pkgs/ai.pkg"
+mk c ai 1.0.0
+DEB=$T/c/zeroos-app-ai_1.0.0_arm64.deb
+[ "$(dpkg-deb -f "$DEB" Replaces)" = zeroos-app-zclaw ] && [ "$(dpkg-deb -f "$DEB" Conflicts)" = zeroos-app-zclaw ] &&
+    ok "renamed app: package replaces the old one" || bad "renamed app: Replaces/Conflicts"
+grep -qx 'replaces=zclaw' "$T/c/zeroos-apps.index" && ok "renamed app: index names the old id" || bad "renamed app: replaces="
+printf 'file://%s/c\n' "$T" > "$T/sources"
+printf 'zeroos-app-zclaw 1.0.0 zeroos-app-abi-%s\n' "$ABI" > "$T/installed"
+mkdir -p "$T/state/extras"; echo something > "$T/state/extras/zclaw"
+: > "$T/apt.log"
+apps run upgrade
+expect "renamed app, upgrade: done" state done
+grep -q "zeroos-app-ai_1.0.0_arm64.deb" "$T/apt.log" && ok "renamed app, upgrade: installs the new one" || bad "renamed app: $(cat "$T/apt.log")"
+[ -e "$T/state/extras/ai" ] && [ ! -e "$T/state/extras/zclaw" ] && ok "renamed app: its extras move over" || bad "renamed app: extras"
+rm -rf "$T/state/extras"
+: > "$T/installed"
+: > "$T/apt.log"
+apps run upgrade
+grep -q 'apt-get install' "$T/apt.log" && bad "renamed app, old one not installed: installed anyway" || ok "renamed app, old one not installed: nothing to do"
+printf 'file://%s/a\n' "$T" > "$T/sources"
 # A package left half installed: repaired first, with nobody typing.
 : > "$T/installed"
 : > "$T/apt.log"

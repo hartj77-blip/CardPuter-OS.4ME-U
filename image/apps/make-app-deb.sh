@@ -26,6 +26,7 @@ case "$VERSION" in [0-9]*) ;; *) echo "error: version '$VERSION' must start with
 
 # What a .pkg sets (it is a bash fragment from this repository).
 NAME="" SUMMARY="" DEPENDS="" NEEDS="" ENABLE="" STOP_ON_REMOVE="" DISABLE_DEPS="" HOMEPAGE=""
+REPLACES=""   # ids of apps this one takes over (a renamed app): see docs/APPS.md
 EXTRA_FILE="" EXTRA_URL="" EXTRA_SHA256=""
 payload() { :; }
 # shellcheck disable=SC1090
@@ -49,6 +50,11 @@ DEB=${PACKAGE}_${VERSION}_${ARCH}.deb
 mkdir -p "$STAGE/DEBIAN" "$OUT"
 deps="zeroos, zeroos-app-abi-$ABI"
 [ -n "$DEPENDS" ] && deps="$deps, $DEPENDS"
+old=""
+for r in $REPLACES; do
+    [[ $r =~ ^[a-z0-9][a-z0-9-]*$ ]] && [ "$r" != "$ID" ] || { echo "error: bad REPLACES id '$r'" >&2; exit 1; }
+    old="${old:+$old, }zeroos-app-$r"
+done
 cat > "$STAGE/DEBIAN/control" <<CONTROL
 Package: $PACKAGE
 Version: $VERSION
@@ -57,7 +63,9 @@ Maintainer: ZeroOS <noreply@github.com>
 Section: misc
 Priority: optional
 Depends: $deps
-Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
+${old:+Replaces: $old
+Conflicts: $old
+}Installed-Size: $(du -sk --exclude=DEBIAN "$STAGE" | cut -f1)
 Homepage: ${HOMEPAGE:-https://github.com/hartj77-blip/CardPuter-OS.4ME-U}
 Description: $NAME for ZeroOS
  $SUMMARY
@@ -120,6 +128,7 @@ dpkg-deb --root-owner-group -Zxz --build "$STAGE" "$OUT/$DEB" >/dev/null
     echo "sha256=$(sha256sum "$OUT/$DEB" | cut -d' ' -f1)"
     echo "size=$(stat -c %s "$OUT/$DEB")"
     [ -n "$NEEDS" ] && echo "needs=$NEEDS"
+    [ -n "$REPLACES" ] && echo "replaces=$(echo $REPLACES)"
     if [ -n "$EXTRA_FILE" ]; then
         echo "extra-file=$EXTRA_FILE"
         echo "extra-url=$EXTRA_URL"
