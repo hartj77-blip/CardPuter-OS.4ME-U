@@ -12,6 +12,15 @@ The first two are already here:
 | Hold Esc | Go to the home screen from anywhere, even from a text box. A quick press is still Back |
 | Ctrl + Space | Open or close the taskbar panel from anywhere, even while typing |
 
+Screens that have been moved to the new design (Wi-Fi so far) also have:
+
+| Key | What it does |
+| --- | --- |
+| Tab | A menu of everything you can do here, each with a letter: press the letter to do it |
+| Ctrl + a letter | Do that menu item straight away, without opening the menu |
+
+and a line along the bottom of the screen that says what the keys do.
+
 Like Shift, Fn and Sym, Ctrl doesn't need holding: tap Ctrl and the status bar shows **Ctrl** until
 you press the next key. Tap it again to cancel. Holding it down works too.
 

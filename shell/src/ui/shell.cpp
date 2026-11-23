@@ -8,6 +8,7 @@
 #include "hal/hal.h"
 #include "platform/keys.h"
 #include "platform/platform.h"
+#include "ui/actions.h"
 #include "ui/numkeys.h"
 #include "ui/player.h"
 #include "ui/power.h"
@@ -163,6 +164,7 @@ void Shell::start(lv_indev_t* keypad) {
     lv_obj_add_flag(toast_, LV_OBJ_FLAG_HIDDEN);
 
     quick_panel_build(screen_);
+    actions_build(screen_);
 
     // Simulator stand-in for the backlight: a black layer over everything.
     blank_ = lv_obj_create(lv_layer_top());
@@ -359,6 +361,8 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     fn_layer_ = false;
     number_hints_hide();
     quick_panel_close();
+    actions_clear();
+    app_root_ = nullptr;
     // Destroy the old app while its widgets still exist: destructors read
     // them (Notes saves its text), then the widgets and group go away.
     app_.reset();
@@ -379,7 +383,9 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     style_plain(root);
     lv_obj_set_size(root, kScreenW, kContentH);
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    app_root_ = root;
     app_->build(root);
+    fit_app_root();
 
     lv_label_set_text(sb_title_, title.c_str());
     update_statusbar();
@@ -405,9 +411,20 @@ std::string Shell::take_app_arg() {
 
 void Shell::go_home() { pending_ = "home"; }
 
+void Shell::set_actions(std::vector<Action> actions) {
+    actions_set(std::move(actions));
+    fit_app_root();
+}
+
+// A screen with actions has the soft-key bar under it: kBodyH, not kContentH.
+void Shell::fit_app_root() {
+    if (app_root_) lv_obj_set_height(app_root_, actions_bar_shown() ? kBodyH : kContentH);
+}
+
 void Shell::hold_home() {
     if (handoff_) return;   // the terminal or camera has the screen
     if (quick_panel_is_open()) quick_panel_close();
+    actions_menu_close();
     number_hints_hide();
     if (app_id_ != "home") go_home();
     apply_pending();
@@ -485,15 +502,25 @@ bool Shell::handle_key(uint32_t key) {
     if (key != '0') number_hints_hide();
     if (key == ctrl_key(' ')) {
         // Ctrl + Space: the taskbar panel, from anywhere, text box or not.
+        actions_menu_close();
         if (panel) quick_panel_close();
         else quick_panel_open();
         used = true;
+    } else if (actions_menu_is_open() && actions_menu_key(key)) {
+        used = true;   // the Tab menu takes every key but the shell's own
     } else if (panel && quick_panel_key(key)) {
         used = true;
     } else if (!panel && app_ && app_->on_key(key)) {
         used = true;
+    } else if (!panel && key == kKeyNext && actions_have_menu()) {
+        // Tab: the screen's menu (docs/UX.md). Screens without one keep Tab.
+        actions_menu_open(focused, lv_label_get_text(sb_title_));
+        used = true;
     } else if (is_ctrl_key(key)) {
-        used = true;   // a Ctrl key nobody took: never to a widget (a text box would type it)
+        // Ctrl + a letter: that menu action. Never to a widget either (a
+        // text box would type it).
+        if (!panel) actions_run_letter(char(key - kKeyCtrl));
+        used = true;
     } else if (is_shell_key(key)) {
         system_key(key);
         used = true;   // never to a widget: a text box would type it
@@ -648,5 +675,6 @@ void shell_prepare_power_off() { Shell::get().prepare_power_off(); }
 bool shell_open_terminal(const std::string& command) { return Shell::get().open_terminal(command); }
 bool shell_open_camera() { return Shell::get().open_camera(); }
 void shell_set_fn_layer(bool on) { Shell::get().set_fn_layer(on); }
+void shell_set_actions(std::vector<Action> actions) { Shell::get().set_actions(std::move(actions)); }
 
 }  // namespace zs

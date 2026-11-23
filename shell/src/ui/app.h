@@ -69,6 +69,21 @@ struct AppModule {
     std::unique_ptr<App> (*make)();
 };
 
+// ---- Actions (docs/UX.md) ----------------------------------------------
+// What a screen can do. The shell shows them three ways: the soft-key bar
+// along the bottom (actions with a key), the menu on Tab and Ctrl + its
+// letter (actions with a letter and a run). One list, so the hints can't go
+// stale. A screen that sets actions is laid out kBodyH high (ui/theme.h),
+// not kContentH: the bar takes the bottom kSoftkeyH.
+struct Action {
+    std::string label;             // "Rescan", "Forget", "Open"
+    char letter = 0;               // 'a'..'z': in the menu, and Ctrl + it. 0: not in the menu
+    const char* key = nullptr;     // shown in the soft-key bar ("Enter", "Esc", "Space"), or nullptr
+    std::function<void()> run;     // nullptr: a hint only (the screen handles the key itself)
+    bool enabled = true;           // greyed in the menu when false
+    bool danger = false;           // destroys something: red, last in the menu
+};
+
 // Shell services available to apps.
 void shell_toast(const std::string& msg);
 void shell_open_app(const std::string& id);
@@ -89,5 +104,8 @@ bool shell_open_camera();
 // (f/z/x/c arrows, a/s/d volume, ...; platform/keys.h), Shift + letter is
 // still the letter. Off again at each app switch; call it from build().
 void shell_set_fn_layer(bool on);
+// This screen's actions (see Action). Call again whenever the screen changes;
+// an empty list hides the bar. Cleared at each app switch.
+void shell_set_actions(std::vector<Action> actions);
 
 }  // namespace zs

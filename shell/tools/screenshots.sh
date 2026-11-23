@@ -37,6 +37,8 @@ STEPS+=",enter,wait:300,shot:03-compass.ppm"
 STEPS+=",open:battery,shot:04-battery.ppm"
 STEPS+=",open:wifi,shot:05-wifi.ppm"
 STEPS+=",down,enter,wait:200,type:hunter2,shot:06-wifi-password.ppm"
+# The Tab menu (docs/UX.md): Wi-Fi's actions for the network in focus.
+STEPS+=",esc,down,tab,shot:95-wifi-menu.ppm,esc"
 STEPS+=",open:bluetooth,wait:200,shot:06b-bluetooth.ppm"
 STEPS+=",open:ir,wait:200,shot:07-ir-remote.ppm"
 STEPS+=",open:files,shot:08-files.ppm"

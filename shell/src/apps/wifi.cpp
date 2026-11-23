@@ -27,9 +27,10 @@ public:
 
     bool on_key(uint32_t key) override {
         if (pw_page_) return password_key(key);
-        if (!pw_page_ && (key == 'r' || key == 'R')) {
-            show_list();
-            shell_toast("Rescanned");
+        // R rescans until lists filter as you type (docs/UX.md); then it's
+        // Tab > R or Ctrl + R only.
+        if (key == 'r' || key == 'R') {
+            rescan();
             return true;
         }
         return false;
@@ -50,10 +51,8 @@ private:
         lv_obj_t* hdr = label(root_, st.wifi_connected ? ("Connected to " + st.wifi_ssid).c_str() : "Not connected",
                               &zs_font_12, st.wifi_connected ? kGood : kMuted);
         lv_obj_set_pos(hdr, 8, 4);
-        lv_obj_t* hint = label(root_, "R rescan", &zs_font_12, kMuted);
-        lv_obj_align(hint, LV_ALIGN_TOP_RIGHT, -8, 4);
 
-        lv_obj_t* list = make_list(root_, 4, 22, kScreenW - 8, kContentH - 26);
+        lv_obj_t* list = make_list(root_, 4, 22, kScreenW - 8, kBodyH - 24);
         for (size_t i = 0; i < nets_.size(); ++i) {
             auto& n = nets_[i];
             std::string text = n.ssid + fmt("   %d%%", n.signal) + (n.secure ? "" : "   open");
@@ -61,6 +60,22 @@ private:
             lv_obj_set_user_data(b, (void*)(intptr_t)i);
         }
         finish_list(list);
+
+        bool on = st.wifi_enabled;
+        std::vector<Action> acts;
+        acts.push_back({"Join", 0, "Enter", nullptr});
+        acts.push_back({"Rescan", 'r', nullptr, [this] { rescan(); }});
+        acts.push_back({on ? "Turn Wi-Fi off" : "Turn Wi-Fi on", 'w', nullptr, [this, on] {
+                            hal().set_wifi_enabled(!on);
+                            shell_toast(on ? "Wi-Fi off" : "Wi-Fi on");
+                            show_list();
+                        }});
+        shell_set_actions(std::move(acts));
+    }
+
+    void rescan() {
+        show_list();
+        shell_toast("Rescanned");
     }
 
     static void on_pick(lv_event_t* e) {
@@ -79,9 +94,10 @@ private:
             return;
         }
         clear();
+        shell_set_actions({{"Connect", 0, "Enter", nullptr}, {"Delete", 0, "Bksp", nullptr}, {"Back", 0, "Esc", nullptr}});
         pw_page_ = lv_obj_create(root_);
         style_plain(pw_page_);
-        lv_obj_set_size(pw_page_, kScreenW, kContentH);
+        lv_obj_set_size(pw_page_, kScreenW, kBodyH);
         lv_obj_t* t = label(pw_page_, ("Password for " + n.ssid).c_str(), &zs_font_14);
         lv_obj_set_pos(t, 10, 10);
         // A plain line of text, not a text box: shown as typed (easier to get
@@ -102,8 +118,7 @@ private:
         lv_obj_align(pw_label_, LV_ALIGN_LEFT_MID, 6, 0);
         pw_.clear();
         show_typed();
-        lv_obj_t* h = label(pw_page_, "Type the password, then Enter to connect.\nBackspace deletes. Esc goes back.",
-                            &zs_font_12, kMuted);
+        lv_obj_t* h = label(pw_page_, "Type the password. It shows as you type.", &zs_font_12, kMuted);
         lv_obj_set_pos(h, 10, 76);
     }
 
