@@ -479,6 +479,17 @@ public:
 
     // Sound effects through the speaker (key click, notification).
     virtual void beep(int freq_hz, int ms) = 0;
+
+    // An app made for M5Stack's launcher (docs/APPS.md, "M5Stack's app
+    // store"): hands the screen to `command` (a .desktop file's Exec line,
+    // run by sh in /usr/share/APPLaunch) until it exits, as Camera does.
+    // It reads the keyboard itself, alongside ZeroShell. external_close
+    // stops it and everything it started. False if it can't start, as in
+    // the simulator. (Last in this class: app modules built before these
+    // existed still find every other call where they expect it.)
+    virtual bool external_open(const std::string& command) = 0;
+    virtual bool external_active() = 0;
+    virtual void external_close() = 0;
 };
 
 // MockHal for the simulator and tests; LinuxHal for the device.

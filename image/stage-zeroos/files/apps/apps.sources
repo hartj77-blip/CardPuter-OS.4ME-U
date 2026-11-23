@@ -3,8 +3,12 @@
 #   owner/repo        a GitHub repository; its newest release must hold
 #                     zeroos-apps.index and the packages it lists
 #   https://...       any address that serves zeroos-apps.index the same way
+#   m5stack           M5Stack's own app store (apps made for M5's launcher;
+#                     ZeroOS opens them full screen). Its address works too.
 # Apps run with full access to this device: only add sources you trust.
 # The apps live in their own repository. The OS repository's releases
 # still carry them for now, as a fallback.
 hartj77-blip/CardPuter-Apps.4ME-U
 hartj77-blip/CardPuter-OS.4ME-U
+# M5Stack's app store, last: community apps made for M5's own launcher.
+m5stack

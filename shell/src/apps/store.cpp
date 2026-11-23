@@ -6,6 +6,9 @@
 //   sources  Enter on "Add a GitHub repo". Tab: N add one, D remove the highlighted one
 // Typing finds an app or a source (ui/list_view.h).
 //
+// Apps from M5Stack's app store (made for M5's own launcher) are marked "M5"
+// in the list; opening one hands it the screen (ui/m5_apps.cpp).
+//
 // zeroos-apps does the work as root; this screen starts it and shows how far
 // it has got. After an install or removal the home screen is rebuilt at
 // once; an upgraded app needs ZeroShell to restart, which this does.
@@ -253,6 +256,7 @@ private:
                 color = kGood;
             } else {
                 right = size_text(e.size_kb);
+                if (e.m5) right = right.empty() ? "M5" : "M5  " + right;
             }
             std::string id = e.id;
             list_.add(icon_of(e.id), e.name, right, [this, id] {
@@ -313,9 +317,10 @@ private:
         lv_obj_set_width(sum, kScreenW - 16);
         lv_label_set_long_mode(sum, LV_LABEL_LONG_WRAP);
         lv_obj_set_pos(sum, 8, 44);
-        std::string from = e->source.empty() ? "" : "From " + e->source;
+        std::string from = e->source.empty() ? "" : "From " + store::source_label(e->source);
+        if (!e->warn.empty()) from += (from.empty() ? "" : ". ") + e->warn;
         if (!e->needs.empty()) from += (from.empty() ? "" : ".  ") + std::string("Brings ") + e->needs;
-        lv_obj_t* f = label(root_, from.c_str(), &zs_font_12, kMuted);
+        lv_obj_t* f = label(root_, from.c_str(), &zs_font_12, e->warn.empty() ? kMuted : kWarn);
         lv_obj_set_size(f, kScreenW - 16, 15);   // one line, cut with "..."
         lv_label_set_long_mode(f, LV_LABEL_LONG_DOT);
         lv_obj_set_pos(f, 8, 74);
@@ -392,7 +397,8 @@ private:
         lv_obj_t* h = label(root_, "Apps come from these GitHub repos.", &zs_font_12, kMuted);
         lv_obj_set_pos(h, 8, 3);
         list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 42);
-        for (size_t i = 0; i < sources_.size(); ++i) list_.add(ZS_ICON_GLOBE, sources_[i], "", nullptr);
+        for (size_t i = 0; i < sources_.size(); ++i)
+            list_.add(ZS_ICON_GLOBE, store::source_label(sources_[i]), "", nullptr);
         list_.add(LV_SYMBOL_PLUS, "Add a GitHub repo", "", [this] { show_add(); });
         list_.finish();
         bottom_line();
@@ -427,8 +433,9 @@ private:
         lv_obj_add_event_cb(ta_, on_add, LV_EVENT_READY, this);
         shell_add_focus(ta_);
         lv_obj_t* h = label(root_,
-                            "Its newest release must have a zeroos-apps.index file. Apps from it run with full "
-                            "access to this device: only add repos you trust.",
+                            "Its newest release must have a zeroos-apps.index file (or type m5stack for "
+                            "M5Stack's app store). Apps from it run with full access to this device: only add "
+                            "repos you trust.",
                             &zs_font_12, kWarn);
         lv_obj_set_width(h, kScreenW - 20);
         lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
@@ -439,7 +446,7 @@ private:
         auto* self = static_cast<StoreApp*>(lv_event_get_user_data(e));
         std::string src = store::normalise_source(lv_textarea_get_text(self->ta_));
         if (src.empty()) {
-            shell_toast("Type it as owner/name");
+            shell_toast("Type it as owner/name, or m5stack");
             return;
         }
         for (auto& s : store::sources())

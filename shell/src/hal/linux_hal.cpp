@@ -21,6 +21,7 @@
 #ifndef __EMSCRIPTEN__
 #include <linux/input.h>   // media keys from a Bluetooth car or headset
 #include <sys/ioctl.h>
+#include <sys/resource.h>
 #endif
 #include <signal.h>
 #include <arpa/inet.h>
@@ -789,10 +790,11 @@ private:
     long long cpu_prev_[2] = {0, 0};
     std::vector<ProcMem> top_;
     int top_calls_ = 0;
-    pid_t play_pid_ = -1, rec_pid_ = -1, cam_pid_ = -1, visible_pid_ = -1, pair_pid_ = -1;
+    pid_t play_pid_ = -1, rec_pid_ = -1, cam_pid_ = -1, visible_pid_ = -1, pair_pid_ = -1, ext_pid_ = -1;
     std::vector<int> media_fds_;
     time_t media_scan_ = 0;
     static constexpr const char* kCameraApp = "/usr/bin/camera_app";
+    static constexpr const char* kM5AppRoot = "/usr/share/APPLaunch";
     PlaybackState pb_;
     MpvVideo video_;   // libmpv, loaded on first use
     RecordState rec_;
@@ -1759,6 +1761,69 @@ private:
         if (cam_pid_ <= 0) return;
         kill_child(cam_pid_, SIGTERM);   // it saves and stops the sensor on SIGTERM
         cam_pid_ = -1;
+    }
+
+    // --- Apps made for M5Stack's launcher (APPLaunch). Started the way it
+    // starts them: sh -c <Exec> in /usr/share/APPLaunch, as our user, in a
+    // process group of its own, the keyboard shared (not grabbed), drawing
+    // on the LCD's framebuffer, which M5's LVGL apps find in these variables.
+    bool external_open(const std::string& command) override {
+#ifdef __EMSCRIPTEN__
+        (void)command;
+        return false;
+#else
+        if (external_active()) return true;
+        if (command.empty()) return false;
+        scan_stop();   // a QR reader left running would hold the camera
+        std::string fb = lcd_framebuffer();
+        // Everything is built before fork (see spawn()).
+        std::vector<std::string> env_s;
+        for (char** e = environ; e && *e; ++e) {
+            std::string v = *e;
+            if (v.rfind("LV_LINUX_FBDEV_DEVICE=", 0) == 0 || v.rfind("APPLAUNCH_LINUX_FBDEV_DEVICE=", 0) == 0 ||
+                v.rfind("SDL_FBDEV=", 0) == 0)
+                continue;
+            env_s.push_back(v);
+        }
+        env_s.push_back("LV_LINUX_FBDEV_DEVICE=" + fb);
+        env_s.push_back("APPLAUNCH_LINUX_FBDEV_DEVICE=" + fb);
+        env_s.push_back("SDL_FBDEV=" + fb);
+        std::vector<char*> envp;
+        for (auto& v : env_s) envp.push_back(const_cast<char*>(v.c_str()));
+        envp.push_back(nullptr);
+        std::string cmd = command;
+        const char* argv[] = {"sh", "-c", cmd.c_str(), nullptr};
+        pid_t pid = fork();
+        if (pid == 0) {
+            setpgid(0, 0);
+            // Ours are -5 and -500 (zeroshell.service): an app gets the usual.
+            setpriority(PRIO_PROCESS, 0, 0);
+            int oom = open("/proc/self/oom_score_adj", O_WRONLY);
+            if (oom >= 0) {
+                (void)!write(oom, "0", 1);
+                close(oom);
+            }
+            if (chdir(kM5AppRoot) != 0) (void)!chdir("/");
+            int devnull = open("/dev/null", O_RDWR);
+            if (devnull >= 0) dup2(devnull, 0);   // output stays: it lands in our journal
+            for (int fd = 3; fd < 1024; ++fd) close(fd);   // not our screen, keyboard or sockets
+            execve("/bin/sh", const_cast<char* const*>(argv), envp.data());
+            _exit(127);
+        }
+        ext_pid_ = pid;
+        if (pid > 0) std::fprintf(stderr, "zeroshell: M5Stack app started (%d): %s\n", int(pid), command.c_str());
+        return pid > 0;
+#endif
+    }
+    bool external_active() override {
+        if (ext_pid_ <= 0) return false;
+        if (exited(ext_pid_)) ext_pid_ = -1;
+        return ext_pid_ > 0;
+    }
+    void external_close() override {
+        if (ext_pid_ <= 0) return;
+        kill_child(ext_pid_, SIGTERM);   // the whole group, SIGKILL after ~1 s
+        ext_pid_ = -1;
     }
 
     static std::string json_str(const std::string& js, const std::string& key) {

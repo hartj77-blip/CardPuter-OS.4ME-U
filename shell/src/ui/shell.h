@@ -44,9 +44,15 @@ public:
     // Hand the screen to the Linux console terminal (see Hal::terminal_open)
     // and take it back when the terminal closes.
     bool open_terminal(const std::string& command);
-    bool in_terminal() const { return handoff_ && !handoff_camera_; }
+    bool in_terminal() const { return handoff_ && !handoff_camera_ && !handoff_external_; }
     // The same, for the camera app (see Hal::camera_open).
     bool open_camera();
+    // The same, for an app made for M5Stack's launcher (Hal::external_open).
+    // Holding Esc for 3 s stops it, as on M5's launcher; then Home.
+    bool open_external(const std::string& command);
+    bool in_external() const { return handoff_ && handoff_external_; }
+    // Keypad hook, while an M5Stack app has the screen: Esc going down or up.
+    void external_key(uint32_t key, bool pressed);
     const std::string& current_app() const { return app_id_; }
     // Bumped each time an app opens or closes (key repeat stops at a switch).
     uint32_t app_generation() const { return app_generation_; }
@@ -78,6 +84,8 @@ private:
     lv_timer_t* tick_timer_ = nullptr;
     bool handoff_ = false;
     bool handoff_camera_ = false;   // handed to the camera app, not the terminal
+    bool handoff_external_ = false; // handed to an M5Stack app
+    uint32_t external_esc_since_ = 0;   // Esc held down since (0: it isn't)
     uint32_t handoff_since_ = 0;
     uint32_t toast_since_ = 0;
     bool toast_shown_ = false;

@@ -101,6 +101,9 @@ void shell_prepare_power_off();         // power manager: close the app and GPS 
 bool shell_open_terminal(const std::string& command);
 // Hand the screen to the camera app until it exits. False if it can't start.
 bool shell_open_camera();
+// Hand the screen to an app made for M5Stack's launcher (its .desktop Exec
+// line) until it exits; then Home. False if it can't start.
+bool shell_open_external(const std::string& command);
 // For a screen that needs no typing: plain letters act as their Fn keys
 // (f/z/x/c arrows, a/s/d volume, ...; platform/keys.h), Shift + letter is
 // still the letter. Off again at each app switch; call it from build().

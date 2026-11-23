@@ -124,6 +124,8 @@ STUB
 # word stands for the package's Depends).
 cat > "$T/bin/dpkg-query" <<STUB
 #!/bin/sh
+# -L <package>: an M5Stack app's files (its launcher entry).
+[ "\$1" = -L ] && { echo /usr/share/APPLaunch; echo "/usr/share/APPLaunch/applications/\$2.desktop"; exit 0; }
 for a; do pat=\$a; done
 case \$pat in *'*') pat=\${pat%\\*} ;; esac
 while read -r p v; do
@@ -139,6 +141,7 @@ apps() {
     PATH="$T/bin:$PATH" APT_LOG=$T/apt.log BAD_CONFIGURE=$T/bad-configure ZEROOS_APPS_SOURCES=$T/sources ZEROOS_APPS_STATE=$T/state ZEROOS_APPS_CACHE=$T/cache \
         ZEROOS_APPS_RUN=$T/run ZEROOS_APPS_ZEROSHELL=$T/zeroshell ZEROOS_APPS_ROOT=$T/root \
         ZEROOS_APPS_ALLOW_FILE=1 ZEROOS_APPS_ARCH=arm64 \
+        ZEROOS_APPS_M5_REGISTRY=$ROOT/image/stage-zeroos/files/apps/m5-registry \
         "$ROOT/image/stage-zeroos/files/apps/zeroos-apps" "$@" 2>>"$T/log"
 }
 cat_has() { grep -qx "$1" "$T/state/catalog"; }
@@ -316,5 +319,73 @@ grep -q 'rm -rf' "$T/sources" && bad "add-source, junk: written" || ok "add-sour
 apps run remove-source:someone/cardputer-apps || true
 grep -qx 'someone/cardputer-apps' "$T/sources" && bad "remove-source" || ok "remove-source: removed"
 apps sources | grep -qx 'other/apps' && ok "sources: lists them" || bad "sources"
+
+# --- M5Stack's app store (registry.json) --------------------------------------
+m5deb() {   # m5deb <package> <version> <arch>: an app made for M5's launcher, in $T/m5
+    local d=$T/m5build/$1
+    rm -rf "$d"
+    mkdir -p "$d/DEBIAN" "$d/usr/share/APPLaunch/applications" "$d/usr/share/APPLaunch/bin"
+    printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: t <t@t>\nDescription: t\n' "$1" "$2" "$3" > "$d/DEBIAN/control"
+    printf '[Desktop Entry]\nName=Hello\nExec=/usr/share/APPLaunch/bin/hello\nType=Application\n' \
+        > "$d/usr/share/APPLaunch/applications/$1.desktop"
+    dpkg-deb -b --root-owner-group "$d" "$T/m5/$1_$2_$3.deb" >/dev/null
+}
+m5entry() {   # m5entry <package> <version> <arch> [sha256]: one app in registry.json
+    local f=$T/m5/$1_$2_$3.deb sha=${4:-}
+    [ -n "$sha" ] || sha=$(sha256sum "$f" | cut -d' ' -f1)
+    printf '{"title":"%s","summary":"Says hello","version":"%s","review":{"status":"approved"},' "$1" "$2"
+    printf '"permissions":{"background_service":true},"depends":"libc6 (>= 2.34), python3",'
+    printf '"download":{"type":"deb","package":"%s","url":"file://%s","sha256":"%s","size":%s}}' \
+        "$1" "$f" "$sha" "$(stat -c %s "$f" 2>/dev/null || echo 1)"
+}
+mkdir -p "$T/m5"
+m5deb hello-zero 1.0.0 arm64
+m5deb pc-only 1.0.0 amd64
+m5deb broken 1.0.0 arm64
+printf '{"apps":[%s,%s,%s,%s]}' "$(m5entry hello-zero 1.0.0 arm64)" "$(m5entry pc-only 1.0.0 amd64)" \
+    "$(m5entry broken 1.0.0 arm64 nothex)" \
+    '{"title":"x","version":"1","download":{"package":"evil;rm","url":"https://e/x_1_arm64.deb","sha256":"'"$(printf '0%.0s' {1..64})"'","size":1}}' \
+    > "$T/m5/registry.json"
+printf 'file://%s/a\nfile://%s/m5/registry.json\n' "$T" "$T" > "$T/sources"
+: > "$T/installed"
+: > "$T/apt.log"
+apps run refresh
+expect "m5 store: refresh done" state done
+cat_has app=m5-hello-zero && cat_has kind=m5 && cat_has package=hello-zero && cat_has app=notes &&
+    ok "m5 store: its apps join the catalog as m5-<package>" || bad "m5 store: not in the catalog"
+cat_has "needs=python3" && cat_has "warn=Runs in the background" && ok "m5 store: extras and warnings carried over" ||
+    bad "m5 store: needs/warn"
+for x in m5-pc-only m5-broken m5-evil-rm; do
+    cat_has "app=$x" && bad "m5 store: kept bad entry $x" || ok "m5 store: dropped bad entry $x"
+done
+apps run install:m5-hello-zero
+expect "m5 install: done" state done
+grep -q "apt-get install .*$T/cache/hello-zero_1.0.0_arm64.deb" "$T/apt.log" &&
+    ok "m5 install: apt installs the downloaded package" || bad "m5 install: $(cat "$T/apt.log")"
+grep -qx 'package=hello-zero' "$T/state/m5/m5-hello-zero" &&
+    grep -qx 'desktop=/usr/share/APPLaunch/applications/hello-zero.desktop' "$T/state/m5/m5-hello-zero" &&
+    ok "m5 install: notes the package and its launcher entry for ZeroShell" || bad "m5 install: note"
+echo "hello-zero 1.0.0" >> "$T/installed"
+apps list > "$T/list"; grep -qE '^m5-hello-zero +1\.0\.0' "$T/list" && ok "m5 list: shown installed" || bad "m5 list: $(cat "$T/list")"
+# A newer version in the store: Update all takes it.
+m5deb hello-zero 1.1.0 arm64
+printf '{"apps":[%s]}' "$(m5entry hello-zero 1.1.0 arm64)" > "$T/m5/registry.json"
+: > "$T/apt.log"
+apps run upgrade
+grep -q "apt-get install .*hello-zero_1.1.0_arm64.deb" "$T/apt.log" && ok "m5 upgrade: newer version installed" ||
+    bad "m5 upgrade: $(cat "$T/apt.log")"
+: > "$T/apt.log"
+apps run remove:m5-hello-zero
+expect "m5 remove: done" state done
+grep -q 'apt-get purge -y hello-zero$' "$T/apt.log" && ok "m5 remove: purges its package" || bad "m5 remove: $(cat "$T/apt.log")"
+[ ! -e "$T/state/m5/m5-hello-zero" ] && ok "m5 remove: note gone" || bad "m5 remove: note left"
+: > "$T/installed"
+# A package of M5's copied over by hand.
+apps install-file "$T/m5/hello-zero_1.0.0_arm64.deb"
+expect "m5 install-file: done" state done
+grep -qx 'package=hello-zero' "$T/state/m5/m5-hello-zero" && ok "m5 install-file: noted as m5-hello-zero" ||
+    bad "m5 install-file: note"
+grep -qx m5stack "$ROOT/image/stage-zeroos/files/apps/apps.sources" && ok "m5 store: a source out of the box" ||
+    bad "m5 store: not in apps.sources"
 
 [ "$fails" = 0 ] && echo "all passed" || { echo "$fails failed"; sed 's/^/log: /' "$T/log" | tail -30; exit 1; }
