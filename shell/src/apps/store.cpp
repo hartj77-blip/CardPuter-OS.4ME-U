@@ -95,10 +95,12 @@ public:
             intptr_t i = f ? (intptr_t)lv_obj_get_user_data(f) : -1;
             if (i > 0 && i <= intptr_t(sources_.size())) {
                 std::string s = sources_[size_t(i - 1)];
-                if (start([s] { store::remove_source(s); })) {
-                    shell_toast("Removed " + s);
-                    defer(Page::Sources);
-                }
+                shell_confirm("Remove " + s + "?", "Apps stop coming from it.", "Remove", [this, s] {
+                    if (start([s] { store::remove_source(s); })) {
+                        shell_toast("Removed " + s);
+                        defer(Page::Sources);
+                    }
+                });
             }
             return true;
         }

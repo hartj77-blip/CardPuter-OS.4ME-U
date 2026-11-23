@@ -24,6 +24,11 @@ lv_obj_t* g_rows = nullptr;     // the menu's rows (scrolls past kMaxRows)
 std::vector<int> g_menu_items;  // g_actions index of each menu row
 std::vector<lv_obj_t*> g_menu_rows;
 int g_sel = -1;
+lv_obj_t* g_sheet = nullptr;    // the key sheet (0)
+lv_obj_t* g_confirm = nullptr;  // the confirm box, over g_confirm_dim
+lv_obj_t* g_confirm_dim = nullptr;
+std::function<void()> g_confirm_yes;
+std::string g_confirm_label;
 
 bool in_menu(const Action& a) { return a.letter && a.run; }
 
@@ -58,6 +63,16 @@ void bar_spacer() {
 void render_bar() {
     if (!g_bar) return;
     lv_obj_clean(g_bar);
+    if (g_confirm) {
+        bar_item("Enter", g_confirm_label);
+        bar_spacer();
+        bar_item("Esc", "Cancel");
+        return;
+    }
+    if (g_sheet) {
+        label(g_bar, "Any key closes", &zs_font_12, kMuted);
+        return;
+    }
     if (g_menu) {
         bar_item("a-z", "Run");
         bar_item("Enter", "Run");
@@ -113,7 +128,9 @@ void run_action(size_t i) {
     if (i >= g_actions.size() || !g_actions[i].enabled || !g_actions[i].run) return;
     std::function<void()> fn = g_actions[i].run;
     actions_menu_close();
-    fn();
+    const Action& a = g_actions[i];
+    if (a.danger) actions_confirm(a.confirm.empty() ? a.label + "?" : a.confirm, "", a.label, fn);
+    else fn();
 }
 
 // The name of what's in focus: a list row's text, or a widget's own label.
@@ -150,6 +167,7 @@ void actions_build(lv_obj_t* screen) {
 
 void actions_set(std::vector<Action> actions) {
     actions_menu_close();
+    actions_sheet_close();
     g_actions = std::move(actions);
     if (!g_bar) return;
     if (g_actions.empty()) lv_obj_add_flag(g_bar, LV_OBJ_FLAG_HIDDEN);
@@ -301,6 +319,166 @@ bool actions_run_letter(char letter) {
             return true;
         }
     return false;
+}
+
+
+// ---- Key sheet ------------------------------------------------------------
+
+namespace {
+void sheet_heading(lv_obj_t* grid, const char* text) {
+    lv_obj_t* h = label(grid, text, &zs_font_12, kMuted);
+    lv_obj_set_width(h, kScreenW - 16);   // a row of its own
+    lv_obj_set_style_pad_top(h, 2, 0);
+}
+
+void sheet_item(lv_obj_t* grid, const std::string& key, const std::string& text) {
+    lv_obj_t* item = lv_obj_create(grid);
+    style_plain(item);
+    lv_obj_set_size(item, (kScreenW - 16) / 2 - 4, 15);
+    lv_obj_remove_flag(item, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(item, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(item, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(item, 5, 0);
+    lv_obj_t* chip = lv_obj_create(item);
+    style_plain(chip);
+    lv_obj_set_size(chip, LV_SIZE_CONTENT, 13);
+    lv_obj_set_style_min_width(chip, 22, 0);
+    lv_obj_set_style_pad_hor(chip, 3, 0);
+    lv_obj_set_style_radius(chip, 3, 0);
+    lv_obj_set_style_bg_color(chip, c(kSurface2), 0);
+    lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+    lv_obj_remove_flag(chip, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_center(label(chip, key.c_str(), &zs_font_12, kText));
+    lv_obj_t* t = label(item, text.c_str(), &zs_font_12, kText);
+    lv_obj_set_flex_grow(t, 1);
+    lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
+}
+}  // namespace
+
+void actions_sheet_open(const std::string& title) {
+    actions_menu_close();
+    actions_sheet_close();
+    g_sheet = lv_obj_create(lv_layer_top());
+    style_plain(g_sheet);
+    lv_obj_set_size(g_sheet, kScreenW, kScreenH - kStatusH - kSoftkeyH);
+    lv_obj_set_pos(g_sheet, 0, kStatusH);
+    lv_obj_set_style_bg_color(g_sheet, c(kBg), 0);
+    lv_obj_set_style_bg_opa(g_sheet, LV_OPA_COVER, 0);
+    lv_obj_set_style_pad_hor(g_sheet, 8, 0);
+    lv_obj_set_style_pad_ver(g_sheet, 2, 0);
+    lv_obj_set_flex_flow(g_sheet, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_set_style_pad_column(g_sheet, 8, 0);
+    lv_obj_set_style_pad_row(g_sheet, 0, 0);
+    lv_obj_set_scrollbar_mode(g_sheet, LV_SCROLLBAR_MODE_OFF);
+
+    sheet_heading(g_sheet, ("KEYS: " + title).c_str());
+    for (const Action& a : g_actions) {
+        if (a.key) sheet_item(g_sheet, a.key, a.label);
+        if (in_menu(a)) {
+            char k[4] = {'^', char(std::toupper(int(a.letter))), 0, 0};
+            sheet_item(g_sheet, k, a.label);
+        }
+    }
+    sheet_heading(g_sheet, "EVERYWHERE");
+    sheet_item(g_sheet, "Esc", "Back");
+    sheet_item(g_sheet, "Tab", "Menu");
+    sheet_item(g_sheet, "1-9", "Pick an item");
+    sheet_item(g_sheet, "Hold Esc", "Home");
+    sheet_item(g_sheet, "Ctrl Space", "Panel");
+    sheet_item(g_sheet, "Fn", "Arrows, volume");
+    render_bar();
+}
+
+void actions_sheet_close() {
+    if (!g_sheet) return;
+    lv_obj_delete(g_sheet);
+    g_sheet = nullptr;
+    render_bar();
+}
+
+bool actions_sheet_is_open() { return g_sheet != nullptr; }
+
+// ---- Confirm ----------------------------------------------------------------
+
+void actions_confirm(const std::string& question, const std::string& detail, const std::string& yes,
+                     std::function<void()> on_yes) {
+    actions_menu_close();
+    actions_confirm_close();
+    g_confirm_yes = std::move(on_yes);
+    g_confirm_label = yes;
+
+    g_confirm_dim = lv_obj_create(lv_layer_top());
+    style_plain(g_confirm_dim);
+    lv_obj_set_size(g_confirm_dim, kScreenW, kScreenH - kStatusH);
+    lv_obj_set_pos(g_confirm_dim, 0, kStatusH);
+    lv_obj_set_style_bg_color(g_confirm_dim, c(0x000000), 0);
+    lv_obj_set_style_bg_opa(g_confirm_dim, LV_OPA_50, 0);
+
+    g_confirm = lv_obj_create(lv_layer_top());
+    style_plain(g_confirm);
+    lv_obj_set_size(g_confirm, 240, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(g_confirm, c(0x2a2a2a), 0);
+    lv_obj_set_style_bg_opa(g_confirm, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(g_confirm, c(kMenuBorder), 0);
+    lv_obj_set_style_border_width(g_confirm, 1, 0);
+    lv_obj_set_style_radius(g_confirm, 7, 0);
+    lv_obj_set_style_pad_all(g_confirm, 9, 0);
+    lv_obj_set_style_pad_row(g_confirm, 4, 0);
+    lv_obj_set_flex_flow(g_confirm, LV_FLEX_FLOW_COLUMN);
+    lv_obj_remove_flag(g_confirm, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_obj_t* q = label(g_confirm, question.c_str(), &zs_font_14, kText);
+    lv_obj_set_width(q, 220);
+    lv_label_set_long_mode(q, LV_LABEL_LONG_WRAP);
+    if (!detail.empty()) {
+        lv_obj_t* d = label(g_confirm, detail.c_str(), &zs_font_12, kMuted);
+        lv_obj_set_width(d, 220);
+        lv_label_set_long_mode(d, LV_LABEL_LONG_WRAP);
+    }
+    lv_obj_t* row = lv_obj_create(g_confirm);
+    style_plain(row);
+    lv_obj_set_size(row, 220, 22);
+    lv_obj_set_style_pad_top(row, 4, 0);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    for (int b = 0; b < 2; ++b) {
+        lv_obj_t* btn = lv_obj_create(row);
+        style_plain(btn);
+        lv_obj_set_size(btn, 106, 20);
+        lv_obj_set_style_radius(btn, 4, 0);
+        lv_obj_set_style_bg_color(btn, c(b ? kBad : kSurface2), 0);
+        lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
+        lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_align(btn, b ? LV_ALIGN_RIGHT_MID : LV_ALIGN_LEFT_MID, 0, 0);
+        std::string t = b ? yes + "  (Enter)" : "Cancel  (Esc)";
+        lv_obj_center(label(btn, t.c_str(), &zs_font_12, kText));
+    }
+    lv_obj_update_layout(g_confirm);
+    lv_obj_align(g_confirm, LV_ALIGN_CENTER, 0, (kStatusH - kSoftkeyH) / 2);
+    // The bar says it too, if the screen has one.
+    render_bar();
+}
+
+bool actions_confirm_is_open() { return g_confirm != nullptr; }
+
+void actions_confirm_close() {
+    if (!g_confirm) return;
+    lv_obj_delete(g_confirm);
+    lv_obj_delete(g_confirm_dim);
+    g_confirm = g_confirm_dim = nullptr;
+    g_confirm_yes = nullptr;
+    render_bar();
+}
+
+bool actions_confirm_key(uint32_t key) {
+    if (!g_confirm) return false;
+    if (key == LV_KEY_ENTER || key == '\r') {
+        std::function<void()> fn = std::move(g_confirm_yes);
+        actions_confirm_close();
+        if (fn) fn();
+    } else if (key == LV_KEY_ESC || key == '`') {
+        actions_confirm_close();
+    }
+    return !is_shell_key(key);   // nothing else reaches the screen behind
 }
 
 }  // namespace zs

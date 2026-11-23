@@ -81,7 +81,8 @@ struct Action {
     const char* key = nullptr;     // shown in the soft-key bar ("Enter", "Esc", "Space"), or nullptr
     std::function<void()> run;     // nullptr: a hint only (the screen handles the key itself)
     bool enabled = true;           // greyed in the menu when false
-    bool danger = false;           // destroys something: red, last in the menu
+    bool danger = false;           // destroys something: red, last in the menu, and asks first
+    std::string confirm;           // danger: the question ("Forget HomeNet?"); default "<label>?"
 };
 
 // Shell services available to apps.
@@ -107,5 +108,9 @@ void shell_set_fn_layer(bool on);
 // This screen's actions (see Action). Call again whenever the screen changes;
 // an empty list hides the bar. Cleared at each app switch.
 void shell_set_actions(std::vector<Action> actions);
+// Ask before something that can't be undone: Enter runs on_yes, Esc doesn't.
+// `yes` names the button ("Forget"). The one way ZeroOS asks (docs/UX.md).
+void shell_confirm(const std::string& question, const std::string& detail, const std::string& yes,
+                   std::function<void()> on_yes);
 
 }  // namespace zs

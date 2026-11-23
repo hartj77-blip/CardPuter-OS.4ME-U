@@ -361,6 +361,7 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     fn_layer_ = false;
     number_hints_hide();
     quick_panel_close();
+    actions_confirm_close();
     actions_clear();
     app_root_ = nullptr;
     // Destroy the old app while its widgets still exist: destructors read
@@ -425,6 +426,8 @@ void Shell::hold_home() {
     if (handoff_) return;   // the terminal or camera has the screen
     if (quick_panel_is_open()) quick_panel_close();
     actions_menu_close();
+    actions_sheet_close();
+    actions_confirm_close();
     number_hints_hide();
     if (app_id_ != "home") go_home();
     apply_pending();
@@ -505,6 +508,11 @@ bool Shell::handle_key(uint32_t key) {
         actions_menu_close();
         if (panel) quick_panel_close();
         else quick_panel_open();
+        used = true;
+    } else if (actions_confirm_is_open() && actions_confirm_key(key)) {
+        used = true;   // the confirm box: Enter or Esc, nothing else
+    } else if (actions_sheet_is_open()) {
+        actions_sheet_close();   // the key sheet: any key closes it
         used = true;
     } else if (actions_menu_is_open() && actions_menu_key(key)) {
         used = true;   // the Tab menu takes every key but the shell's own
@@ -589,19 +597,16 @@ void Shell::system_key(uint32_t key) {
 
 bool Shell::number_key(uint32_t key) {
     switch (key) {
-        case '1':
-            if (app_id_ != "home") go_home();
-            return true;
-        case '2':
-            quick_panel_open();
-            return true;
         case '0':
-            if (number_hints_shown()) number_hints_hide();
+            // The key sheet where the screen has actions; elsewhere, badges on
+            // what 1 to 9 pick (lists show theirs all the time).
+            if (actions_bar_shown()) actions_sheet_open(lv_label_get_text(sb_title_));
+            else if (number_hints_shown()) number_hints_hide();
             else if (number_hints_show(number_targets(group_)) == 0) toast("Nothing to pick here");
             return true;
         default: {
             auto targets = number_targets(group_);
-            size_t i = key - '3';
+            size_t i = key - '1';
             if (i >= targets.size()) return true;
             lv_group_focus_obj(targets[i]);
             lv_obj_scroll_to_view(targets[i], LV_ANIM_OFF);
@@ -676,5 +681,9 @@ bool shell_open_terminal(const std::string& command) { return Shell::get().open_
 bool shell_open_camera() { return Shell::get().open_camera(); }
 void shell_set_fn_layer(bool on) { Shell::get().set_fn_layer(on); }
 void shell_set_actions(std::vector<Action> actions) { Shell::get().set_actions(std::move(actions)); }
+void shell_confirm(const std::string& question, const std::string& detail, const std::string& yes,
+                   std::function<void()> on_yes) {
+    actions_confirm(question, detail, yes, std::move(on_yes));
+}
 
 }  // namespace zs

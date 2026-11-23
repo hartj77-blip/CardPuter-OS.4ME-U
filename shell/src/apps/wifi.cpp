@@ -1,5 +1,6 @@
 // Wi-Fi: scan, pick a network, type the password, connect (NetworkManager).
 #include "apps/common.h"
+#include "ui/list_view.h"
 
 namespace zs {
 namespace {
@@ -13,7 +14,6 @@ public:
     }
 
     ~WifiApp() override {   // left before a deferred step ran: don't run it on a freed app
-        lv_async_call_cancel(show_password_cb, this);
         lv_async_call_cancel(connect_cb, this);
     }
 
@@ -27,13 +27,7 @@ public:
 
     bool on_key(uint32_t key) override {
         if (pw_page_) return password_key(key);
-        // R rescans until lists filter as you type (docs/UX.md); then it's
-        // Tab > R or Ctrl + R only.
-        if (key == 'r' || key == 'R') {
-            rescan();
-            return true;
-        }
-        return false;
+        return list_.key(key);   // typing filters the networks
     }
 
 private:
@@ -52,14 +46,17 @@ private:
                               &zs_font_12, st.wifi_connected ? kGood : kMuted);
         lv_obj_set_pos(hdr, 8, 4);
 
-        lv_obj_t* list = make_list(root_, 4, 22, kScreenW - 8, kBodyH - 24);
+        list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 21);
+        list_.set_empty_text("No networks found. Tab > R rescans.");
         for (size_t i = 0; i < nets_.size(); ++i) {
             auto& n = nets_[i];
-            std::string text = n.ssid + fmt("   %d%%", n.signal) + (n.secure ? "" : "   open");
-            lv_obj_t* b = list_button(list, n.connected ? LV_SYMBOL_OK : LV_SYMBOL_WIFI, text.c_str(), on_pick, this);
-            lv_obj_set_user_data(b, (void*)(intptr_t)i);
+            std::string value = fmt("%d%%", n.signal) + (n.secure ? "" : "  open");
+            list_.add(n.connected ? LV_SYMBOL_OK : LV_SYMBOL_WIFI, n.ssid, value, [this, i] {
+                pick_ = int(i);
+                show_password();
+            });
         }
-        finish_list(list);
+        list_.finish();
 
         bool on = st.wifi_enabled;
         std::vector<Action> acts;
@@ -76,14 +73,6 @@ private:
     void rescan() {
         show_list();
         shell_toast("Rescanned");
-    }
-
-    static void on_pick(lv_event_t* e) {
-        auto* self = static_cast<WifiApp*>(lv_event_get_user_data(e));
-        size_t i = (size_t)(intptr_t)lv_obj_get_user_data(lv_event_get_target_obj(e));
-        // Defer: we're inside an event of a widget that show_password() deletes.
-        self->pick_ = int(i);
-        lv_async_call(show_password_cb, self);
     }
 
     void show_password() {
@@ -149,7 +138,6 @@ private:
         return true;
     }
 
-    static void show_password_cb(void* p) { static_cast<WifiApp*>(p)->show_password(); }
     static void connect_cb(void* p) {
         auto* s = static_cast<WifiApp*>(p);
         if (s->pick_ >= 0 && s->pick_ < int(s->nets_.size())) s->connect(s->nets_[size_t(s->pick_)].ssid, s->pw_);
@@ -166,6 +154,7 @@ private:
     lv_obj_t* pw_page_ = nullptr;
     lv_obj_t* pw_label_ = nullptr;
     std::vector<WifiNetwork> nets_;
+    ListView list_;
     int pick_ = -1;
     std::string pw_;
 };

@@ -310,7 +310,9 @@ already-built modules never call it. The level goes to 4 in the first change tha
 installable app (CardPuter-Apps.4ME-U) onto the kit, since that app can't run on an older ZeroOS.
 
 Done so far: hold Esc and Ctrl + Space (0.3.8); actions, the soft-key bar, the Tab menu and
-Ctrl + a letter, with Wi-Fi as the first screen using them.
+Ctrl + a letter; 1 to 9 pick, 0 the key sheet; `ListView` (numbered rows, type to filter) and
+`shell_confirm()`. Wi-Fi is the first screen on all of it; the Apps store asks before removing a
+source. Tabs and value rows come with the Settings tree (phase 4).
 
 ### Testing
 

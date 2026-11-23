@@ -3,41 +3,37 @@
 Everything on ZeroOS works from the keyboard. Arrows move, Enter opens, and Esc (top left) goes back.
 The \` key works as Esc too.
 
-The keys are being redesigned: [UX.md](UX.md) is the plan (hold Esc for home, Ctrl + Space for the
-taskbar panel, 1 to 9 pick items, Tab for a menu). This page describes the keys as they are today.
-The first two are already here:
+The keys are being redesigned to work the same on every screen ([UX.md](UX.md) is the plan).
+Screens move over one at a time; Wi-Fi is the first.
+
+## Everywhere
 
 | Key | What it does |
 | --- | --- |
-| Hold Esc | Go to the home screen from anywhere, even from a text box. A quick press is still Back |
-| Ctrl + Space | Open or close the taskbar panel from anywhere, even while typing |
+| Esc | Back. Hold it for a moment to go to the home screen from anywhere, even from a text box |
+| Ctrl + Space | Open or close the taskbar panel, from anywhere, even while typing |
+| 1 to 9 | Pick the 1st to 9th item on screen: the same as moving to it and pressing Enter |
+| 0 | Show every key for this screen. On screens not moved over yet, show which number is which |
 
-Screens that have been moved to the new design (Wi-Fi so far) also have:
+Away from a text box the number keys are buttons; in a text box they type numbers. An app can use a
+number key for something of its own first. For example, 0 goes back to the start of a video in
+Media.
+
+Like Shift, Fn and Sym, Ctrl doesn't need holding: tap Ctrl and the status bar shows **Ctrl** until
+you press the next key. Tap it again to cancel. Holding it down works too.
+
+## Screens moved to the new design
+
+Wi-Fi so far. A line along the bottom of the screen says what the keys do, and:
 
 | Key | What it does |
 | --- | --- |
 | Tab | A menu of everything you can do here, each with a letter: press the letter to do it |
 | Ctrl + a letter | Do that menu item straight away, without opening the menu |
+| Letters | In a list, type to find: only the rows that match stay. Backspace or Esc undoes it |
 
-and a line along the bottom of the screen that says what the keys do.
-
-Like Shift, Fn and Sym, Ctrl doesn't need holding: tap Ctrl and the status bar shows **Ctrl** until
-you press the next key. Tap it again to cancel. Holding it down works too.
-
-## Number keys
-
-When you're not typing in a text box, the number keys work as buttons. In a text box they type
-numbers.
-
-| Key | What it does |
-| --- | --- |
-| 1 | Go to the home screen |
-| 2 | Open the taskbar panel (see below) |
-| 3 to 9 | Pick the 1st to 7th item on screen. It's the same as moving to the item and pressing Enter |
-| 0 | Show which number goes with which item. Press 0 again, or any other key, to hide them |
-
-An app can use a number key for something of its own first. For example, 0 goes back to the start
-of a video in Media.
+Every row shows its number key. Something that can't be undone (forgetting, removing) asks first:
+Enter does it, Esc doesn't.
 
 ## Home screen
 
@@ -46,26 +42,26 @@ table below). F, Z, X and C are the arrows.
 
 | Key | What it does |
 | --- | --- |
-| 3 to 9 | Open the dock's apps, top to bottom. Press 0 to see the numbers |
+| 1 to 7 | Open the dock's apps, top to bottom. Press 0 to see the numbers |
 | Shift + a letter | Jump to the next app whose name starts with that letter |
 | K / N | First / last app |
 | L / M | Page before / page after |
 
 ## The taskbar panel
 
-Press 2 to open a row of tiles under the status bar. Each tile has a number key:
+Press Ctrl + Space to open a row of tiles under the status bar. Each tile has a number key:
 
 | Key | Tile | Enter or its number |
 | --- | --- | --- |
-| 3 | Wi-Fi | Turns Wi-Fi on or off |
-| 4 | Bluetooth | Turns Bluetooth on or off |
-| 5 | Volume | Up/Down change it. Enter mutes |
-| 6 | Brightness | Up/Down change it |
-| 7 | Battery | Opens Battery |
-| 8 | Clock | Opens Clock |
-| 9 | More | Opens Settings |
+| 1 | Wi-Fi | Turns Wi-Fi on or off |
+| 2 | Bluetooth | Turns Bluetooth on or off |
+| 3 | Volume | Up/Down change it. Enter mutes |
+| 4 | Brightness | Up/Down change it |
+| 5 | Battery | Opens Battery |
+| 6 | Clock | Opens Clock |
+| 7 | More | Opens Settings |
 
-Left/Right move between the tiles, and Esc or 2 closes the panel.
+Left/Right move between the tiles, and Esc or Ctrl + Space closes the panel.
 
 ## Fn keys
 
