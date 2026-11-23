@@ -5,7 +5,9 @@
 // zeroos-apps@<action>.service) and writes:
 //   /var/lib/zeroos/apps/catalog   every app on offer, from every source
 //   /run/zeroos/apps.status        how the current job is going
-// Installed apps are Debian packages called zeroos-app-<id>.
+// Installed apps are Debian packages called zeroos-app-<id>, or, for apps
+// from M5Stack's app store (id m5-<x>), the package that
+// /var/lib/zeroos/apps/m5/m5-<x> names.
 // In the simulator a made-up catalog stands in, and jobs pretend to run.
 #pragma once
 
@@ -20,6 +22,8 @@ struct Entry {
     std::string installed;   // installed version, "" if not installed
     std::string source;      // where it comes from (owner/repo or a URL)
     std::string needs;       // Debian packages it brings along, for the details page
+    std::string warn;        // M5Stack's store: what to know first ("Runs in the background")
+    bool m5 = false;         // from M5Stack's app store (made for M5's launcher)
     long size_kb = 0;        // download
     bool update() const;     // installed, and a newer version is on offer
 };
@@ -53,6 +57,9 @@ void remove(const std::string& id);
 void upgrade_all();
 void add_source(const std::string& source);
 void remove_source(const std::string& source);
+
+// How to show a source: "M5Stack's app store" for M5's, else as it is.
+std::string source_label(const std::string& source);
 
 // "owner/repo", "github.com/owner/repo" or https://... : the form
 // add_source() takes, or "" if it doesn't look like a source.

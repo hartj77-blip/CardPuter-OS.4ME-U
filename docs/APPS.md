@@ -59,12 +59,14 @@ An SD card image can have apps on it from the start: the **Build image** workflo
 ## Where apps come from
 
 A **source** is a GitHub repository whose newest release holds a file called `zeroos-apps.index`
-and the packages it lists. ZeroOS starts with two, in this order:
+and the packages it lists, or M5Stack's own app store (below). ZeroOS starts with three, in this
+order:
 
 | Source | What it is |
 | --- | --- |
 | [`hartj77-blip/CardPuter-Apps.4ME-U`](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U) | The apps' own repository. Each app is developed and released there, with its own version. |
 | `hartj77-blip/CardPuter-OS.4ME-U` | This repository. Its releases still carry the apps built from the same commit as the OS, as a fallback while the move is under way. |
+| `m5stack` | [M5Stack's app store](#m5stacks-app-store): community apps made for M5's own launcher. |
 
 When two sources offer an app with the same name, the one higher in the list wins, so apps come
 from the apps repository whenever it has a build for this ZeroOS. A device updated from ZeroOS
@@ -78,6 +80,58 @@ or any `https://` address that serves the index).
 **Trust.** An app runs with the same access as the home screen, and installing one runs its
 package's scripts as root. The SHA-256 in the index only proves the download is complete; the
 index comes from the same place. Only add sources you trust.
+
+## M5Stack's app store
+
+M5Stack runs an app store for the Cardputer Zero: about 180 apps by the community, listed in
+[CardputerZero/packages](https://github.com/CardputerZero/packages) and reviewed there before they
+are published. They are made for M5's own launcher (APPLaunch), which ZeroOS replaces, but they
+are ordinary Debian packages, so ZeroOS installs them too and opens them its own way.
+
+- **In Apps** they are in the same list as ZeroOS's apps, marked **M5**, with ids `m5-<package>`.
+  An app's page says it's from M5Stack's app store, and what to know first ("Runs in the
+  background", "Needs extra hardware") as M5's store lists it.
+- **Opening one** hands it the screen, the way Camera works: ZeroShell stops drawing and the app
+  draws on the LCD and reads the keyboard itself. **Hold Esc for 3 seconds** to leave an app that
+  has no way out of its own (as on M5's launcher); ZeroShell then stops it and everything it
+  started, and goes home. Apps marked to run in a terminal open in the Terminal instead.
+- **Install, update and remove** work as for any app, Update all included. `zeroos-apps` reads
+  M5's `registry.json` (`https://cardputerzero.github.io/generated/registry.json`), checks each
+  download against its SHA-256 and installs it with apt, which brings the Debian packages it
+  depends on.
+
+To take M5Stack's store out of the list: **Apps > Tab > P**, highlight it, **Tab > D**. To put it
+back, **Add a GitHub repo** and type `m5stack`.
+
+What's different from ZeroOS's own apps:
+
+- **They are not checked by this project.** M5 reviews them; ZeroOS only checks that each
+  download is the one M5's list names. Like any app, installing one runs its package's scripts
+  as root, and some change system settings (a battery saver that adds a service, apps that add
+  you to hardware groups).
+- **Some may not work.** They were tested on M5's system with M5's launcher running. An app that
+  talks to that launcher, expects its services, or draws somewhere other than the LCD's
+  framebuffer won't work here. Most apps (Python with pygame or Pillow, LVGL, SDL) only need the
+  screen and keyboard, which ZeroOS hands over.
+- **No real icons yet**: on the home screen each shows its first letter.
+- **Background apps keep running** after you leave them, as on M5's system (an app with a
+  service, such as a battery saver). Remove the app to stop it.
+
+How it fits together:
+
+```
+zeroos-apps refresh      registry.json --(image/stage-zeroos/files/apps/m5-registry)--> catalog blocks
+                         app=m5-<pkg>, kind=m5, package=, url=, sha256=, size=, needs=, warn=
+zeroos-apps install      download url, check SHA-256, apt-get install, note the package and its
+                         launcher entries in /var/lib/zeroos/apps/m5/m5-<pkg>
+ZeroShell                one app per launcher entry (/usr/share/APPLaunch/applications/*.desktop),
+                         ui/m5_apps.cpp; Hal::external_open runs its Exec line with sh in
+                         /usr/share/APPLaunch, as uid 1000, with LV_LINUX_FBDEV_DEVICE and
+                         APPLAUNCH_LINUX_FBDEV_DEVICE set to the LCD's framebuffer
+```
+
+An M5 package copied over by hand installs with `sudo zeroos-apps install-file <file>.deb`. M5's
+camera program's own launcher entry is hidden: the Camera app already opens it.
 
 ## How it works
 
@@ -143,5 +197,7 @@ Release workflow by hand.
 - A ZeroOS update doesn't update apps by itself; open **Apps** and press **Tab > U**.
 - Removing Terminal also removes one-key SSH from Remote (Remote says so); removing Dock leaves
   Dock mode reachable through Settings' "On HDMI" option.
-- The store shows an app's real icon only once it's installed (until then, a grid).
+- The store shows an app's real icon only once it's installed (until then, a grid). Apps from
+  M5Stack's store show a letter, not their icon.
+- Apps from M5Stack's store haven't been tried on a Cardputer running ZeroOS yet.
 - An app's page doesn't show screenshots.

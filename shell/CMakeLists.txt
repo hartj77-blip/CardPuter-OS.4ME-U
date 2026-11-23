@@ -120,6 +120,11 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(ai_test PRIVATE src)
   target_compile_options(ai_test PRIVATE -Wall -Wextra)
   add_test(NAME ai_test COMMAND ai_test)
+  # Launcher entries of apps made for M5Stack's launcher.
+  add_executable(desktop_entry_test tests/desktop_entry_test.cpp src/ui/desktop_entry.cpp)
+  target_include_directories(desktop_entry_test PRIVATE src)
+  target_compile_options(desktop_entry_test PRIVATE -Wall -Wextra)
+  add_test(NAME desktop_entry_test COMMAND desktop_entry_test)
   # A test-pattern libretro core for the Games app (tests/games/testcore.c):
   # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
   add_library(zstest_libretro MODULE tests/games/testcore.c)

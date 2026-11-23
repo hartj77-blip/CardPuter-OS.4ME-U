@@ -35,6 +35,7 @@ uint32_t g_press_ms = 0, g_repeat_ms = 0, g_press_app = 0;
 lv_obj_t* g_enter_box = nullptr;   // text box that had focus when Enter went down
 constexpr uint32_t kRepeatDelay = 400, kRepeatEvery = 80;
 constexpr uint32_t kHoldHomeMs = 600;   // hold Esc this long: home (docs/UX.md)
+constexpr uint32_t kExternalQuitMs = 3000;   // an M5Stack app: hold Esc this long to stop it (as M5's launcher)
 
 // Only movement and deleting repeat. Enter, Tab and letters are actions
 // (install, record, save a waypoint): holding one must not do it 10 times.
@@ -54,6 +55,7 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
     bool new_press = pressed && (g_last_state == LV_INDEV_STATE_RELEASED || data->key != g_last_key);
     if (pressed) g_last_key = data->key;
     g_last_state = data->state;
+    if (Shell::get().in_external()) Shell::get().external_key(data->key, pressed);
     if (new_press && power().on_key(lv_tick_get())) {
         g_swallowed = true;
     } else if (new_press) {
@@ -328,18 +330,33 @@ void Shell::tick_cb(lv_timer_t* t) {
         mesh_seen = seq;
     }
     static int n = 0;
-    // Terminal closed (exit, or tmux detach with Ctrl+Q) or camera app closed:
-    // take the screen back.
+    // Esc held down in an M5Stack app (keys come only as they change while
+    // it has the screen, so this is checked here, not in the keypad hook).
+    if (s->in_external() && s->external_esc_since_ &&
+        lv_tick_elaps(s->external_esc_since_) > kExternalQuitMs) {
+        s->external_esc_since_ = 0;
+        std::fprintf(stderr, "zeroshell: Esc held, stopping %s\n", s->app_id_.c_str());
+        hal().external_close();
+    }
+    // Terminal closed (exit, or tmux detach with Ctrl+Q), camera app or
+    // M5Stack app closed: take the screen back.
     if (s->handoff_ && lv_tick_elaps(s->handoff_since_) > 1500) {
         // Nobody is looking: don't leave the sensor running with the screen off.
         if (s->handoff_camera_ && power().screen_off()) hal().camera_close();
-        if (!(s->handoff_camera_ ? hal().camera_active() : hal().terminal_active())) {
-            if (!s->handoff_camera_) {
+        bool active = s->handoff_camera_     ? hal().camera_active()
+                      : s->handoff_external_ ? hal().external_active()
+                                             : hal().terminal_active();
+        if (!active) {
+            if (s->handoff_external_) {
+                // Its page in ZeroShell only says "running": go home.
+                s->go_home();
+            } else if (!s->handoff_camera_) {
                 platform_console_handoff(false);
                 // The Terminal app has nothing to show on the device: go home.
                 if (s->app_id_ == "terminal") s->go_home();
             }
-            s->handoff_ = s->handoff_camera_ = false;
+            s->handoff_ = s->handoff_camera_ = s->handoff_external_ = false;
+            s->external_esc_since_ = 0;
             power().set_handoff(false);
             s->screen_changed();
         }
@@ -668,6 +685,24 @@ bool Shell::open_camera() {
     return true;
 }
 
+bool Shell::open_external(const std::string& command) {
+    if (!hal().external_open(command)) return false;
+    handoff_ = handoff_external_ = true;
+    external_esc_since_ = 0;
+    handoff_since_ = lv_tick_get();
+    power().set_handoff(true);
+    screen_changed();
+    return true;
+}
+
+void Shell::external_key(uint32_t key, bool pressed) {
+    if (pressed && (key == LV_KEY_ESC || key == '`')) {
+        if (!external_esc_since_) external_esc_since_ = lv_tick_get() | 1;   // 0 means "not held"
+    } else {
+        external_esc_since_ = 0;
+    }
+}
+
 void Shell::screen_changed() {
     lv_display_t* disp = lv_display_get_default();
     bool off = power().screen_off();
@@ -708,6 +743,7 @@ void shell_screen_changed() { Shell::get().screen_changed(); }
 void shell_prepare_power_off() { Shell::get().prepare_power_off(); }
 bool shell_open_terminal(const std::string& command) { return Shell::get().open_terminal(command); }
 bool shell_open_camera() { return Shell::get().open_camera(); }
+bool shell_open_external(const std::string& command) { return Shell::get().open_external(command); }
 void shell_set_fn_layer(bool on) { Shell::get().set_fn_layer(on); }
 void shell_set_actions(std::vector<Action> actions) { Shell::get().set_actions(std::move(actions)); }
 void shell_confirm(const std::string& question, const std::string& detail, const std::string& yes,

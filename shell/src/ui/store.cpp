@@ -2,6 +2,7 @@
 // simulated one for the simulator and screenshots. See ui/store.h.
 #include "ui/store.h"
 
+#include <dirent.h>
 #include <sys/stat.h>
 
 #include <algorithm>
@@ -24,6 +25,8 @@ bool g_mock = false;
 const char* const kCatalog = "/var/lib/zeroos/apps/catalog";
 const char* const kStatus = "/run/zeroos/apps.status";
 const char* const kSources = "/etc/zeroos/apps.sources";
+const char* const kM5Notes = "/var/lib/zeroos/apps/m5";   // m5-<x>: package=<its Debian package>
+const char* const kM5Store = "https://cardputerzero.github.io/generated/registry.json";
 
 std::string run(const std::string& cmd) {
     std::string out;
@@ -83,7 +86,8 @@ struct MockJob {
 MockJob g_job;
 Status g_mock_status;
 std::map<std::string, std::string> g_mock_installed;   // id -> version
-std::vector<std::string> g_mock_sources = {"hartj77-blip/CardPuter-OS.4ME-U"};
+std::vector<std::string> g_mock_sources = {"hartj77-blip/CardPuter-Apps.4ME-U", "hartj77-blip/CardPuter-OS.4ME-U",
+                                          "m5stack"};
 bool g_mock_init = false;
 uint32_t g_mock_refreshed = 0;
 
@@ -116,6 +120,13 @@ const MockApp kMockApps[] = {
      "git, micro, make, gcc, libc6-dev, python3, lua5.4, bc, sqlite3", 180, nullptr},
     {"games", "Games", "Play NES, Game Boy and GBA games (more consoles with downloadable cores)",
      "libretro-nestopia, libretro-gambatte, libretro-mgba, curl, unzip", 140, nullptr},
+    // A few from M5Stack's app store, as its registry.json lists them.
+    {"m5-acidzero", "AcidZero", "Acid bass synth with a 16-step sequencer and MIDI CC control",
+     "libsdl2-2.0-0, libasound2", 58, "m5stack"},
+    {"m5-zero-weather", "Zero Weather", "Weather for where you are, with a 7-day forecast", "python3, python3-pil",
+     24, "m5stack"},
+    {"m5-ghost-hunter", "Ghost Hunter", "A ghost-hunting game for the Cardputer Zero",
+     "python3, python3-pygame, python3-numpy", 31, "m5stack"},
 };
 
 void mock_init() {
@@ -190,6 +201,8 @@ std::vector<Entry> mock_catalog() {
         e.version = "0.4.0";
         e.size_kb = m.kb;
         e.source = m.source ? m.source : "hartj77-blip/CardPuter-OS.4ME-U";
+        e.m5 = e.id.rfind("m5-", 0) == 0;
+        if (e.m5) e.version = "1.0.0";
         auto it = g_mock_installed.find(e.id);
         if (it != g_mock_installed.end()) e.installed = it->second;
         out.push_back(e);
@@ -212,6 +225,38 @@ std::map<std::string, std::string> installed_packages() {
         if (!(l >> st >> pkg >> ver)) continue;
         // "ii" = installed; anything else (rc: removed, config left) isn't.
         if (st.size() >= 2 && st[1] == 'i' && pkg.rfind("zeroos-app-", 0) == 0) out[pkg.substr(11)] = ver;
+    }
+    // Apps from M5Stack's store: zeroos-apps noted each one's package.
+    std::map<std::string, std::string> m5;   // package -> id
+    if (DIR* d = opendir(kM5Notes)) {
+        while (dirent* x = readdir(d)) {
+            std::string id = x->d_name;
+            if (id.rfind("m5-", 0) != 0) continue;
+            std::ifstream f(std::string(kM5Notes) + "/" + id);
+            std::string l;
+            while (std::getline(f, l)) {
+                if (l.rfind("package=", 0) != 0) continue;
+                std::string pkg = l.substr(8);
+                bool ok = !pkg.empty();
+                for (char ch : pkg)
+                    ok = ok && ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '+' || ch == '.' || ch == '-');
+                if (ok) m5[pkg] = id;
+                break;
+            }
+        }
+        closedir(d);
+    }
+    if (!m5.empty()) {
+        std::string cmd = "dpkg-query -W -f='${db:Status-Abbrev} ${Package} ${Version}\\n'";
+        for (auto& [pkg, id] : m5) cmd += " " + quote(pkg);
+        std::istringstream q(run(cmd));
+        while (std::getline(q, line)) {
+            std::istringstream l(line);
+            std::string st, pkg, ver;
+            if (!(l >> st >> pkg >> ver)) continue;
+            auto it = m5.find(pkg);
+            if (st.size() >= 2 && st[1] == 'i' && it != m5.end()) out[it->second] = ver;
+        }
     }
     return out;
 }
@@ -240,6 +285,8 @@ std::vector<Entry> real_catalog() {
         else if (k == "version") e.version = v;
         else if (k == "source") e.source = v;
         else if (k == "needs") e.needs = v;
+        else if (k == "warn") e.warn = v;
+        else if (k == "kind") e.m5 = v == "m5";
         else if (k == "size") e.size_kb = (std::atol(v.c_str()) + 1023) / 1024;
     }
     flush();
@@ -258,6 +305,7 @@ std::vector<Entry> real_catalog() {
         const AppInfo* a = app_find(id);
         x.name = a ? a->name : id;
         x.installed = ver;
+        x.m5 = id.rfind("m5-", 0) == 0;
         x.summary = "No longer offered by your sources";
         out.push_back(x);
     }
@@ -282,18 +330,32 @@ Status real_status() {
 }
 
 // Simple version order, enough for the update badge: dpkg decides for real.
+// Runs of digits compare as numbers, anything else as text ("0.2.0-1",
+// "1.0.3~beta" from M5's store too); an epoch ("1:") is ignored.
 bool newer(const std::string& a, const std::string& b) {
-    std::istringstream x(a), y(b);
-    for (;;) {
-        long p = -1, q = -1;
-        char dot;
-        x >> p;
-        y >> q;
-        if (p != q) return p > q;
-        if (p < 0) return false;
-        bool more_x = bool(x >> dot), more_y = bool(y >> dot);
-        if (!more_x && !more_y) return false;
+    auto strip = [](const std::string& v) {
+        size_t c = v.find(':');
+        return c != std::string::npos && c < 4 ? v.substr(c + 1) : v;
+    };
+    std::string x = strip(a), y = strip(b);
+    size_t i = 0, j = 0;
+    while (i < x.size() || j < y.size()) {
+        bool dx = i < x.size() && std::isdigit(static_cast<unsigned char>(x[i]));
+        bool dy = j < y.size() && std::isdigit(static_cast<unsigned char>(y[j]));
+        if (dx && dy) {
+            long p = 0, q = 0;
+            while (i < x.size() && std::isdigit(static_cast<unsigned char>(x[i]))) p = p * 10 + (x[i++] - '0');
+            while (j < y.size() && std::isdigit(static_cast<unsigned char>(y[j]))) q = q * 10 + (y[j++] - '0');
+            if (p != q) return p > q;
+            continue;
+        }
+        char cx = i < x.size() ? x[i] : 0, cy = j < y.size() ? y[j] : 0;
+        if (cx == '~' || cy == '~') return cy == '~' && cx != '~';   // ~ sorts before anything
+        if (cx != cy) return cx > cy;
+        ++i;
+        ++j;
     }
+    return false;
 }
 
 }  // namespace
@@ -364,10 +426,20 @@ void remove_source(const std::string& source) {
     }
 }
 
+std::string source_label(const std::string& source) {
+    if (source == "m5stack" || source == kM5Store) return "M5Stack's app store";
+    return source;
+}
+
 std::string normalise_source(const std::string& text) {
     std::string s = text;
     s.erase(0, s.find_first_not_of(" \t"));
     s.erase(s.find_last_not_of(" \t/") + 1);
+    {
+        std::string low;
+        for (char ch : s) low += char(std::tolower(static_cast<unsigned char>(ch)));
+        if (low == "m5stack" || low == "m5" || low == "m5stack store") return "m5stack";
+    }
     if (s.rfind("https://", 0) == 0 && s.rfind("https://github.com/", 0) != 0) {
         // Any https address that serves zeroos-apps.index.
         for (char ch : s)

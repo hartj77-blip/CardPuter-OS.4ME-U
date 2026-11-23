@@ -842,6 +842,9 @@ public:
     bool camera_open() override { return false; }
     bool camera_active() override { return false; }
     void camera_close() override {}
+    bool external_open(const std::string&) override { return false; }
+    bool external_active() override { return false; }
+    void external_close() override {}
 
     void power_off() override { std::printf("[mock] power off\n"); }
     void reboot() override { std::printf("[mock] reboot\n"); }

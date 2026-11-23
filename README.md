@@ -86,7 +86,9 @@ Ctrl, Shift, Fn and Sym are sticky: tap one and then press the next key. Apps sh
 on screen. For example, in Media Space pauses and N skips, and in IR Remote L learns a button from
 another remote. The full list is in [Keys](docs/KEYS.md).
 
-**Installing apps:** open **Apps**, pick one and press Enter. **Update all** at the top of the list (or Ctrl + U) updates everything.
+**Installing apps:** open **Apps**, pick one and press Enter. The list includes
+[M5Stack's app store](docs/APPS.md#m5stacks-app-store) too (marked **M5**): about 180 community apps
+made for M5's launcher, which ZeroOS opens full screen (hold Esc for 3 seconds to leave one). **Update all** at the top of the list (or Ctrl + U) updates everything.
 **Updating ZeroOS:** open **Update**. No re-flashing needed, see [Updates](docs/UPDATE.md).
 
 ### Battery and memory

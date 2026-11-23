@@ -1,0 +1,120 @@
+#!/usr/bin/python3 -I
+# m5-registry: turn M5Stack's app store list (registry.json, from
+# github.com/CardputerZero/packages) into catalog blocks for zeroos-apps
+# (docs/APPS.md, "M5Stack's app store").
+#
+#   m5-registry <source> < registry.json
+#
+# Each usable app becomes one block of key=value lines, like the ones
+# zeroos-apps reads from zeroos-apps.index:
+#
+#   app=m5-<package>     kind=m5               package=<Debian package>
+#   name= summary= version= url= sha256= size= needs= warn= source=
+#
+# Nothing in the list is run. An app that isn't the expected shape (a
+# package name, version, https address or checksum that doesn't look right,
+# a download for another kind of computer, one not approved by M5's review)
+# is left out. Values are cut to one line of at most 200 characters.
+import json
+import os
+import re
+import sys
+
+PKG = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
+VERSION = re.compile(r"^([0-9]+:)?[0-9][0-9A-Za-z.+~-]*$")
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+URL = re.compile(r"^https://[^\s'\"\\]+\.deb$")
+if os.environ.get("ZEROOS_APPS_ALLOW_FILE") == "1":   # tests only
+    URL = re.compile(r"^(https|file)://[^\s'\"\\]+\.deb$")
+
+
+def clean(value, limit=200):
+    text = " ".join(str(value or "").split())   # no newlines, tabs or runs of spaces
+    text = "".join(ch for ch in text if ch.isprintable())
+    return text[:limit]
+
+
+def app_id(package):
+    return "m5-" + re.sub(r"[^a-z0-9-]", "-", package)
+
+
+def needs_of(depends):
+    # "libc6 (>= 2.34), python3, python3-pil" -> "python3, python3-pil":
+    # what an install may bring along, without the C library everything has.
+    names = []
+    for part in str(depends or "").split(","):
+        name = part.split("|")[0].split("(")[0].split(":")[0].strip()
+        if name and name not in ("libc6", "libstdc++6", "libgcc-s1") and PKG.match(name):
+            names.append(name)
+    return ", ".join(names)
+
+
+def warning_of(app):
+    perms = app.get("permissions") or {}
+    notes = []
+    if perms.get("background_service"):
+        notes.append("Runs in the background")
+    if perms.get("additional_hardware"):
+        notes.append("Needs extra hardware")
+    if perms.get("external_display"):
+        notes.append("Uses a monitor")
+    for flag in app.get("risk_flags") or []:
+        notes.append(clean(flag, 40))
+    return ". ".join(notes)
+
+
+def blocks(registry, source, arch):
+    seen = set()
+    for app in registry.get("apps") or []:
+        if not isinstance(app, dict):
+            continue
+        dl = app.get("download") or {}
+        package = str(dl.get("package") or "")
+        version = str(app.get("version") or "")
+        url = str(dl.get("url") or "")
+        sha = str(dl.get("sha256") or "")
+        size = dl.get("size")
+        if (app.get("review") or {}).get("status", "approved") != "approved":
+            continue
+        if dl.get("type", "deb") != "deb" or not PKG.match(package) or not VERSION.match(version):
+            continue
+        if not URL.match(url) or not SHA256.match(sha) or not isinstance(size, int) or size <= 0:
+            continue
+        # The file's own name says what it is: <package>_<version>_<arch>.deb.
+        if not (url.endswith("_" + arch + ".deb") or url.endswith("_all.deb")):
+            continue
+        ident = app_id(package)
+        if ident in seen:
+            continue
+        seen.add(ident)
+        name = clean(app.get("title"), 40) or package
+        fields = [
+            ("app", ident), ("kind", "m5"), ("package", package), ("name", name),
+            ("summary", clean(app.get("summary"))), ("version", version), ("url", url),
+            ("sha256", sha), ("size", str(size)), ("needs", clean(needs_of(app.get("depends")))),
+            ("warn", clean(warning_of(app))), ("source", source),
+        ]
+        yield "".join("%s=%s\n" % (k, v) for k, v in fields if v)
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write("usage: m5-registry <source> [arch] < registry.json\n")
+        return 2
+    source = clean(sys.argv[1])
+    arch = sys.argv[2] if len(sys.argv) > 2 else "arm64"
+    try:
+        registry = json.load(sys.stdin)
+    except (ValueError, UnicodeDecodeError) as e:
+        sys.stderr.write("m5-registry: not a registry: %s\n" % e)
+        return 1
+    if not isinstance(registry, dict):
+        sys.stderr.write("m5-registry: not a registry\n")
+        return 1
+    out = list(blocks(registry, source, arch))
+    sys.stdout.write("\n".join(out))
+    return 0 if out else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
