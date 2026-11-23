@@ -15,7 +15,7 @@
 namespace zs::jf {
 namespace {
 
-constexpr int kPage = 200;       // most rows fetched for one list
+constexpr int kPage = kJfPage;   // most rows fetched for one list
 constexpr int kTimeoutS = 8;   // these calls run on the UI thread
 
 // ---- a small JSON reader: just enough to walk objects and arrays ----------
@@ -334,9 +334,21 @@ std::string video_url(const JfSession& s, const std::string& item_id, const std:
            "&MaxAudioChannels=2&TranscodingMaxAudioChannels=2&RequireAvc=false";
 }
 
-std::string list_path(const JfSession& s, JfView view, const std::string& arg) {
+// "...@200" -> ("...", "&startIndex=200"); no '@' or not a number: no start.
+static std::string split_start(const std::string& arg, std::string& rest) {
+    auto at = arg.rfind('@');
+    rest = arg.substr(0, at);
+    if (at == std::string::npos || at + 1 >= arg.size() || arg.size() - at > 7) return "";
+    for (size_t i = at + 1; i < arg.size(); ++i)
+        if (!std::isdigit((unsigned char)arg[i])) return "";
+    return "&startIndex=" + arg.substr(at + 1);
+}
+
+std::string list_path(const JfSession& s, JfView view, const std::string& full_arg) {
+    std::string arg;
+    const std::string start = split_start(full_arg, arg);
     const std::string user = "userId=" + url_encode(s.user_id);
-    const std::string limit = "&limit=" + std::to_string(kPage);
+    const std::string limit = "&limit=" + std::to_string(kPage) + start;
     const std::string albums = "/Items?" + user + "&includeItemTypes=MusicAlbum&recursive=true";
     switch (view) {
         case JfView::Latest: return albums + "&sortBy=DateCreated&sortOrder=Descending&limit=40";
@@ -347,8 +359,8 @@ std::string list_path(const JfSession& s, JfView view, const std::string& arg) {
             return "/Items?" + user + "&includeItemTypes=Playlist&recursive=true&sortBy=SortName" + limit;
         case JfView::Search:
             return "/Items?" + user +
-                   "&includeItemTypes=Audio,MusicAlbum,MusicArtist,Movie,Series,Episode&recursive=true&limit=60"
-                   "&searchTerm=" + url_encode(arg);
+                   "&includeItemTypes=Audio,MusicAlbum,MusicArtist,Playlist,Movie,Series,Episode,MusicVideo,Video,"
+                   "AudioBook&recursive=true&limit=60&searchTerm=" + url_encode(full_arg);
         case JfView::AlbumTracks:
             if (!safe_id(arg)) return "";
             return "/Items?" + user + "&parentId=" + arg +
@@ -375,6 +387,23 @@ std::string list_path(const JfSession& s, JfView view, const std::string& arg) {
             if (!safe_id(series) || !safe_id(season)) return "";
             return "/Shows/" + series + "/Episodes?" + user + "&seasonId=" + season + limit;
         }
+        case JfView::Libraries: return "/UserViews?" + user;
+        case JfView::Library: {
+            auto colon = arg.find(':');
+            std::string id = arg.substr(0, colon);
+            std::string type = colon == std::string::npos ? "" : arg.substr(colon + 1);
+            if (!safe_id(id)) return "";
+            const std::string in = "&parentId=" + id;
+            if (type == "music") return albums + in + "&sortBy=SortName" + limit;
+            if (type == "movies")
+                return "/Items?" + user + in + "&includeItemTypes=Movie&recursive=true&sortBy=SortName" + limit;
+            if (type == "tvshows")
+                return "/Items?" + user + in + "&includeItemTypes=Series&recursive=true&sortBy=SortName" + limit;
+            // Home videos, music videos, books, mixed, collections, a plain
+            // folder: what is in it, folders first.
+            return "/Items?" + user + in + "&sortBy=IsFolder,SortName&sortOrder=Descending,Ascending" +
+                   "&enableUserData=true" + limit;
+        }
     }
     return "";
 }
@@ -399,17 +428,29 @@ bool parse_items(const std::string& json, std::vector<JfItem>& out) {
         if (type == "MusicAlbum") x.kind = JfItem::Album;
         else if (type == "MusicArtist") x.kind = JfItem::Artist;
         else if (type == "Playlist") x.kind = JfItem::Playlist;
-        else if (type == "Audio") x.kind = JfItem::Track;
+        else if (type == "Audio" || type == "AudioBook") x.kind = JfItem::Track;
         else if (type == "Movie") x.kind = JfItem::Movie;
         else if (type == "Series") x.kind = JfItem::Series;
         else if (type == "Season") x.kind = JfItem::Season;
         else if (type == "Episode") x.kind = JfItem::Episode;
         else if (type == "Video" || type == "MusicVideo") x.kind = JfItem::Video;
+        else if (type == "CollectionFolder" || type == "UserView" || type == "Folder" || type == "BoxSet" ||
+                 type == "PhotoAlbum" || type == "PlaylistsFolder" || type == "ManualPlaylistsFolder")
+            x.kind = JfItem::Folder;
         else continue;
         x.id = it["Id"].text();
         x.name = it["Name"].text();
         if (!safe_id(x.id) || x.name.empty()) continue;
         if (x.kind == JfItem::Album || x.kind == JfItem::Track) x.detail = artist_of(it);
+        if (x.kind == JfItem::Folder) {
+            // The library type: "music", "movies", "tvshows", "homevideos"...
+            // Live TV can't be played here, so it isn't listed.
+            for (char ch : it["CollectionType"].text()) x.detail += char(std::tolower((unsigned char)ch));
+            if (x.detail == "livetv") continue;
+            if (type == "BoxSet") x.detail = "boxsets";
+            if (type == "PlaylistsFolder" || type == "ManualPlaylistsFolder") x.detail = "playlists";
+            if (x.detail.find_first_not_of("abcdefghijklmnopqrstuvwxyz") != std::string::npos) x.detail.clear();
+        }
         if (x.kind == JfItem::Season || x.kind == JfItem::Episode) {
             x.detail = it["SeriesName"].text();
             x.series_id = it["SeriesId"].text();
@@ -470,12 +511,19 @@ bool list(const JfSession& s, JfView view, const std::string& arg, std::vector<J
         r = http(s.server + "/Users/" + s.user_id + "/Items/Resume?mediaTypes=Video&limit=40", auth_header(s), nullptr);
         ok = r.status == 200 && parse_items(r.body, got);
     }
+    if (view == JfView::Libraries && !ok && safe_id(s.user_id)) {
+        // Servers before 10.9 only have the per-user path.
+        got.clear();
+        r = http(s.server + "/Users/" + s.user_id + "/Views", auth_header(s), nullptr);
+        ok = r.status == 200 && parse_items(r.body, got);
+    }
     if (view == JfView::Artists && (!ok || got.empty())) {
         // Servers differ on whether artists come from /Items; this is the
         // older, dedicated list.
         got.clear();
+        std::string rest;
         r = http(s.server + "/Artists/AlbumArtists?userId=" + url_encode(s.user_id) + "&limit=" +
-                     std::to_string(kPage),
+                     std::to_string(kPage) + split_start(arg, rest),
                  auth_header(s), nullptr);
         ok = r.status == 200 && parse_items(r.body, got);
     }

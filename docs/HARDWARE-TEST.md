@@ -29,7 +29,7 @@ override afterwards with `sudo systemctl revert zeroshell`.
 - [ ] **Battery**: shows a real percentage and time left; plugging in USB shows charging.
 - [ ] **System**: CPU, memory and temperature show real, changing numbers.
 - [ ] **Compass**: needle moves as you turn the device (Lite model: should say "No IMU").
-- [ ] **Media**: copy a song into ~/Music, it plays through the speaker; record a voice note and play it back.
+- [ ] **Media**: copy a song into ~/Music, it plays through the speaker; Fn + Q pauses it. **Recorder**: record a voice note and play it back.
 - [ ] **Camera** (full model): viewfinder opens, a photo saves; Q scans a Wi-Fi QR code. Lite: should say "No camera found".
 - [ ] **IR Remote**: Universal > pick a TV brand, point at a TV, it turns off; learn one button from a real remote and send it back.
 - [ ] **GPS** (needs the Cap LoRa-1262 or a Grove GPS): outdoors, a fix within a few minutes. With no module: "No GPS found" after a few seconds.
