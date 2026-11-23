@@ -1,5 +1,5 @@
 // A list screen (docs/UX.md): rows with their number key showing (1 to 9 pick
-// the rows on screen), and typing filters them. The app passes its keys to
+// the first nine rows, like a phone menu), and typing filters them. The app passes its keys to
 // key() first; Up/Down, Enter and the numbers work through the focus group.
 //
 //   ListView list_;                       // an App member
@@ -31,13 +31,21 @@ public:
     // runs after the key is handled, so it may rebuild the screen.
     lv_obj_t* add(const char* icon, const std::string& text, const std::string& value,
                   std::function<void()> on_enter);
+    // A value row: Left/Right step through `choices` (Enter steps forward),
+    // on_change(index) follows each step. A switch is {"Off", "On"}.
+    lv_obj_t* add_choice(const char* icon, const std::string& text, std::vector<std::string> choices, int at,
+                         std::function<void(int)> on_change);
+    // Show a row's value anew (its state changed elsewhere).
+    void set_value(int row, const std::string& value);
+    // The focused row is a value row (Left/Right change it).
+    bool focused_is_choice() const;
     // What shows when there are no rows, or none match the filter.
     void set_empty_text(const std::string& text) { empty_text_ = text; }
     // After the rows: focus the first and number them.
     void finish();
 
-    // Typing: letters, space and punctuation filter the rows, Backspace takes
-    // the last one off. True if it used the key; Backspace with no filter is
+    // Typing: 1 to 9 pick a row; letters, space and punctuation filter the
+    // rows, Backspace takes the last one off. True if it used the key; Backspace with no filter is
     // left to the app (Files: up a folder).
     bool key(uint32_t key);
     const std::string& filter() const { return filter_; }
@@ -52,7 +60,12 @@ private:
         lv_obj_t* badge;
         std::string text;
         std::function<void()> on_enter;
+        lv_obj_t* value = nullptr;
+        std::vector<std::string> choices;   // a value row's values
+        int at = 0;
+        std::function<void(int)> on_change;
     };
+    void step(int row, int dir);
     void apply_filter();
     void renumber();
     static void clicked_cb(lv_event_t* e);

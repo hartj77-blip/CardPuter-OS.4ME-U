@@ -60,6 +60,8 @@ private:
     void build_statusbar();
     void update_statusbar();
     void switch_to(std::unique_ptr<App> app, const std::string& title);
+    void remember_back(const std::string& id);
+    void go_back();
     void fit_app_root();
     static void tick_cb(lv_timer_t* t);
 
@@ -87,6 +89,7 @@ private:
     std::unique_ptr<App> app_;
     std::string app_id_;
     std::string pending_;
+    std::vector<std::string> back_;   // apps that opened the open one (Esc returns)
     std::string app_arg_;   // shell_open_app(id, arg): read once by the app
     lv_group_t* group_ = nullptr;
 };

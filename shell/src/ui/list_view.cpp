@@ -5,7 +5,6 @@
 
 #include "platform/keys.h"
 #include "ui/app.h"
-#include "ui/numkeys.h"
 #include "ui/theme.h"
 
 namespace zs {
@@ -122,8 +121,49 @@ lv_obj_t* ListView::add(const char* icon, const std::string& text, const std::st
         lv_obj_set_style_text_color(o, c(kOnAccent), LV_STATE_FOCUSED);
     }
     shell_add_focus(row);
-    rows_.push_back({row, num, text, std::move(on_enter)});
+    rows_.push_back({row, num, text, std::move(on_enter), v});
     return row;
+}
+
+lv_obj_t* ListView::add_choice(const char* icon, const std::string& text, std::vector<std::string> choices, int at,
+                               std::function<void(int)> on_change) {
+    if (choices.empty()) choices.push_back("");
+    at = std::clamp(at, 0, int(choices.size()) - 1);
+    // Room for the widest value, so the text doesn't move as it changes.
+    std::string widest;
+    for (auto& ch : choices)
+        if (lv_text_get_width(ch.c_str(), uint32_t(ch.size()), &zs_font_12, 0) >
+            lv_text_get_width(widest.c_str(), uint32_t(widest.size()), &zs_font_12, 0))
+            widest = ch;
+    lv_obj_t* row = add(icon, text, LV_SYMBOL_LEFT " " + widest + " " LV_SYMBOL_RIGHT, nullptr);
+    Row& r = rows_.back();
+    r.choices = std::move(choices);
+    r.at = at;
+    r.on_change = std::move(on_change);
+    lv_label_set_text(r.value, r.choices[size_t(at)].c_str());
+    lv_obj_set_style_text_color(r.value, c(kText), 0);
+    return row;
+}
+
+void ListView::set_value(int i, const std::string& value) {
+    if (i < 0 || i >= int(rows_.size()) || !rows_[size_t(i)].value) return;
+    lv_label_set_text(rows_[size_t(i)].value, value.c_str());
+}
+
+bool ListView::focused_is_choice() const {
+    int i = focused();
+    return i >= 0 && !rows_[size_t(i)].choices.empty();
+}
+
+void ListView::step(int i, int dir) {
+    Row& r = rows_[size_t(i)];
+    int n = int(r.choices.size());
+    r.at = ((r.at + dir) % n + n) % n;
+    lv_label_set_text(r.value, r.choices[size_t(r.at)].c_str());
+    if (r.on_change) {
+        std::function<void(int)> fn = r.on_change;
+        fn(r.at);
+    }
 }
 
 void ListView::finish() {
@@ -185,15 +225,14 @@ void ListView::apply_filter() {
     renumber();
 }
 
-// The rows' badges: the number key that picks each (the shell's
-// number_targets, in focus order and on screen), or nothing past 9.
+// The rows' badges: the number key that picks each. Like a phone menu, 1 to
+// 9 are the first nine rows the filter leaves, wherever the list is
+// scrolled, so "Settings, 9" is always the same row.
 void ListView::renumber() {
-    if (rows_.empty()) return;
-    lv_group_t* g = lv_obj_get_group(rows_.front().obj);
-    std::vector<lv_obj_t*> targets = number_targets(g);
+    int shown = 0;
     for (Row& r : rows_) {
-        auto it = std::find(targets.begin(), targets.end(), r.obj);
-        int n = it == targets.end() ? 0 : int(it - targets.begin()) + 1;
+        int n = 0;
+        if (!lv_obj_has_flag(r.obj, LV_OBJ_FLAG_HIDDEN) && ++shown <= 9) n = shown;
         char t[2] = {char(n ? '0' + n : 0), 0};
         lv_label_set_text(r.badge, t);
         lv_obj_t* box = lv_obj_get_parent(r.badge);
@@ -203,6 +242,23 @@ void ListView::renumber() {
 
 bool ListView::key(uint32_t key) {
     if (!list_) return false;
+    if (key >= '1' && key <= '9') {   // pick the row with that number
+        int want = int(key - '0'), shown = 0;
+        for (size_t i = 0; i < rows_.size(); ++i) {
+            if (lv_obj_has_flag(rows_[i].obj, LV_OBJ_FLAG_HIDDEN) || ++shown != want) continue;
+            lv_group_focus_obj(rows_[i].obj);
+            lv_obj_scroll_to_view(rows_[i].obj, LV_ANIM_OFF);
+            pending_ = int(i);
+            lv_async_call_cancel(run_cb, this);
+            lv_async_call(run_cb, this);
+            break;
+        }
+        return true;
+    }
+    if ((key == LV_KEY_LEFT || key == LV_KEY_RIGHT) && focused_is_choice()) {
+        step(focused(), key == LV_KEY_RIGHT ? +1 : -1);
+        return true;
+    }
     if (key == LV_KEY_BACKSPACE || key == LV_KEY_DEL) {
         if (filter_.empty()) return false;
         filter_.pop_back();
@@ -249,7 +305,12 @@ void ListView::run_cb(void* p) {
     auto* self = static_cast<ListView*>(p);
     int i = self->pending_;
     self->pending_ = -1;
-    if (i < 0 || i >= int(self->rows_.size()) || !self->rows_[size_t(i)].on_enter) return;
+    if (i < 0 || i >= int(self->rows_.size())) return;
+    if (!self->rows_[size_t(i)].choices.empty()) {   // a value row: Enter steps it
+        self->step(i, +1);
+        return;
+    }
+    if (!self->rows_[size_t(i)].on_enter) return;
     std::function<void()> fn = self->rows_[size_t(i)].on_enter;   // it may rebuild the list
     fn();
 }

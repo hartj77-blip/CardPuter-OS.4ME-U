@@ -397,11 +397,33 @@ void Shell::open_app(const std::string& id) {
     // destroys the calling app. apply_pending() runs once the call returns.
     pending_ = id;
     app_arg_.clear();
+    remember_back(id);
 }
 
 void Shell::open_app(const std::string& id, const std::string& arg) {
     pending_ = id;
     app_arg_ = arg;
+    remember_back(id);
+}
+
+// One app opening another (Settings > Wi-Fi, Files > Notes): Esc at the new
+// one's first screen comes back here, not home. Home itself isn't kept: it's
+// where an empty stack goes anyway.
+void Shell::remember_back(const std::string& id) {
+    if (app_id_.empty() || app_id_ == "home" || app_id_ == id) return;
+    if (!back_.empty() && back_.back() == app_id_) return;
+    back_.push_back(app_id_);
+    if (back_.size() > 8) back_.erase(back_.begin());
+}
+
+void Shell::go_back() {
+    if (back_.empty()) {
+        go_home();
+        return;
+    }
+    pending_ = back_.back();
+    back_.pop_back();
+    app_arg_.clear();
 }
 
 std::string Shell::take_app_arg() {
@@ -410,7 +432,10 @@ std::string Shell::take_app_arg() {
     return a;
 }
 
-void Shell::go_home() { pending_ = "home"; }
+void Shell::go_home() {
+    pending_ = "home";
+    back_.clear();
+}
 
 void Shell::set_actions(std::vector<Action> actions) {
     actions_set(std::move(actions));
@@ -547,7 +572,7 @@ bool Shell::handle_key(uint32_t key) {
         if (app_ && app_->on_back()) {
             used = true;
         } else if (app_id_ != "home") {
-            go_home();
+            go_back();   // to the app that opened this one, else home
             used = true;
         }
     }

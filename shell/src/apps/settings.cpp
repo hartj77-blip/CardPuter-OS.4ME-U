@@ -1,8 +1,13 @@
-// Settings: radios, display, sound, power.
+// Settings: one numbered list of sections (docs/UX.md), each a list of its
+// own. Values change with Left/Right (or Enter); sections that are apps of
+// their own (Wi-Fi, Update, About) open them, and Esc there comes back here.
+#include <algorithm>
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "apps/common.h"
+#include "ui/list_view.h"
 #include "ui/power.h"
 #include "ui/remote.h"
 #include "ui/sync.h"
@@ -11,199 +16,219 @@ namespace zs {
 namespace {
 using namespace theme;
 
+enum class Page { Root, Bluetooth, Display, Sound, Battery, Remote, Power };
+
+// A value row's choices: what it shows and what it stores.
+struct Choice {
+    const char* text;
+    int value;
+};
+
+const char* const kOffOn[] = {"Off", "On"};
+
 class SettingsApp : public App {
 public:
     void build(lv_obj_t* root) override {
-        lv_obj_t* col = lv_obj_create(root);
-        style_plain(col);
-        lv_obj_set_size(col, kScreenW, kContentH);
-        lv_obj_set_flex_flow(col, LV_FLEX_FLOW_COLUMN);
-        lv_obj_set_style_pad_all(col, 6, 0);
-        lv_obj_set_style_pad_row(col, 4, 0);
-        lv_obj_set_scrollbar_mode(col, LV_SCROLLBAR_MODE_ACTIVE);
+        root_ = root;
+        show(Page::Root);
+    }
 
-        auto& h = hal();
-        NetStatus n = h.net();
-        wifi_ = switch_row(col, LV_SYMBOL_WIFI "  Wi-Fi", n.wifi_enabled, [](lv_event_t* e) {
-            hal().set_wifi_enabled(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-        });
-        bt_ = switch_row(col, LV_SYMBOL_BLUETOOTH "  Bluetooth", n.bt_enabled, [](lv_event_t* e) {
-            hal().set_bt_enabled(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-        });
-        slider_row(col, LV_SYMBOL_EYE_OPEN "  Brightness", power().user_brightness(), [](lv_event_t* e) {
-            power().set_user_brightness(lv_slider_get_value(lv_event_get_target_obj(e)) * kSliderStep);
-        });
-        slider_row(col, LV_SYMBOL_VOLUME_MAX "  Volume", h.volume(), [](lv_event_t* e) {
-            hal().set_volume(lv_slider_get_value(lv_event_get_target_obj(e)) * kSliderStep);
-        });
-        switch_row(col, LV_SYMBOL_MUTE "  Mute", h.muted(), [](lv_event_t* e) {
-            hal().set_muted(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-        });
+    bool on_key(uint32_t key) override { return list_.key(key); }
 
-        // Battery life
-        auto& p = power();
-        cycle_row(col, LV_SYMBOL_CHARGE "  Power profile",
-                  {{"Saver", 0}, {"Balanced", 1}, {"Performance", 2}}, int(p.profile()),
-                  [](int v) { power().set_profile(Profile(v)); });
-        cycle_row(col, LV_SYMBOL_EYE_CLOSE "  Dim screen after",
-                  {{"15 s", 15}, {"30 s", 30}, {"1 min", 60}, {"2 min", 120}, {"Never", 0}}, p.dim_after_s(),
-                  [](int v) { power().set_dim_after_s(v); });
-        cycle_row(col, LV_SYMBOL_POWER "  Screen off after",
-                  {{"30 s", 30}, {"1 min", 60}, {"2 min", 120}, {"5 min", 300}, {"10 min", 600}, {"Never", 0}},
-                  p.off_after_s(), [](int v) { power().set_off_after_s(v); });
-        cycle_row(col, LV_SYMBOL_BLUETOOTH "  Bluetooth auto-off",
-                  {{"5 min", 5}, {"10 min", 10}, {"30 min", 30}, {"Never", 0}}, p.bt_auto_off_min(),
-                  [](int v) { power().set_bt_auto_off_min(v); });
-        switch_row(col, LV_SYMBOL_WIFI "  Wi-Fi off with screen", p.wifi_sleep(), [](lv_event_t* e) {
-            power().set_wifi_sleep(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-        });
-        switch_row(col, LV_SYMBOL_BATTERY_2 "  Time left in top bar", p.show_time_left(), [](lv_event_t* e) {
-            power().set_show_time_left(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-        });
-        if (hal().imu().available) {
-            switch_row(col, LV_SYMBOL_UP "  Wake on pickup", p.wake_on_pickup(), [](lv_event_t* e) {
-                power().set_wake_on_pickup(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-            });
-            switch_row(col, LV_SYMBOL_DOWN "  Screen off face down", p.sleep_face_down(), [](lv_event_t* e) {
-                power().set_sleep_face_down(lv_obj_has_state(lv_event_get_target_obj(e), LV_STATE_CHECKED));
-            });
-        }
-
-        // Remote
-        int ts = tailscale_mode() == "always" ? 1 : tailscale_mode() == "off" ? 2 : 0;
-        cycle_row(col, LV_SYMBOL_SHUFFLE "  Tailscale", {{"When needed", 0}, {"Always on", 1}, {"Off", 2}}, ts,
-                  [](int v) {
-                      set_tailscale_mode(v == 1 ? "always" : v == 2 ? "off" : "needed");
-                      if (v == 1) hal().tailscale_start();
-                      if (v == 2) hal().tailscale_stop();
-                  });
-
-        int sm = sync_mode() == "always" ? 1 : sync_mode() == "manual" ? 2 : 0;
-        cycle_row(col, LV_SYMBOL_LOOP "  Sync", {{"While charging", 0}, {"Always on", 1}, {"When asked", 2}}, sm,
-                  [](int v) { set_sync_mode(v == 1 ? "always" : v == 2 ? "manual" : "charging"); });
-
-        button_row(col, LV_SYMBOL_WIFI "  Wi-Fi networks", [](lv_event_t*) { shell_open_app("wifi"); });
-        button_row(col, LV_SYMBOL_BLUETOOTH "  Bluetooth devices", [](lv_event_t*) { shell_open_app("bluetooth"); });
-        button_row(col, LV_SYMBOL_DOWNLOAD "  Software update", [](lv_event_t*) { shell_open_app("update"); });
-        button_row(col, LV_SYMBOL_LIST "  About this device", [](lv_event_t*) { shell_open_app("sysmon"); });
-        button_row(col, LV_SYMBOL_REFRESH "  Restart", [](lv_event_t*) {
-            shell_toast("Restarting...");
-            hal().reboot();
-        });
-        button_row(col, LV_SYMBOL_POWER "  Shut down", [](lv_event_t*) {
-            shell_toast("Shutting down...");
-            hal().power_off();
-        });
+    bool on_back() override {
+        if (page_ == Page::Root) return false;
+        Page from = page_;
+        show(Page::Root);
+        focus_section(from);
+        return true;
     }
 
 private:
-    lv_obj_t* row(lv_obj_t* parent, const char* text) {
-        lv_obj_t* r = lv_obj_create(parent);
-        style_panel(r);
-        lv_obj_set_size(r, LV_PCT(100), 30);
-        lv_obj_set_style_pad_ver(r, 2, 0);
-        lv_obj_set_style_pad_hor(r, 8, 0);
-        lv_obj_remove_flag(r, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_t* l = label(r, text, &zs_font_12);
-        lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
-        return r;
-    }
-
-    static void focus_style(lv_obj_t* o) {
-        lv_obj_set_style_outline_color(o, c(kAccent), LV_STATE_FOCUS_KEY);
-        lv_obj_set_style_outline_width(o, 2, LV_STATE_FOCUS_KEY);
-        lv_obj_set_style_outline_pad(o, 2, LV_STATE_FOCUS_KEY);
-    }
-
-    lv_obj_t* switch_row(lv_obj_t* parent, const char* text, bool on, lv_event_cb_t cb) {
-        lv_obj_t* r = row(parent, text);
-        lv_obj_t* sw = lv_switch_create(r);
-        lv_obj_set_size(sw, 40, 20);
-        lv_obj_align(sw, LV_ALIGN_RIGHT_MID, 0, 0);
-        lv_obj_set_style_bg_color(sw, c(kAccent), LV_PART_INDICATOR | LV_STATE_CHECKED);
-        if (on) lv_obj_add_state(sw, LV_STATE_CHECKED);
-        lv_obj_add_event_cb(sw, cb, LV_EVENT_VALUE_CHANGED, nullptr);
-        focus_style(sw);
-        shell_add_focus(sw);
-        return sw;
-    }
-
-    static constexpr int kSliderStep = 5;
-    lv_obj_t* slider_row(lv_obj_t* parent, const char* text, int value, lv_event_cb_t cb) {
-        lv_obj_t* r = row(parent, text);
-        lv_obj_t* s = lv_slider_create(r);
-        lv_obj_set_size(s, 120, 8);
-        lv_obj_align(s, LV_ALIGN_RIGHT_MID, -6, 0);
-        // Left/Right move a slider one unit: make that 5%, not 1% (20 presses
-        // end to end, not 100). Callbacks multiply by kSliderStep.
-        lv_slider_set_range(s, 0, 100 / kSliderStep);
-        lv_slider_set_value(s, (value + kSliderStep / 2) / kSliderStep, LV_ANIM_OFF);
-        lv_obj_set_style_bg_color(s, c(kAccent), LV_PART_INDICATOR);
-        lv_obj_set_style_bg_color(s, c(kText), LV_PART_KNOB);
-        lv_obj_set_style_pad_all(s, 3, LV_PART_KNOB);
-        lv_obj_add_event_cb(s, cb, LV_EVENT_VALUE_CHANGED, nullptr);
-        focus_style(s);
-        shell_add_focus(s);
-        return s;
-    }
-
-    lv_obj_t* button_row(lv_obj_t* parent, const char* text, lv_event_cb_t cb, void* user = nullptr) {
-        lv_obj_t* b = lv_button_create(parent);
-        lv_obj_set_size(b, LV_PCT(100), 28);
-        lv_obj_set_style_bg_color(b, c(kSurface), 0);
-        lv_obj_set_style_bg_color(b, c(kAccent), LV_STATE_FOCUSED);
-        lv_obj_set_style_text_color(b, c(kOnAccent), LV_STATE_FOCUSED);
-        lv_obj_set_style_shadow_width(b, 0, 0);
-        lv_obj_set_style_radius(b, 8, 0);
-        lv_obj_set_style_text_color(b, c(kText), 0);
-        lv_obj_t* l = lv_label_create(b);  // inherits the button's text color
-        lv_label_set_text(l, text);
-        lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
-        lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user);
-        shell_add_focus(b);
-        return b;
-    }
-
-    // A row whose value steps through choices: Enter or Right = next, Left = previous.
-    struct Choice {
-        const char* text;
-        int value;
-    };
-    struct Cycle {
-        std::vector<Choice> choices;
-        size_t at = 0;
-        std::function<void(int)> set;
-        lv_obj_t* value = nullptr;
-        void step(int d) {
-            int n = int(choices.size());
-            at = size_t((int(at) + d + n) % n);
-            lv_label_set_text(value, choices[at].text);
-            set(choices[at].value);
+    void show(Page p) {
+        page_ = p;
+        has_values_ = false;
+        lv_obj_clean(root_);
+        lv_group_remove_all_objs(group);
+        static const char* const kNames[] = {"", "Bluetooth", "Display", "Sound", "Battery & power",
+                                             "Remote & sync", "Restart or shut down"};
+        if (p == Page::Root) {
+            list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 4);
+        } else {
+            lv_obj_t* h = label(root_, (std::string("Settings  " LV_SYMBOL_RIGHT "  ") + kNames[int(p)]).c_str(),
+                                &zs_font_12, kMuted);
+            lv_obj_set_pos(h, 8, 2);
+            list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);
         }
-    };
-
-    void cycle_row(lv_obj_t* parent, const char* text, std::vector<Choice> choices, int current,
-                   std::function<void(int)> set) {
-        auto* cy = new Cycle{std::move(choices), 0, std::move(set)};
-        for (size_t i = 0; i < cy->choices.size(); ++i)
-            if (cy->choices[i].value == current) cy->at = i;
-        lv_obj_t* b = button_row(parent, text, [](lv_event_t* e) {
-            static_cast<Cycle*>(lv_event_get_user_data(e))->step(1);
-        }, cy);
-        cy->value = lv_label_create(b);
-        lv_label_set_text(cy->value, cy->choices[cy->at].text);
-        lv_obj_align(cy->value, LV_ALIGN_RIGHT_MID, 0, 0);
-        lv_obj_add_event_cb(b, [](lv_event_t* e) {
-            uint32_t k = lv_event_get_key(e);
-            auto* c = static_cast<Cycle*>(lv_event_get_user_data(e));
-            if (k == LV_KEY_RIGHT) c->step(1);
-            else if (k == LV_KEY_LEFT) c->step(-1);
-        }, LV_EVENT_KEY, cy);
-        lv_obj_add_event_cb(b, [](lv_event_t* e) { delete static_cast<Cycle*>(lv_event_get_user_data(e)); },
-                            LV_EVENT_DELETE, cy);
+        switch (p) {
+            case Page::Root: root_page(); break;
+            case Page::Bluetooth: bluetooth_page(); break;
+            case Page::Display: display_page(); break;
+            case Page::Sound: sound_page(); break;
+            case Page::Battery: battery_page(); break;
+            case Page::Remote: remote_page(); break;
+            case Page::Power: power_page(); break;
+        }
+        list_.finish();
+        if (p == Page::Root) {
+            shell_set_actions({{"Open", 0, "Enter", nullptr}, {"Find", 0, "a-z", nullptr}, {"Keys", 0, "0", nullptr}});
+        } else if (has_values_) {
+            shell_set_actions({{"Change", 0, LV_SYMBOL_LEFT LV_SYMBOL_RIGHT, nullptr},
+                               {"Settings", 0, "Esc", nullptr}});
+        } else {
+            shell_set_actions({{"Select", 0, "Enter", nullptr}, {"Settings", 0, "Esc", nullptr}});
+        }
     }
 
-    lv_obj_t *wifi_ = nullptr, *bt_ = nullptr;
+    void open(Page p) {
+        show(p);
+    }
+
+    // Back on the root page: focus the section we came from.
+    void focus_section(Page from) {
+        static const Page order[] = {Page::Bluetooth, Page::Display, Page::Sound, Page::Battery, Page::Remote,
+                                     Page::Power};
+        int row = 0;
+        for (int i = 0; i < 6; ++i)
+            if (order[i] == from) row = i == 5 ? 8 : i + 1;   // Wi-Fi is row 0; Power is last
+        for (int i = 0; i < row; ++i) lv_group_focus_next(group);
+    }
+
+    // ---- Root -----------------------------------------------------------
+
+    void root_page() {
+        auto& h = hal();
+        NetStatus n = h.net();
+        auto& p = power();
+        std::string wifi = !n.wifi_enabled ? "Off" : n.wifi_connected ? n.wifi_ssid : "Not connected";
+        static const char* const kProfiles[] = {"Saver", "Balanced", "Performance"};
+        std::string version = h.update().current;
+
+        list_.add(LV_SYMBOL_WIFI, "Wi-Fi", wifi, [] { shell_open_app("wifi"); });
+        list_.add(LV_SYMBOL_BLUETOOTH, "Bluetooth", n.bt_enabled ? "On" : "Off", [this] { open(Page::Bluetooth); });
+        list_.add(LV_SYMBOL_EYE_OPEN, "Display", fmt("%d%%, dim %s", p.user_brightness(), secs(p.dim_after_s()).c_str()),
+                  [this] { open(Page::Display); });
+        list_.add(LV_SYMBOL_VOLUME_MAX, "Sound", h.muted() ? "Muted" : fmt("%d%%", h.volume()),
+                  [this] { open(Page::Sound); });
+        list_.add(LV_SYMBOL_BATTERY_3, "Battery & power", kProfiles[std::clamp(int(p.profile()), 0, 2)],
+                  [this] { open(Page::Battery); });
+        list_.add(LV_SYMBOL_SHUFFLE, "Remote & sync", "", [this] { open(Page::Remote); });
+        list_.add(LV_SYMBOL_DOWNLOAD, "Software update", version.empty() ? "" : version,
+                  [] { shell_open_app("update"); });
+        list_.add(LV_SYMBOL_LIST, "About this device", "", [] { shell_open_app("sysmon"); });
+        list_.add(LV_SYMBOL_POWER, "Restart or shut down", "", [this] { open(Page::Power); });
+        list_.set_empty_text("No setting by that name");
+    }
+
+    // ---- Sections -------------------------------------------------------
+
+    void bluetooth_page() {
+        NetStatus n = hal().net();
+        toggle(LV_SYMBOL_BLUETOOTH, "Bluetooth", n.bt_enabled, [](bool on) { hal().set_bt_enabled(on); });
+        choice(LV_SYMBOL_CLOSE, "Turn off when unused",
+               {{"5 min", 5}, {"10 min", 10}, {"30 min", 30}, {"Never", 0}}, power().bt_auto_off_min(),
+               [](int v) { power().set_bt_auto_off_min(v); });
+        list_.add(LV_SYMBOL_LIST, "Devices", "", [] { shell_open_app("bluetooth"); });
+    }
+
+    void display_page() {
+        auto& p = power();
+        percent(LV_SYMBOL_EYE_OPEN, "Brightness", p.user_brightness(), 5,
+                [](int v) { power().set_user_brightness(v); });
+        choice(LV_SYMBOL_EYE_CLOSE, "Dim screen after",
+               {{"15 s", 15}, {"30 s", 30}, {"1 min", 60}, {"2 min", 120}, {"Never", 0}}, p.dim_after_s(),
+               [](int v) { power().set_dim_after_s(v); });
+        choice(LV_SYMBOL_POWER, "Screen off after",
+               {{"30 s", 30}, {"1 min", 60}, {"2 min", 120}, {"5 min", 300}, {"10 min", 600}, {"Never", 0}},
+               p.off_after_s(), [](int v) { power().set_off_after_s(v); });
+        if (hal().imu().available) {
+            toggle(LV_SYMBOL_UP, "Wake on pickup", p.wake_on_pickup(), [](bool on) { power().set_wake_on_pickup(on); });
+            toggle(LV_SYMBOL_DOWN, "Screen off face down", p.sleep_face_down(),
+                   [](bool on) { power().set_sleep_face_down(on); });
+        }
+    }
+
+    void sound_page() {
+        auto& h = hal();
+        percent(LV_SYMBOL_VOLUME_MAX, "Volume", h.volume(), 5, [](int v) { hal().set_volume(v); });
+        toggle(LV_SYMBOL_MUTE, "Mute", h.muted(), [](bool on) { hal().set_muted(on); });
+    }
+
+    void battery_page() {
+        auto& p = power();
+        choice(LV_SYMBOL_CHARGE, "Power profile", {{"Saver", 0}, {"Balanced", 1}, {"Performance", 2}},
+               int(p.profile()), [](int v) { power().set_profile(Profile(v)); });
+        toggle(LV_SYMBOL_WIFI, "Wi-Fi off with screen", p.wifi_sleep(), [](bool on) { power().set_wifi_sleep(on); });
+        toggle(LV_SYMBOL_BATTERY_2, "Time left in top bar", p.show_time_left(),
+               [](bool on) { power().set_show_time_left(on); });
+        if (app_find("battery")) list_.add(LV_SYMBOL_BATTERY_3, "Battery details", "", [] { shell_open_app("battery"); });
+    }
+
+    void remote_page() {
+        int ts = tailscale_mode() == "always" ? 1 : tailscale_mode() == "off" ? 2 : 0;
+        choice(LV_SYMBOL_SHUFFLE, "Tailscale", {{"When needed", 0}, {"Always on", 1}, {"Off", 2}}, ts, [](int v) {
+            set_tailscale_mode(v == 1 ? "always" : v == 2 ? "off" : "needed");
+            if (v == 1) hal().tailscale_start();
+            if (v == 2) hal().tailscale_stop();
+        });
+        int sm = sync_mode() == "always" ? 1 : sync_mode() == "manual" ? 2 : 0;
+        choice(LV_SYMBOL_LOOP, "Sync", {{"While charging", 0}, {"Always on", 1}, {"When asked", 2}}, sm,
+               [](int v) { set_sync_mode(v == 1 ? "always" : v == 2 ? "manual" : "charging"); });
+    }
+
+    void power_page() {
+        list_.add(LV_SYMBOL_REFRESH, "Restart", "", [] {
+            shell_confirm("Restart the Cardputer?", "", "Restart", [] {
+                shell_toast("Restarting...");
+                hal().reboot();
+            });
+        });
+        list_.add(LV_SYMBOL_POWER, "Shut down", "", [] {
+            shell_confirm("Shut down the Cardputer?", "Press the power button to start it again.", "Shut down", [] {
+                shell_toast("Shutting down...");
+                hal().power_off();
+            });
+        });
+    }
+
+    // ---- Rows -----------------------------------------------------------
+
+    static std::string secs(int s) {
+        if (s <= 0) return "never";
+        return s < 60 ? fmt("%d s", s) : fmt("%d min", s / 60);
+    }
+
+    void toggle(const char* icon, const char* text, bool on, std::function<void(bool)> set) {
+        has_values_ = true;
+        list_.add_choice(icon, text, {kOffOn[0], kOffOn[1]}, on ? 1 : 0,
+                         [set = std::move(set)](int i) { set(i == 1); });
+    }
+
+    void choice(const char* icon, const char* text, std::vector<Choice> choices, int current,
+                std::function<void(int)> set) {
+        std::vector<std::string> texts;
+        int at = 0;
+        has_values_ = true;
+        for (size_t i = 0; i < choices.size(); ++i) {
+            texts.push_back(choices[i].text);
+            if (choices[i].value == current) at = int(i);
+        }
+        list_.add_choice(icon, text, std::move(texts), at,
+                         [choices, set = std::move(set)](int i) { set(choices[size_t(i)].value); });
+    }
+
+    // 0..100 in steps of `step` (Left/Right: one step).
+    void percent(const char* icon, const char* text, int value, int step, std::function<void(int)> set) {
+        has_values_ = true;
+        std::vector<std::string> texts;
+        for (int v = 0; v <= 100; v += step) texts.push_back(fmt("%d%%", v));
+        list_.add_choice(icon, text, std::move(texts), (value + step / 2) / step,
+                         [step, set = std::move(set)](int i) { set(i * step); });
+    }
+
+    lv_obj_t* root_ = nullptr;
+    Page page_ = Page::Root;
+    bool has_values_ = false;   // the page has value rows (the bar says Left/Right change them)
+    ListView list_;
 };
 }  // namespace
 
