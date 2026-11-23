@@ -4,8 +4,11 @@ ZeroOS is an operating system for the [M5Stack Cardputer Zero](https://shop.m5st
 the pocket computer with a keyboard, a 320x170 screen and a Raspberry Pi CM0 inside.
 
 Under the hood it's Debian Linux. On top is a home screen built for that tiny screen and keyboard:
-no mouse, no touch, everything from the keys. It ships with four apps and you install the rest
-from the device when you want them.
+no mouse, no touch, everything from the keys. It comes with the basics (Wi-Fi, Settings, Update,
+Apps, plus Terminal, Files and Dock) and you install the rest from the device when you want them.
+
+It only runs on the Cardputer Zero. The original Cardputer and the Cardputer ADV have an ESP32
+inside, not a Raspberry Pi, and can't run it.
 
 This is a community project. It isn't made, endorsed or supported by M5Stack.
 
@@ -27,10 +30,11 @@ You need a microSD card and a computer to write it from.
 
 1. Download [zeroos-cardputerzero-arm64.img.xz](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest/download/zeroos-cardputerzero-arm64.img.xz)
    from the [latest release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest).
-   It's about 1.5 GB. There's a `.sha256` file next to it if you want to check the download.
+   It's about 1.2 GB. There's a `.sha256` file next to it if you want to check the download.
 2. Write it to the card with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
    (Choose OS > Use custom) or [balenaEtcher](https://etcher.balena.io/). Both take the `.xz`
    file as it is, no need to unzip it.
+   In Raspberry Pi Imager, pick **Raspberry Pi Zero 2 W** as the device (the CM0 is the same chip).
 3. Put the card in the Cardputer and switch it on. The first boot takes a few minutes.
 
 The image is built after each release is published, so for about 10 minutes after a new release
@@ -53,7 +57,8 @@ app or over SSH (`ssh pi@cardputer.local`), you have to pick a new password. If 
 key in Raspberry Pi Imager you can skip that and run `passwd` later.
 
 You can also set your own username and password in Raspberry Pi Imager's settings before writing
-the card. Imager renames `pi` to your username, and ZeroOS runs as that user instead.
+the card; ZeroOS then runs as that user instead of `pi`. This needs a version newer than 0.4.0
+(see [Troubleshooting](#troubleshooting)).
 
 ## Using it
 
@@ -127,6 +132,7 @@ image, but you can remove them like anything else. The code for these lives in
 | Battery | Time left, power draw and power profiles ([guide](docs/PERFORMANCE.md)) |
 | System | CPU, memory, storage and temperature |
 | Media | Music, voice recordings, and Jellyfin music and video ([guide](docs/JELLYFIN.md)) |
+| Recorder | Voice notes: record, play back, rename, delete |
 | Camera | Photos, a gallery, and a QR reader that can join Wi-Fi. Needs a model with a camera ([guide](docs/CAMERA.md)) |
 | IR Remote | Universal remote with about 2,000 TVs, projectors, AC units and more, and it can learn from your own remotes ([guide](docs/IR.md)) |
 | Dock | Full desktop on an HDMI monitor: browser, video player, terminal, file manager ([guide](docs/DOCK.md)) |
@@ -158,8 +164,11 @@ install the newest version, then open Apps and choose **Update all**.
 On older versions see [Updates](docs/UPDATE.md#it-says-the-package-system-needs-repair-first).
 
 **The home screen never starts, and every login asks for a new password, after setting a username
-in Raspberry Pi Imager.** Fixed in the next release; versions up to 0.4.0 only worked with the user
-`pi`. Log in over SSH with your username and run `sudo zeroos-update install`, then restart.
+in Raspberry Pi Imager.** Versions up to 0.4.0 only work with the user `pi`; this is fixed in the
+next release. To fix a card that's already like this, log in over SSH with your username
+(`ssh yourname@cardputer.local`; if it asks for a new password, choose one), run
+`sudo zeroos-update install`, then restart. Or write the card
+again without setting a username in Imager, and change the password after the first login.
 
 **Slow boot.** After a restart, run this to see what's taking the time:
 
