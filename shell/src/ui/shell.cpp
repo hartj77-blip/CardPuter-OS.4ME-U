@@ -411,8 +411,10 @@ void Shell::open_app(const std::string& id, const std::string& arg) {
 // where an empty stack goes anyway.
 void Shell::remember_back(const std::string& id) {
     if (app_id_.empty() || app_id_ == "home" || app_id_ == id) return;
-    if (!back_.empty() && back_.back() == app_id_) return;
-    back_.push_back(app_id_);
+    if (!back_.empty() && back_.back().first == app_id_) return;
+    // With what it was opened with, so it comes back the same (Settings at
+    // its Bluetooth section, not its first page).
+    back_.push_back({app_id_, app_open_arg_});
     if (back_.size() > 8) back_.erase(back_.begin());
 }
 
@@ -421,9 +423,9 @@ void Shell::go_back() {
         go_home();
         return;
     }
-    pending_ = back_.back();
+    pending_ = back_.back().first;
+    app_arg_ = back_.back().second;
     back_.pop_back();
-    app_arg_.clear();
 }
 
 std::string Shell::take_app_arg() {
@@ -476,6 +478,7 @@ void Shell::apply_pending() {
         // Copy what switch_to needs: an app may reload the registry.
         auto make = info->make;
         std::string name = info->name;
+        app_open_arg_ = app_arg_;
         switch_to(make(), name);
         app_arg_.clear();   // build() had its chance to read it
         return;

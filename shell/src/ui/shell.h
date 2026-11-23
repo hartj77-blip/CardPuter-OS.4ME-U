@@ -89,7 +89,8 @@ private:
     std::unique_ptr<App> app_;
     std::string app_id_;
     std::string pending_;
-    std::vector<std::string> back_;   // apps that opened the open one (Esc returns)
+    std::vector<std::pair<std::string, std::string>> back_;   // apps (and their args) that opened this one
+    std::string app_open_arg_;        // what the open app was opened with
     std::string app_arg_;   // shell_open_app(id, arg): read once by the app
     lv_group_t* group_ = nullptr;
 };

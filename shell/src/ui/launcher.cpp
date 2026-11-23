@@ -54,8 +54,9 @@ std::string join(const std::vector<std::string>& v) {
 
 std::vector<std::string> pinned() {
     std::vector<std::string> out;
-    std::string saved = prefs::get_str("home.pinned", "");
-    if (!saved.empty()) {
+    // "\x01": never set (a fresh device). An empty string is "nothing pinned".
+    std::string saved = prefs::get_str("home.pinned", "\x01");
+    if (saved != "\x01") {
         for (auto& id : split(saved))
             if (app_find(id) && int(out.size()) < kPins) out.push_back(id);
         return out;
@@ -175,15 +176,19 @@ std::vector<Result> search(const std::string& q) {
     auto toggle = [&](const char* icon, const std::string& text, const char* words, std::function<void()> run) {
         if (matches(text + " " + words, q)) out.push_back({icon, text, "Action", std::move(run)});
     };
-    toggle(LV_SYMBOL_WIFI, n.wifi_enabled ? "Turn Wi-Fi off" : "Turn Wi-Fi on", "wireless", [on = n.wifi_enabled] {
+    // Each reads the state when it runs (the row is relabelled after).
+    toggle(LV_SYMBOL_WIFI, n.wifi_enabled ? "Turn Wi-Fi off" : "Turn Wi-Fi on", "wireless", [] {
+        bool on = hal().net().wifi_enabled;
         hal().set_wifi_enabled(!on);
         shell_toast(on ? "Wi-Fi off" : "Wi-Fi on");
     });
-    toggle(LV_SYMBOL_BLUETOOTH, n.bt_enabled ? "Turn Bluetooth off" : "Turn Bluetooth on", "bt", [on = n.bt_enabled] {
+    toggle(LV_SYMBOL_BLUETOOTH, n.bt_enabled ? "Turn Bluetooth off" : "Turn Bluetooth on", "bt", [] {
+        bool on = hal().net().bt_enabled;
         hal().set_bt_enabled(!on);
         shell_toast(on ? "Bluetooth off" : "Bluetooth on");
     });
-    toggle(LV_SYMBOL_MUTE, h.muted() ? "Sound on" : "Mute", "sound volume silent", [m = h.muted()] {
+    toggle(LV_SYMBOL_MUTE, h.muted() ? "Sound on" : "Mute", "sound volume silent", [] {
+        bool m = hal().muted();
         hal().set_muted(!m);
         shell_toast(m ? "Sound on" : "Sound off");
     });
@@ -272,6 +277,8 @@ private:
         row_ids_.clear();
         open_ids_.clear();
         row_runs_.clear();
+        results_.reset();   // their rows went with the screen
+        all_.reset();
         box_ = nullptr;
     }
 
@@ -513,8 +520,17 @@ private:
             shell_toast("Pinned " + name + fmt_key(int(p.size())));
         }
         save_pinned(p);
-        if (all_apps_) show_all_apps();
+        if (all_apps_) relabel_all();   // in place: the filter and focus stay
         else refresh();
+    }
+
+    // All apps' "Pinned n" labels, after a pin or unpin.
+    void relabel_all() {
+        std::vector<std::string> p = pinned();
+        for (size_t i = 0; i < all_ids_.size(); ++i) {
+            auto at = std::find(p.begin(), p.end(), all_ids_[i]);
+            all_.set_value(int(i), at == p.end() ? "" : "Pinned " + std::to_string(int(at - p.begin()) + 1));
+        }
     }
 
     static std::string fmt_key(int n) { return " on " + std::to_string(n); }
@@ -538,6 +554,15 @@ private:
         for (Result& r : search(query_)) {
             if (!r.choices.empty()) {
                 results_.add_choice(r.icon, r.text, r.choices, r.at, r.change);
+            } else if (r.kind == "Action") {
+                // Done in place: show the results again, relabelled ("Turn Wi-Fi on").
+                std::function<void()> run = r.run;
+                results_.add(r.icon, r.text, r.kind, [this, run] {
+                    int at = results_.focused();
+                    run();
+                    refresh();
+                    results_.focus(at);
+                });
             } else {
                 results_.add(r.icon, r.text, r.kind, r.run);
             }

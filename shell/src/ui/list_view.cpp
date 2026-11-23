@@ -25,6 +25,14 @@ bool filter_char(uint32_t key) { return key >= 32 && key < 127 && !std::isdigit(
 
 ListView::~ListView() { lv_async_call_cancel(run_cb, this); }
 
+void ListView::reset() {
+    lv_async_call_cancel(run_cb, this);
+    rows_.clear();
+    filter_.clear();
+    pending_ = -1;
+    list_ = chip_ = empty_ = nullptr;
+}
+
 void ListView::build(lv_obj_t* parent, int x, int y, int w, int h) {
     lv_async_call_cancel(run_cb, this);
     rows_.clear();
@@ -100,12 +108,12 @@ lv_obj_t* ListView::add(const char* icon, const std::string& text, const std::st
         lv_obj_align(ic, LV_ALIGN_LEFT_MID, 22, 0);
         tx = 40;
     }
-    lv_obj_t* v = nullptr;
+    // Always there, even empty, so set_value() can fill it in later.
+    lv_obj_t* v = label(row, value.c_str(), &zs_font_12, kMuted);
+    follow(v);
+    lv_obj_align(v, LV_ALIGN_RIGHT_MID, -6, 0);
     int vw = 0;
     if (!value.empty()) {
-        v = label(row, value.c_str(), &zs_font_12, kMuted);
-        follow(v);
-        lv_obj_align(v, LV_ALIGN_RIGHT_MID, -6, 0);
         lv_obj_update_layout(v);
         vw = lv_obj_get_width(v) + 10;
     }

@@ -37,8 +37,8 @@ public:
         std::string arg = shell_app_arg();
         for (auto& [name, page] : kSections)
             if (arg == name) {
+                direct_ = true;   // before show(): the bar says Esc goes Back
                 show(page);
-                direct_ = true;
                 return;
             }
         show(Page::Root);
@@ -84,9 +84,9 @@ private:
             shell_set_actions({{"Open", 0, "Enter", nullptr}, {"Find", 0, "a-z", nullptr}, {"Keys", 0, "0", nullptr}});
         } else if (has_values_) {
             shell_set_actions({{"Change", 0, LV_SYMBOL_LEFT LV_SYMBOL_RIGHT, nullptr},
-                               {"Settings", 0, "Esc", nullptr}});
+                               {direct_ ? "Back" : "Settings", 0, "Esc", nullptr}});
         } else {
-            shell_set_actions({{"Select", 0, "Enter", nullptr}, {"Settings", 0, "Esc", nullptr}});
+            shell_set_actions({{"Select", 0, "Enter", nullptr}, {direct_ ? "Back" : "Settings", 0, "Esc", nullptr}});
         }
     }
 
