@@ -95,5 +95,7 @@ private:
 };
 
 std::unique_ptr<App> make_launcher();
+// An app was opened (not home): it goes to the front of Home's Recent.
+void home_opened(const std::string& id);
 
 }  // namespace zs

@@ -30,13 +30,24 @@ class SettingsApp : public App {
 public:
     void build(lv_obj_t* root) override {
         root_ = root;
+        // Opened at a section (home search: "Brightness" opens Display).
+        static const std::pair<const char*, Page> kSections[] = {
+            {"bluetooth", Page::Bluetooth}, {"display", Page::Display}, {"sound", Page::Sound},
+            {"battery", Page::Battery},     {"remote", Page::Remote},   {"power", Page::Power}};
+        std::string arg = shell_app_arg();
+        for (auto& [name, page] : kSections)
+            if (arg == name) {
+                show(page);
+                direct_ = true;
+                return;
+            }
         show(Page::Root);
     }
 
     bool on_key(uint32_t key) override { return list_.key(key); }
 
     bool on_back() override {
-        if (page_ == Page::Root) return false;
+        if (page_ == Page::Root || direct_) return false;   // opened at a section: Esc leaves
         Page from = page_;
         show(Page::Root);
         focus_section(from);
@@ -227,7 +238,8 @@ private:
 
     lv_obj_t* root_ = nullptr;
     Page page_ = Page::Root;
-    bool has_values_ = false;   // the page has value rows (the bar says Left/Right change them)
+    bool has_values_ = false;
+    bool direct_ = false;       // opened straight at a section (from search)   // the page has value rows (the bar says Left/Right change them)
     ListView list_;
 };
 }  // namespace

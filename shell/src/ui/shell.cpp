@@ -470,6 +470,7 @@ void Shell::apply_pending() {
         switch_to(make_launcher(), "");
         return;
     }
+    if (app_find(id)) home_opened(id);
     if (const AppInfo* info = app_find(id)) {
         app_id_ = id;
         // Copy what switch_to needs: an app may reload the registry.

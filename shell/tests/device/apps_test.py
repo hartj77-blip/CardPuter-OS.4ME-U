@@ -17,7 +17,7 @@ Runs ZeroShell twice, with the fake LCD and keyboard from device_test.py:
      stand-ins that log and fail. This is what an app sees when its
      hardware or its extras are missing.
 
-For each app: from the home screen, arrow to it and press Enter, check it
+For each app: from the home screen, open All apps, arrow to it and press Enter, check it
 opened and drew something, press a few keys, then Esc back home. Fails if
 ZeroShell exits, an app doesn't open, the screen goes black, or Esc doesn't
 lead home.
@@ -96,10 +96,14 @@ def run(binary, shim, shots, hal, expect, apps_dir, settle, env_extra=None):
         home = d.frame()
         check("home screen draws", any(home), "framebuffer is all black")
 
-        # The home screen starts on its first app; the n-th is n arrows right.
+        # Home's All apps (Up from the pinned apps is its last row) lists every
+        # app A-Z; the n-th is n arrows down from the first.
         visited = []
         for i in range(len(want) + 2):   # +2: a few extra, to see it wrap round
-            d.nav("right", i)
+            d.nav("up")
+            d.nav("enter")
+            time.sleep(0.5)
+            d.nav("down", i)
             d.nav("enter")
             time.sleep(settle)
             ids = [x for x in opened(new_log()) if x != "home"]

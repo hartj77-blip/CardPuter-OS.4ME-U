@@ -153,8 +153,10 @@ def main():
         moved = d.frame()
         check("arrow key moves the launcher", moved != home)
 
-        # Notes is the 5th app: 3 more to the right, then Enter.
-        d.nav("right", 3)
+        # Home's search: type a name, Enter opens the first result.
+        d.type("notes")
+        time.sleep(0.3)
+        d.shot("1b-search")
         d.nav("enter")
         time.sleep(0.6)
         before = d.frame()
