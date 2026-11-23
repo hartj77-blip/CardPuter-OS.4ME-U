@@ -114,9 +114,10 @@ filter_index() {
                 && length(v["sha256"]) == 64 && v["size"] ~ /^[0-9]+$/ \
                 && (v["extra-file"] == "" || (v["extra-file"] ~ /^[A-Za-z0-9][A-Za-z0-9_.+~-]*\.deb$/ \
                     && v["extra-url"] ~ /^https:\/\/[^ \047"\\]+$/ && v["extra-sha256"] ~ /^[0-9a-f]+$/ \
-                    && length(v["extra-sha256"]) == 64))) {
+                    && length(v["extra-sha256"]) == 64)) \
+                && (v["replaces"] == "" || v["replaces"] ~ /^[a-z0-9][a-z0-9-]*( [a-z0-9][a-z0-9-]*)*$/)) {
                 printf "app=%s\n", id
-                n = split("name summary version abi file sha256 size needs extra-file extra-url extra-sha256", k, " ")
+                n = split("name summary version abi file sha256 size needs extra-file extra-url extra-sha256 replaces", k, " ")
                 for (i = 1; i <= n; i++) if (v[k[i]] != "") printf "%s=%s\n", k[i], v[k[i]]
                 printf "source=%s\n\n", src
             }
@@ -396,6 +397,26 @@ upgrade_all() {
             n=$((n + 1))
         fi
     done <<< "$todo"
+    # A renamed app (replaces=<old id> in the index): install the new one in
+    # place of the old. Its package conflicts with the old one, so apt takes
+    # the old one off in the same step.
+    local new olds o
+    while read -r new olds; do
+        [ -n "$new" ] && [ -z "$(installed_version "$new")" ] || continue
+        for o in $olds; do
+            [ -n "$(installed_version "$o")" ] || continue
+            app=$new
+            install_app "$new"
+            [ -e "$STATE_DIR/extras/$o" ] && [ ! -e "$STATE_DIR/extras/$new" ] &&
+                mv -f -- "$STATE_DIR/extras/$o" "$STATE_DIR/extras/$new"
+            rm -f -- "$STATE_DIR/extras/$o"
+            n=$((n + 1))
+            break
+        done
+    done < <(awk -v RS= '{ n = split($0, l, "\n"); id = ""; r = ""
+                for (i = 1; i <= n; i++) { if (l[i] ~ /^app=/) id = substr(l[i], 5)
+                                           if (l[i] ~ /^replaces=/) r = substr(l[i], 10) }
+                if (id != "" && r != "") print id, r }' "$CATALOG")
     # Apps that were part of ZeroOS before an update made them installable
     # (the zeroos package writes the list): put them back, once.
     if [ -s "$STATE_DIR/restore" ]; then

@@ -1,4 +1,4 @@
-#include "apps/zclaw/ai.h"
+#include "apps/ai/chat.h"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -18,7 +18,7 @@
 
 extern char** environ;
 
-namespace zs::zclaw {
+namespace zs::ai {
 namespace {
 
 // ---- a small JSON reader: enough to walk the replies ----------------------
@@ -257,7 +257,7 @@ std::string get(const Conf& c, const std::string& k) {
 // A private file (0600) holding data, for curl to read. "" on failure.
 std::string private_file(const std::string& data) {
     const char* dir = std::getenv("TMPDIR");
-    std::string tmpl = std::string(dir && *dir ? dir : "/tmp") + "/zeroos-zclaw-XXXXXX";
+    std::string tmpl = std::string(dir && *dir ? dir : "/tmp") + "/zeroos-ai-XXXXXX";
     std::vector<char> buf(tmpl.begin(), tmpl.end());
     buf.push_back('\0');
     int fd = mkstemp(buf.data());
@@ -330,7 +330,7 @@ const Provider* find_provider(const std::string& id) {
 }
 
 const char* default_system_prompt() {
-    return "You are ZClaw, a helpful assistant on a pocket computer (a CardputerZero running ZeroOS) with a "
+    return "You are a helpful AI assistant on a pocket computer (a CardputerZero running ZeroOS) with a "
            "320x170 screen and a small keyboard. Keep answers short and plain: a few sentences, no tables, "
            "little markdown. Give longer, step-by-step answers only when asked.";
 }
@@ -387,7 +387,7 @@ bool save(const std::string& path, const Settings& s) {
     c[s.provider + ".key"] = s.key;
     c[s.provider + ".url"] = s.url;
     c["system"] = s.system;
-    std::string out = "# ZClaw settings. Holds API keys: keep it private (mode 600).\n";
+    std::string out = "# AI settings. Holds API keys: keep it private (mode 600).\n";
     for (auto& kv : c)
         if (!kv.second.empty()) out += kv.first + "=" + esc(kv.second) + "\n";
 
@@ -470,7 +470,7 @@ Request build_request(const Settings& s, const std::vector<Message>& history) {
     } else {
         if (!key.empty()) r.headers.push_back("Authorization: Bearer " + key);
         if (s.provider == "openrouter") {
-            r.headers.push_back("X-Title: ZClaw for ZeroOS");
+            r.headers.push_back("X-Title: AI for ZeroOS");
         }
         std::string sys = "{\"role\":\"system\",\"content\":\"" + json_escape(system) + "\"}";
         r.body = "{\"model\":\"" + json_escape(model) + "\",\"messages\":[" + sys + (msgs.empty() ? "" : ",") +
@@ -546,9 +546,9 @@ bool chat(const Settings& s, const std::vector<Message>& history, std::string& r
           std::atomic<int>* cancel_pid) {
     reply.clear();
     error.clear();
-    if (const char* fake = std::getenv("ZEROOS_ZCLAW_FAKE")) {
+    if (const char* fake = std::getenv("ZEROOS_AI_FAKE")) {
         // Screenshots and tests: no network, a canned answer.
-        reply = *fake ? fake : "Hi! I'm ZClaw. Ask me anything.";
+        reply = *fake ? fake : "Hi! I'm your AI assistant. Ask me anything.";
         return true;
     }
     const Provider* p = find_provider(s.provider);
@@ -619,7 +619,7 @@ bool chat(const Settings& s, const std::vector<Message>& history, std::string& r
     unlink(hfile.c_str());
     unlink(bfile.c_str());
     if (rc != 0) {
-        error = "curl is missing: reinstall ZClaw in Apps";
+        error = "curl is missing: reinstall the AI app in Apps";
         return false;
     }
 
@@ -633,4 +633,4 @@ bool chat(const Settings& s, const std::vector<Message>& history, std::string& r
 #endif
 }
 
-}  // namespace zs::zclaw
+}  // namespace zs::ai
