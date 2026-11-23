@@ -150,6 +150,17 @@ void ListView::set_value(int i, const std::string& value) {
     lv_label_set_text(rows_[size_t(i)].value, value.c_str());
 }
 
+void ListView::set_value_color(int i, uint32_t color) {
+    if (i < 0 || i >= int(rows_.size()) || !rows_[size_t(i)].value) return;
+    lv_obj_set_style_text_color(rows_[size_t(i)].value, c(color), 0);
+}
+
+void ListView::focus(int i) {
+    if (i < 0 || i >= int(rows_.size()) || lv_obj_has_flag(rows_[size_t(i)].obj, LV_OBJ_FLAG_HIDDEN)) return;
+    lv_group_focus_obj(rows_[size_t(i)].obj);
+    lv_obj_scroll_to_view(rows_[size_t(i)].obj, LV_ANIM_OFF);
+}
+
 bool ListView::focused_is_choice() const {
     int i = focused();
     return i >= 0 && !rows_[size_t(i)].choices.empty();

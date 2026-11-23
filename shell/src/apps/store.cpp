@@ -1,9 +1,10 @@
 // Apps: install and remove apps (docs/APPS.md). ZeroOS itself keeps only a
 // few apps; everything else comes from here, downloaded from GitHub.
 //
-//   list     Enter: details   U: update all   R: look for new apps   S: sources
-//   details  Enter: the highlighted button (Install, Update, Open, Remove)
-//   sources  Enter on "Add a GitHub repo"   D: remove the highlighted source
+//   list     Enter: details. Tab: U update all, R look for new apps, P sources
+//   details  Enter: the highlighted button. Tab: I install, U update, O open, D remove
+//   sources  Enter on "Add a GitHub repo". Tab: N add one, D remove the highlighted one
+// Typing finds an app or a source (ui/list_view.h).
 //
 // zeroos-apps does the work as root; this screen starts it and shows how far
 // it has got. After an install or removal the home screen is rebuilt at
@@ -11,6 +12,7 @@
 #include <csignal>
 
 #include "apps/common.h"
+#include "ui/list_view.h"
 #include "ui/store.h"
 
 namespace zs {
@@ -75,36 +77,8 @@ public:
     }
 
     bool on_key(uint32_t key) override {
-        if (page_ == Page::Add) return false;   // typing
-        if (page_ == Page::List) {
-            if (key == 'r' || key == 'R') {
-                start([] { store::refresh(); });
-                return true;
-            }
-            if (key == 's' || key == 'S') {
-                show_sources();
-                return true;
-            }
-            if (key == 'u' || key == 'U') {
-                update_all();
-                return true;
-            }
-        }
-        if (page_ == Page::Sources && (key == 'd' || key == 'D')) {
-            lv_obj_t* f = lv_group_get_focused(group);
-            intptr_t i = f ? (intptr_t)lv_obj_get_user_data(f) : -1;
-            if (i > 0 && i <= intptr_t(sources_.size())) {
-                std::string s = sources_[size_t(i - 1)];
-                shell_confirm("Remove " + s + "?", "Apps stop coming from it.", "Remove", [this, s] {
-                    if (start([s] { store::remove_source(s); })) {
-                        shell_toast("Removed " + s);
-                        defer(Page::Sources);
-                    }
-                });
-            }
-            return true;
-        }
-        return false;
+        if (page_ == Page::List || page_ == Page::Sources) return list_.key(key);   // typing finds
+        return false;   // details: buttons; add: the text box types
     }
 
 private:
@@ -192,8 +166,7 @@ private:
                 color = kWarn;
                 break;
             default:
-                text = page_ == Page::List ? "Updated " + age_text(store::catalog_age()) + "   R refresh  S sources"
-                                           : "";
+                text = page_ == Page::List ? "Updated " + age_text(store::catalog_age()) : "";
                 break;
         }
         color = s == store::Status::Refreshing || s == store::Status::Downloading || s == store::Status::Installing ||
@@ -257,20 +230,19 @@ private:
         cat_ = store::catalog();
         int updates = 0;
         for (auto& e : cat_) updates += e.update();
+        shell_set_actions({
+            {"Details", 0, "Enter", nullptr},
+            {fmt("Update all (%d)", updates), 'u', nullptr, [this] { update_all(); }, updates > 0},
+            {"Look for new apps", 'r', nullptr, [this] { start([] { store::refresh(); }); }},
+            {"Sources", 'p', nullptr, [this] { show_sources(); }},
+        });
 
-        lv_obj_t* list = make_list(root_, 4, 2, kScreenW - 8, kContentH - 26);
-        if (updates > 0) {
-            lv_obj_t* b = list_button(list, LV_SYMBOL_REFRESH, fmt("Update all (%d)   U", updates).c_str(),
-                                      [](lv_event_t* e) {
-                                          static_cast<StoreApp*>(lv_event_get_user_data(e))->update_all();
-                                      },
-                                      this);
-            lv_obj_set_user_data(b, (void*)(intptr_t)-1);
-        }
+        list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 24);
+        list_.set_empty_text(online() ? "No apps yet. Tab > R looks for them." : "No apps yet. Join Wi-Fi, then Tab > R.");
+        int focus = -1;
+        if (updates > 0) list_.add(LV_SYMBOL_REFRESH, "Update all", fmt("%d", updates), [this] { update_all(); });
         for (size_t i = 0; i < cat_.size(); ++i) {
             auto& e = cat_[i];
-            lv_obj_t* b = list_button(list, icon_of(e.id), e.name.c_str(), on_pick, this);
-            lv_obj_set_user_data(b, (void*)(intptr_t)i);
             std::string right;
             uint32_t color = kMuted;
             if (e.update()) {
@@ -282,37 +254,18 @@ private:
             } else {
                 right = size_text(e.size_kb);
             }
-            lv_obj_t* r = label(b, right.c_str(), &zs_font_12, color);
-            lv_obj_add_flag(r, LV_OBJ_FLAG_IGNORE_LAYOUT);
-            lv_obj_align(r, LV_ALIGN_RIGHT_MID, -4, 0);
+            std::string id = e.id;
+            list_.add(icon_of(e.id), e.name, right, [this, id] {
+                sel_id_ = id;
+                show_details();
+            });
+            list_.set_value_color(list_.size() - 1, color);
+            if (!sel_id_.empty() && e.id == sel_id_) focus = list_.size() - 1;
         }
-        if (cat_.empty()) {
-            lv_obj_t* l = label(list, online() ? "No apps yet. R looks for them." : "No apps yet. Join Wi-Fi, then press R.",
-                                &zs_font_12, kMuted);
-            lv_obj_set_style_pad_all(l, 8, 0);
-        }
-        finish_list(list);
+        list_.finish();
         // Back on the list after a details page: keep the same app selected.
-        if (sel_id_.size()) {
-            for (uint32_t k = 0; k < lv_obj_get_child_count(list); ++k) {
-                lv_obj_t* ch = lv_obj_get_child(list, int32_t(k));
-                intptr_t i = (intptr_t)lv_obj_get_user_data(ch);
-                if (i >= 0 && size_t(i) < cat_.size() && cat_[size_t(i)].id == sel_id_ &&
-                    lv_obj_check_type(ch, &lv_list_button_class)) {
-                    lv_group_focus_obj(ch);
-                    lv_obj_scroll_to_view(ch, LV_ANIM_OFF);
-                }
-            }
-        }
+        if (focus >= 0) list_.focus(focus);
         bottom_line();
-    }
-
-    static void on_pick(lv_event_t* e) {
-        auto* self = static_cast<StoreApp*>(lv_event_get_user_data(e));
-        intptr_t i = (intptr_t)lv_obj_get_user_data(lv_event_get_target_obj(e));
-        if (i < 0 || size_t(i) >= self->cat_.size()) return;
-        self->sel_id_ = self->cat_[size_t(i)].id;
-        self->defer(Page::Details);   // the list (and this button) go away
     }
 
     void update_all() {
@@ -386,6 +339,19 @@ private:
             x += lv_obj_get_width(b) + 6;
         };
         bool installed = !e->installed.empty();
+        std::string id = e->id, app_name = e->name;
+        std::vector<Action> acts = {{"Select", 0, "Enter", nullptr}};
+        if (!installed && !e->version.empty())
+            acts.push_back({"Install", 'i', nullptr, [this, id] { start([id] { store::install(id); }); }});
+        if (e->update()) acts.push_back({"Update", 'u', nullptr, [this, id] { start([id] { store::install(id); }); }});
+        if (installed && app_find(id)) acts.push_back({"Open", 'o', nullptr, [id] { shell_open_app(id); }});
+        if (installed) {
+            Action rm{"Remove", 'd', nullptr, [this, id] { start([id] { store::remove(id); }); }};
+            rm.danger = true;
+            rm.confirm = "Remove " + app_name + "?";
+            acts.push_back(rm);
+        }
+        shell_set_actions(std::move(acts));
         if (!installed && !e->version.empty())
             button(LV_SYMBOL_DOWNLOAD "  Install", true, [](lv_event_t* ev) {
                 auto* s = static_cast<StoreApp*>(lv_event_get_user_data(ev));
@@ -406,7 +372,9 @@ private:
             button(LV_SYMBOL_TRASH "  Remove", false, [](lv_event_t* ev) {
                 auto* s = static_cast<StoreApp*>(lv_event_get_user_data(ev));
                 std::string id = s->sel_id_;
-                s->start([id] { store::remove(id); });
+                shell_confirm("Remove " + s->name_of(id) + "?", "", "Remove", [s, id] {
+                    s->start([id] { store::remove(id); });
+                });
             });
         bottom_line();
     }
@@ -417,26 +385,36 @@ private:
         clear();
         page_ = Page::Sources;
         sources_ = store::sources();
-        lv_obj_t* h = label(root_, "Apps come from these GitHub repos.   D removes one", &zs_font_12, kMuted);
+        Action rm{"Remove", 'd', nullptr, [this] { remove_source(); }};
+        rm.danger = true;
+        rm.confirm = "Remove this source?";
+        shell_set_actions({{"Select", 0, "Enter", nullptr}, {"Add a GitHub repo", 'n', nullptr, [this] { show_add(); }}, rm});
+        lv_obj_t* h = label(root_, "Apps come from these GitHub repos.", &zs_font_12, kMuted);
         lv_obj_set_pos(h, 8, 3);
-        lv_obj_t* list = make_list(root_, 4, 20, kScreenW - 8, kContentH - 44);
-        for (size_t i = 0; i < sources_.size(); ++i) {
-            lv_obj_t* b = list_button(list, ZS_ICON_GLOBE, sources_[i].c_str(), nullptr, nullptr);
-            lv_obj_set_user_data(b, (void*)(intptr_t)(i + 1));
-        }
-        lv_obj_t* add = list_button(list, LV_SYMBOL_PLUS, "Add a GitHub repo",
-                                    [](lv_event_t* e) {
-                                        static_cast<StoreApp*>(lv_event_get_user_data(e))->defer(Page::Add);
-                                    },
-                                    this);
-        lv_obj_set_user_data(add, (void*)(intptr_t)0);
-        finish_list(list);
+        list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 42);
+        for (size_t i = 0; i < sources_.size(); ++i) list_.add(ZS_ICON_GLOBE, sources_[i], "", nullptr);
+        list_.add(LV_SYMBOL_PLUS, "Add a GitHub repo", "", [this] { show_add(); });
+        list_.finish();
         bottom_line();
+    }
+
+    void remove_source() {
+        int i = list_.focused();
+        if (i < 0 || i >= int(sources_.size())) {
+            shell_toast("Pick a source first");
+            return;
+        }
+        std::string s = sources_[size_t(i)];
+        if (start([s] { store::remove_source(s); })) {
+            shell_toast("Removed " + s);
+            defer(Page::Sources);
+        }
     }
 
     void show_add() {
         clear();
         page_ = Page::Add;
+        shell_set_actions({{"Add", 0, "Enter", nullptr}, {"Back", 0, "Esc", nullptr}});
         lv_obj_t* t = label(root_, "GitHub repo (owner/name)", &zs_font_14);
         lv_obj_set_pos(t, 10, 6);
         ta_ = lv_textarea_create(root_);
@@ -455,8 +433,6 @@ private:
         lv_obj_set_width(h, kScreenW - 20);
         lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
         lv_obj_set_pos(h, 10, 68);
-        lv_obj_t* k = label(root_, "Enter adds it.  Esc goes back", &zs_font_12, kMuted);
-        lv_obj_set_pos(k, 10, 128);
     }
 
     static void on_add(lv_event_t* e) {
@@ -483,6 +459,7 @@ private:
     std::vector<store::Entry> cat_;
     std::vector<std::string> sources_;
     std::string sel_id_;
+    ListView list_;
     store::Status st_;
     bool watching_ = false;
     int wait_ = 0;        // half seconds

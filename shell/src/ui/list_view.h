@@ -35,8 +35,12 @@ public:
     // on_change(index) follows each step. A switch is {"Off", "On"}.
     lv_obj_t* add_choice(const char* icon, const std::string& text, std::vector<std::string> choices, int at,
                          std::function<void(int)> on_change);
-    // Show a row's value anew (its state changed elsewhere).
+    // Show a row's value anew (its state changed elsewhere), or in a colour
+    // of its own (theme kGood for "Installed", kAccent for "Update").
     void set_value(int row, const std::string& value);
+    void set_value_color(int row, uint32_t color);
+    // Focus a row (and scroll to it), as the index add() returned it in.
+    void focus(int row);
     // The focused row is a value row (Left/Right change it).
     bool focused_is_choice() const;
     // What shows when there are no rows, or none match the filter.

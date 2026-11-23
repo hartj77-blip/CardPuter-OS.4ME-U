@@ -140,6 +140,7 @@ std::string focused_name(lv_obj_t* focused) {
     if (parent && lv_obj_check_type(parent, &lv_list_class) && lv_obj_check_type(focused, &lv_list_button_class))
         return lv_list_get_button_text(parent, focused);
     if (lv_obj_check_type(focused, &lv_label_class)) return lv_label_get_text(focused);
+    if (lv_obj_check_type(focused, &lv_button_class)) return "";   // a button's label isn't a name: the screen's title
     uint32_t n = lv_obj_get_child_count(focused);
     for (uint32_t i = n; i-- > 0;) {
         lv_obj_t* ch = lv_obj_get_child(focused, int32_t(i));
@@ -218,7 +219,7 @@ void actions_menu_open(lv_obj_t* focused, const std::string& title) {
 
     std::string name = focused_name(focused);
     lv_obj_t* head = label(g_menu, (name.empty() ? title : name).c_str(), &zs_font_12, kMuted);
-    lv_obj_set_width(head, kMenuW - 14);
+    lv_obj_set_size(head, kMenuW - 14, 17);   // one line, cut with "..."
     lv_label_set_long_mode(head, LV_LABEL_LONG_DOT);
     lv_obj_set_style_pad_left(head, 4, 0);
     lv_obj_set_style_pad_bottom(head, 2, 0);
