@@ -4,7 +4,8 @@ Everything on ZeroOS works from the keyboard. Arrows move, Enter opens, and Esc 
 The \` key works as Esc too.
 
 The keys are being redesigned to work the same on every screen ([UX.md](UX.md) is the plan).
-Screens move over one at a time; Wi-Fi is the first.
+Screens move over one at a time: everything that is part of ZeroOS itself is done, and the
+installable apps follow.
 
 ## Everywhere
 
@@ -24,7 +25,7 @@ you press the next key. Tap it again to cancel. Holding it down works too.
 
 ## Screens moved to the new design
 
-Wi-Fi so far. A line along the bottom of the screen says what the keys do, and:
+Home, Settings, Wi-Fi, Bluetooth, Apps and Update so far. A line along the bottom of the screen says what the keys do, and:
 
 | Key | What it does |
 | --- | --- |
@@ -32,20 +33,24 @@ Wi-Fi so far. A line along the bottom of the screen says what the keys do, and:
 | Ctrl + a letter | Do that menu item straight away, without opening the menu |
 | Letters | In a list, type to find: only the rows that match stay. Backspace or Esc undoes it |
 
-Every row shows its number key. Something that can't be undone (forgetting, removing) asks first:
+Every row shows its number key: 1 to 9 are the first nine rows of a list, like a phone menu.
+Esc in an app opened from another one (Settings > Wi-Fi) goes back to that one. Something that can't be undone (forgetting, removing) asks first:
 Enter does it, Esc doesn't.
 
 ## Home screen
 
-You don't type anything on the home screen, so the keys work as if Fn were held down (see the
-table below). F, Z, X and C are the arrows.
+Home is a search box, seven pinned apps and the apps you opened last.
 
 | Key | What it does |
 | --- | --- |
-| 1 to 7 | Open the dock's apps, top to bottom. Press 0 to see the numbers |
-| Shift + a letter | Jump to the next app whose name starts with that letter |
-| K / N | First / last app |
-| L / M | Page before / page after |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute"). Enter opens the first |
+| 1 to 7 | Open a pinned app. While searching, 1 to 9 pick a result |
+| Arrows (Fn + F/Z/X/C) | Move between the pinned apps and the Recent list |
+| Esc | Clear the search |
+| Tab | Pin or unpin the app in focus (P), move a pin (L / R), All apps (A) |
+
+**All apps**, the last row, lists every app A to Z: type to find one. Some search results change
+in place: on Volume or Brightness, Left and Right turn it down or up.
 
 ## The taskbar panel
 
@@ -65,8 +70,8 @@ Left/Right move between the tiles, and Esc or Ctrl + Space closes the panel.
 
 ## Fn keys
 
-Hold Fn and press a key, anywhere. On the home screen and in the taskbar panel you can leave out the
-Fn. This is M5's Fn layer for the Cardputer Zero.
+Hold Fn and press a key, anywhere. In the taskbar panel you can leave out the Fn. This is M5's Fn
+layer for the Cardputer Zero.
 
 | Key | With Fn |
 | --- | --- |

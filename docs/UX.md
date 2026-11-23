@@ -126,9 +126,11 @@ A List screen with a filter typed shows the filter on the left instead:
 
 ## Number badges
 
-Rows that 1 to 9 can pick show their number all the time, in a small muted badge on the left. The
-numbers belong to the rows **on screen**, top to bottom, so scrolling renumbers them. Rows past 9
-have no badge. Badges are off on Text screens (the keys type digits) and on screens with no list.
+Rows that 1 to 9 can pick show their number all the time, in a small muted badge on the left. Like a
+phone menu, the numbers belong to the **first nine rows** of the list (of what the filter leaves),
+wherever it is scrolled, so "Settings, 9" is always the same row; picking one scrolls to it. Rows
+past 9 have no badge. Badges are off on Text screens (the keys type digits). Screens without a
+list keep the older rule: 0 shows badges on what 1 to 9 pick there.
 
 ## Confirming
 
@@ -158,7 +160,7 @@ dock.
 └──────────────────────────────────┘
 ```
 
-- **Pinned**: up to 9 apps on 1 to 9. Tab on a pinned app: Unpin, Move left, Move right. Tab on any
+- **Pinned**: up to 7 apps on 1 to 7 (as many as fit across). Tab: P Pin or unpin, L / R Move. Tab on any
   app: Pin. A fresh ZeroOS pins Terminal, Files, Notes, Media, Apps and Settings, the ones installed.
 - **Recent**: the last few things you did, newest first. An app can say what to reopen (a track, a
   remote, a network, a file), so Enter goes straight back to it.
@@ -309,10 +311,17 @@ The kit needs no app-level (`ZS_APP_ABI`) bump on its own: it only adds to the h
 already-built modules never call it. The level goes to 4 in the first change that moves an
 installable app (CardPuter-Apps.4ME-U) onto the kit, since that app can't run on an older ZeroOS.
 
-Done so far: hold Esc and Ctrl + Space (0.3.8); actions, the soft-key bar, the Tab menu and
-Ctrl + a letter; 1 to 9 pick, 0 the key sheet; `ListView` (numbered rows, type to filter) and
-`shell_confirm()`. Wi-Fi is the first screen on all of it; the Apps store asks before removing a
-source. Tabs and value rows come with the Settings tree (phase 4).
+Done so far:
+- Hold Esc and Ctrl + Space (0.3.8).
+- The kit: actions, the soft-key bar, the Tab menu, Ctrl + a letter, the key sheet (0),
+  `ListView` (numbered rows, type to filter, value rows), `shell_confirm()`. 1 to 9 pick.
+- Esc goes back to the app that opened this one (a back stack); hold Esc goes home.
+- Home: search (apps, settings, actions), pinned apps, Recent, All apps.
+- Settings as one numbered tree; Wi-Fi, Bluetooth, Apps and Update on the kit.
+
+Still to do: the installable apps (CardPuter-Apps.4ME-U), with the app-level bump; Tabs (Media,
+Mesh, System); apps adding their own search results and Recent entries (search providers,
+`recent_push`); the first-run tour.
 
 ### Testing
 

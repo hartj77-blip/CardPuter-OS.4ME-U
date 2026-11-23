@@ -33,8 +33,9 @@ The [roadmap](docs/ROADMAP.md) lists what is done and what is next.
   [Keys](docs/KEYS.md).
   - Number keys as buttons: 1 to 9 pick the items on screen, and 0 shows the keys. Hold Esc to go
     home, and Ctrl + Space opens the taskbar panel (Wi-Fi, Bluetooth, volume, brightness and more).
-  - On the home screen you don't need to hold Fn: F, Z, X and C are the arrows, A, S and D are mute
-    and volume, and so on. Shift and a letter jumps to an app, and 1 to 7 open the dock's apps.
+  - Home is a search box: type to find an app, a setting or an action ("wifi", "bright"). Seven
+    pinned apps sit on 1 to 7, with the apps you opened last below them.
+  - A line along the bottom says what the keys do, and Tab opens a menu of everything you can do.
 - Install only what you need. Four apps are part of ZeroOS. Every other app is installed, updated
   and removed in the Apps app. See the [Apps guide](docs/APPS.md). The apps have their own
   repository, [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U).
@@ -131,13 +132,17 @@ and change the password later with `passwd`.
 
 | Key | Action |
 | --- | --- |
-| Arrow keys | Move |
+| Arrow keys (Fn + F/Z/X/C) | Move |
 | Enter | Open the selected item |
-| Esc or ` | Go back |
-| A letter | Jump to an app on the home screen |
-| 1 to 5 | Open the dock's apps from the home screen |
+| Esc or ` | Go back. Hold Esc to go home |
+| Letters | On the home screen, search. In a list, find a row |
+| 1 to 9 | Pick an item. On the home screen, 1 to 7 open the pinned apps |
+| Tab | A menu of everything you can do on this screen |
+| 0 | Show every key for this screen |
+| Ctrl + Space | The taskbar panel: Wi-Fi, Bluetooth, volume, brightness |
 
-Some apps have their own keys, shown on screen. For example, in Media, Space pauses and N skips to
+The line along the bottom of the screen says what the keys do. See [Keys](docs/KEYS.md). Some apps
+have their own keys, shown on screen. For example, in Media, Space pauses and N skips to
 the next track. In IR Remote, L learns a button from your own remote.
 
 To add apps, open Apps. To get a newer ZeroOS, open Update.
