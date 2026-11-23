@@ -14,7 +14,8 @@
 set -u
 export LC_ALL=C.UTF-8          # so accented file names survive the copy
 
-MUSIC=${ZEROOS_MUSIC:-/home/pi/Music}
+# The UI user's (uid 1000) home: /home/pi, or wherever a rename put it.
+MUSIC=${ZEROOS_MUSIC:-$(getent passwd 1000 | cut -d: -f6)/Music}
 DIR=${ZEROOS_CAR_DIR:-/var/lib/zeroos/car}
 IMG=$DIR/music.img
 STAMP=$DIR/music.stamp

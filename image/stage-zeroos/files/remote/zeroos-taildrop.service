@@ -6,9 +6,10 @@ BindsTo=tailscaled.service
 After=tailscaled.service
 
 [Service]
-User=pi
-ExecStartPre=/bin/mkdir -p /home/pi/Downloads
-ExecStart=/usr/bin/tailscale file get --loop --conflict=rename /home/pi/Downloads
+# uid 1000: pi, or the name set in Raspberry Pi Imager. systemd sets HOME.
+User=1000
+ExecStartPre=/bin/sh -c 'mkdir -p "$HOME/Downloads"'
+ExecStart=/bin/sh -c 'exec /usr/bin/tailscale file get --loop --conflict=rename "$HOME/Downloads"'
 Restart=on-failure
 RestartSec=10
 

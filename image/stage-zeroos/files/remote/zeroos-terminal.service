@@ -1,7 +1,7 @@
 # The Terminal app: tmux on the Linux console (tty3), on the built-in screen.
 # ZeroShell starts this and steps aside; when tmux detaches (Ctrl+Q) or the
 # last shell exits, we switch back to ZeroShell on tty1. terminal-session
-# starts the tmux server in pi's user manager (pi lingers), outside this
+# starts the tmux server in the user's manager (it lingers), outside this
 # service, so sessions and SSH connections survive the service stopping.
 # systemd 257 refuses KillMode=process together with PAMName=, so this is
 # mixed: SIGTERM to tmux attach, SIGKILL to anything left in the service.
@@ -9,7 +9,8 @@
 Description=ZeroOS terminal on the built-in screen
 
 [Service]
-User=pi
+# uid 1000: pi, or the name set in Raspberry Pi Imager.
+User=1000
 PAMName=login
 TTYPath=/dev/tty3
 TTYReset=yes

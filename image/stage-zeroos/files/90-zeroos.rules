@@ -1,6 +1,21 @@
 // Let the UI user manage Wi-Fi/Bluetooth and power without a login session.
+// The UI user is uid 1000: "pi", or the name it was given in Raspberry Pi
+// Imager's settings (which renames pi). Looked up once, when first needed.
+var zeroosUser = "";
+function zeroosUiUser() {
+    if (!zeroosUser) {
+        try {
+            zeroosUser = polkit.spawn(["/usr/bin/id", "-nu", "1000"]).trim();
+        } catch (e) {
+            return "pi";
+        }
+    }
+    return zeroosUser;
+}
+
 polkit.addRule(function(action, subject) {
-    if (subject.user != "pi") return;
+    var user = zeroosUiUser();
+    if (subject.user != user) return;
     if (action.id.indexOf("org.freedesktop.NetworkManager.") == 0 ||
         action.id == "org.freedesktop.login1.power-off" ||
         action.id == "org.freedesktop.login1.power-off-multiple-sessions" ||
@@ -11,7 +26,7 @@ polkit.addRule(function(action, subject) {
     // Dock mode: ZeroShell starts and stops the desktop on the HDMI monitor.
     // Terminal app, Tailscale ("when needed"), Sync and updates are started the same way.
     var units = ["zeroos-dock.service", "zeroos-terminal.service", "tailscaled.service",
-                 "syncthing@pi.service", "meshtasticd.service", "zeroos-usb-stick.service",
+                 "syncthing@" + user + ".service", "meshtasticd.service", "zeroos-usb-stick.service",
                  "zeroos-update.service", "zeroos-update-check.service"];
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         units.indexOf(action.lookup("unit")) >= 0) {
