@@ -52,6 +52,9 @@ The user is `pi` and the password is `raspberry`. The first time you log in, fro
 app or over SSH (`ssh pi@cardputer.local`), you have to pick a new password. If you added an SSH
 key in Raspberry Pi Imager you can skip that and run `passwd` later.
 
+You can also set your own username and password in Raspberry Pi Imager's settings before writing
+the card. Imager renames `pi` to your username, and ZeroOS runs as that user instead.
+
 ## Using it
 
 Arrow keys move, Enter opens, Esc goes back. The \` key also works as Esc.
@@ -153,6 +156,10 @@ install the newest version, then open Apps and choose **Update all**.
 
 **"The package system needs repair first".** From 0.3.3 on, Update and Apps fix this themselves.
 On older versions see [Updates](docs/UPDATE.md#it-says-the-package-system-needs-repair-first).
+
+**The home screen never starts, and every login asks for a new password, after setting a username
+in Raspberry Pi Imager.** Fixed in the next release; versions up to 0.4.0 only worked with the user
+`pi`. Log in over SSH with your username and run `sudo zeroos-update install`, then restart.
 
 **Slow boot.** After a restart, run this to see what's taking the time:
 

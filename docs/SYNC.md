@@ -67,7 +67,7 @@ in all). It stops a minute after it's no longer wanted.
 
 | Piece | What |
 | --- | --- |
-| `syncthing` package | From Debian. `syncthing@pi.service` is never started at boot; ZeroShell starts and stops it (polkit allows `pi` exactly this unit). |
+| `syncthing` package | From Debian. `syncthing@<user>.service` (the UI user, uid 1000: `pi` unless renamed in Raspberry Pi Imager) is never started at boot; ZeroShell starts and stops it (polkit allows that user exactly this unit). |
 | `syncthing@.service.d/zeroos.conf` | Small for 512 MB: Go heap limit 48 MB, two cores, low CPU and disk priority, no default folder, no self-upgrade. earlyoom closes it before anything you're using. After start it runs `zeroos-sync setup`. |
 | `zeroos-sync` | Python helper that talks to Syncthing's local API (key from Syncthing's own config). `setup` turns off usage and crash reports, syncs one folder at a time, and creates the three folders (`zeroos-notes`, `zeroos-documents`, `zeroos-recordings`) with file watching and 14-day trash-can versioning. Also `status`, `add-device`, `remove-device`, `ignore-device`, `accept-folder`, `ignore-folder`, `rescan`. Works over ssh too. |
 | ZeroShell | Decides when Syncthing runs (`sync.mode`), runs "Sync now", and draws the Sync app from `zeroos-sync status` (every few seconds, only while the app is open). |

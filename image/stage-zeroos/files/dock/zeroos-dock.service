@@ -1,4 +1,5 @@
-# Dock mode: a small Wayland desktop (labwc) on the HDMI monitor, as user pi.
+# Dock mode: a small Wayland desktop (labwc) on the HDMI monitor, as the UI user
+# (uid 1000: pi, or the name set in Raspberry Pi Imager).
 # ZeroShell keeps running on the built-in screen. Started by ZeroShell (Dock
 # app, or when a monitor is plugged in) or with `zeroos-dock start`.
 [Unit]
@@ -6,7 +7,7 @@ Description=ZeroOS Dock mode (desktop on the HDMI monitor)
 After=systemd-user-sessions.service zeroshell.service
 
 [Service]
-User=pi
+User=1000
 # A logind session on tty2 gives labwc the HDMI display and input devices.
 PAMName=login
 TTYPath=/dev/tty2
