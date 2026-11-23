@@ -29,6 +29,12 @@ static JfSession session() {
     return s;
 }
 
+// Apps built against older headers spell these by number (Media does), so
+// they must never move: new values only ever go at the end.
+static_assert(int(JfView::Libraries) == 13 && int(JfView::Library) == 14, "JfView values are fixed");
+static_assert(int(JfItem::Folder) == 9, "JfItem::Kind values are fixed");
+static_assert(kJfPage == 200, "Media assumes 200 rows a page");
+
 int main() {
     CHECK(jf::normalize_server("nas") == "http://nas:8096");
     CHECK(jf::normalize_server("https://media.example.com/") == "https://media.example.com");
