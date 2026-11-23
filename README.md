@@ -133,7 +133,7 @@ image, but you can remove them like anything else. The code for these lives in
 | Router | Plug in a laptop and send its traffic through a Tailscale exit node |
 | Net Tools | Find devices, scan ports, trace routes, look up DNS, capture packets, share Ethernet |
 | Car | Music in the car, as a USB stick or over Bluetooth ([guide](docs/CAR.md)) |
-| ZClaw | AI chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/ZCLAW.md)) |
+| AI | AI chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/AI.md)) |
 | Dev Tools | Code editor and runner, REPL, Git, and a serial monitor for Arduino and ESP32 boards ([guide](docs/DEV.md)) |
 | Games | NES, Game Boy and GBA, plus SNES, Mega Drive, PlayStation and more with libretro cores. Bring your own games ([guide](docs/GAMES.md)) |
 | GPS | Position, saved places and track recording. Needs a GPS module ([guide](docs/EXPANSION.md)) |
@@ -179,7 +179,7 @@ Apps:
 [GPS and LoRa](docs/EXPANSION.md) ·
 [Dev Tools](docs/DEV.md) ·
 [Games](docs/GAMES.md) ·
-[ZClaw](docs/ZCLAW.md)
+[AI](docs/AI.md)
 
 Development:
 [Architecture](docs/ARCHITECTURE.md) ·

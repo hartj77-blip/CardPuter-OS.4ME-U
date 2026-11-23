@@ -5,7 +5,7 @@ what a device needs to get online, update itself and install apps. Everything el
 install from the **Apps** app, downloaded from the apps repository,
 [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): Battery, Camera, Car,
 Clock, Compass, Dock, Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal,
-Tether and ZClaw, the [Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Games](GAMES.md).
+Tether and AI, the [Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Games](GAMES.md).
 
 Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
 with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**

@@ -1,5 +1,5 @@
-// ZClaw's AI layer without a network: requests, replies, settings, and a
-// whole chat() through a stand-in curl. cmake ... && ctest, or run zclaw_test.
+// The AI app's chat layer without a network: requests, replies, settings, and a
+// whole chat() through a stand-in curl. cmake ... && ctest, or run ai_test.
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -9,9 +9,9 @@
 #include <sstream>
 #include <string>
 
-#include "apps/zclaw/ai.h"
+#include "apps/ai/chat.h"
 
-using namespace zs::zclaw;
+using namespace zs::ai;
 
 static int failures = 0;
 #define CHECK(cond)                                                    \
@@ -43,7 +43,7 @@ int main() {
         CHECK(r.url == "https://api.anthropic.com/v1/messages");
         CHECK(has(r.body, "\"model\":\"claude-opus-5-5\""));
         CHECK(has(r.body, "\"max_tokens\":16000"));
-        CHECK(has(r.body, "\"system\":\"You are ZClaw"));
+        CHECK(has(r.body, "\"system\":\"You are a helpful AI assistant"));
         CHECK(has(r.body, "Hi \\\"there\\\"\\nline two"));
         CHECK(has(r.body, "\"role\":\"assistant\",\"content\":\"Hello!\""));
         CHECK(has(r.body, "\"fallbacks\":\"default\""));
@@ -110,13 +110,13 @@ int main() {
         CHECK(!parse_reply(Wire::OpenAI, 200, "<html>", t, e));
     }
 
-    char dir[] = "/tmp/zclaw_test_XXXXXX";
+    char dir[] = "/tmp/ai_test_XXXXXX";
     if (!mkdtemp(dir)) return 1;
     std::string d = dir;
 
     // Settings: private file, one key per provider, newlines survive.
     {
-        std::string path = d + "/cfg/zeroos/zclaw.conf";
+        std::string path = d + "/cfg/zeroos/ai.conf";
         Settings s;
         s.provider = "anthropic";
         s.key = "sk-ant-1";
@@ -149,7 +149,7 @@ int main() {
         chmod((bin + "/curl").c_str(), 0755);
         std::string old = std::getenv("PATH") ? std::getenv("PATH") : "";
         setenv("PATH", (bin + ":" + old).c_str(), 1);
-        unsetenv("ZEROOS_ZCLAW_FAKE");
+        unsetenv("ZEROOS_AI_FAKE");
 
         Settings s;
         s.key = "sk-ant-secret";
@@ -170,9 +170,9 @@ int main() {
 
     if (std::system(("rm -rf '" + d + "'").c_str())) {}
     if (failures) {
-        std::printf("zclaw_test: %d failed\n", failures);
+        std::printf("ai_test: %d failed\n", failures);
         return 1;
     }
-    std::printf("zclaw_test: all passed\n");
+    std::printf("ai_test: all passed\n");
     return 0;
 }

@@ -1,6 +1,6 @@
-# ZClaw
+# AI
 
-ZClaw is an AI assistant for the Cardputer Zero. Type a question and get an answer on the
+AI is an assistant app for the Cardputer Zero. Type a question and get an answer on the
 built-in screen. It works with Claude and with other AI services, so you can use whichever one you
 already pay for, or run a model on your own PC for free.
 
@@ -26,7 +26,7 @@ model and server, so switching between them doesn't lose your settings.
 
 ## Getting started
 
-1. Open **ZClaw**. The first time, it opens on its settings page.
+1. Open **AI**. The first time, it opens on its settings page.
 2. **Provider**: pick a service.
 3. **API key**: type the key. A key is long, so it's easier to send it over SSH (see below).
 4. Press **Tab** to go to the chat page, type a question and press **Enter**.
@@ -45,7 +45,7 @@ left). Press Enter on the empty box to try the question again.
 
 - **New chat**: starts over. The conversation stays while ZeroShell runs, even after you leave
   the app, and is never written to the card unless you save it.
-- **Save chat to Notes**: writes the conversation to `~/Notes/ZClaw <date>.txt`. Open it in Notes,
+- **Save chat to Notes**: writes the conversation to `~/Notes/AI <date>.txt`. Open it in Notes,
   or sync it to your PC with Sync.
 - **Personality**: the system prompt. The default one asks for short, plain answers that fit the
   small screen.
@@ -56,8 +56,8 @@ Nothing leaves your home network, and there's no key or bill.
 
 1. Install [Ollama](https://ollama.com) on your PC and download a model: `ollama pull llama3.2`.
 2. Let other devices connect to it: set `OLLAMA_HOST=0.0.0.0` on the PC and restart Ollama.
-3. In ZClaw, pick **Ollama (your PC)** and set **Server** to the PC's address, such as
-   `192.168.1.20` or `my-pc.local`. ZClaw adds the `http://`, the port (11434) and the path.
+3. In the AI app, pick **Ollama (your PC)** and set **Server** to the PC's address, such as
+   `192.168.1.20` or `my-pc.local`. The app adds the `http://`, the port (11434) and the path.
 
 LM Studio and other servers work the same way with **Other (OpenAI-compatible)**. Type the address
 and port, for example `192.168.1.20:1234`.
@@ -65,33 +65,30 @@ and port, for example `192.168.1.20:1234`.
 ## Setting a key from your PC
 
 Typing a long key on the small keyboard is slow. Over SSH (`ssh pi@cardputer.local`), edit
-`~/.config/zeroos/zclaw.conf` and add a line such as:
+`~/.config/zeroos/ai.conf` and add a line such as:
 
 ```
 anthropic.key=sk-ant-...
 ```
 
 The file has one `provider.key`, `provider.model` and `provider.url` line per provider (for
-example `openai.key`), plus `provider=` for the one in use. Reopen ZClaw to load the changes.
+example `openai.key`), plus `provider=` for the one in use. Reopen the AI app to load the changes.
 
 ## Privacy and cost
 
-- Your key is stored on the card in `~/.config/zeroos/zclaw.conf`. Only your user can read the file
+- Your key is stored on the card in `~/.config/zeroos/ai.conf`. Only your user can read the file
   (mode 600). While a request is being sent, the key is kept in a private temporary file, so it
   never appears in the process list.
 - Each question is sent to the provider you chose, with the recent conversation (up to the last 40
   messages), and the provider bills your account for it. Ollama keeps everything on your network.
-- ZClaw is a chat client. It doesn't run commands or change anything on the device.
+- The AI app is a chat client. It doesn't run commands or change anything on the device.
 
 ## How it works
 
-`shell/src/apps/zclaw/ai.cpp` builds the request. It uses the Anthropic Messages API for Claude and
+`shell/src/apps/ai/chat.cpp` builds the request. It uses the Anthropic Messages API for Claude and
 the OpenAI chat-completions format for every other provider. Gemini, OpenRouter, Groq, Mistral and
 Ollama all offer the OpenAI format. The request is sent with `curl` on a background thread, so the
-screen stays responsive, and leaving the app stops it. On current Claude models, ZClaw turns on
+screen stays responsive, and leaving the app stops it. On current Claude models, the app turns on
 Anthropic's server-side fallback, so a request that Claude's safety checks decline is retried on
-another suitable model. `shell/tests/zclaw_test.cpp` tests the requests, replies and settings
+another suitable model. `shell/tests/ai_test.cpp` tests the requests, replies and settings
 without a network.
-
-The name is a nod to the "claw" family of pocket AI assistants that M5Stack's community has built
-for the Cardputer. ZClaw is a separate app written for ZeroOS.

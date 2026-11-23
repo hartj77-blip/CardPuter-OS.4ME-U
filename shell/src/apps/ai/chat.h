@@ -1,5 +1,5 @@
-// ZClaw's AI layer: one chat request to whichever service the user picked.
-// No LVGL here, so it can be unit-tested (tests/zclaw_test.cpp).
+// The AI app's chat layer: one chat request to whichever service the user picked.
+// No LVGL here, so it can be unit-tested (tests/ai_test.cpp).
 //
 // Two wire formats cover every provider:
 //   Anthropic   POST /v1/messages          (Claude)
@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-namespace zs::zclaw {
+namespace zs::ai {
 
 enum class Wire { Anthropic, OpenAI };
 
@@ -28,7 +28,7 @@ struct Provider {
     const char* key_hint;    // where to get a key
 };
 
-// Every provider ZClaw knows, in the order the settings page lists them.
+// Every provider the AI app knows, in the order the settings page lists them.
 const std::vector<Provider>& providers();
 const Provider* find_provider(const std::string& id);
 
@@ -45,7 +45,7 @@ std::string effective_model(const Settings& s);
 std::string effective_url(const Settings& s);
 const char* default_system_prompt();
 
-// ~/.config/zeroos/zclaw.conf (mode 0600: it holds API keys). Each provider
+// ~/.config/zeroos/ai.conf (mode 0600: it holds API keys). Each provider
 // keeps its own key, model and URL, so switching back and forth loses nothing.
 Settings load(const std::string& path);
 bool save(const std::string& path, const Settings& s);
@@ -83,4 +83,4 @@ std::string normalize_url(const std::string& provider_id, const std::string& typ
 // JSON string escaping, exposed for the tests.
 std::string json_escape(const std::string& s);
 
-}  // namespace zs::zclaw
+}  // namespace zs::ai

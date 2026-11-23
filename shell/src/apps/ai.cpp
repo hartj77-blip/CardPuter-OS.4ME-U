@@ -1,6 +1,6 @@
-// ZClaw: a pocket AI assistant. Chat with Claude, or with ChatGPT, Gemini,
+// AI: a pocket AI assistant. Chat with Claude, or with ChatGPT, Gemini,
 // OpenRouter, Groq, Mistral, an Ollama server on your PC, or any
-// OpenAI-compatible server. Bring your own API key. See docs/ZCLAW.md.
+// OpenAI-compatible server. Bring your own API key. See docs/AI.md.
 //
 //   Chat page      type, Enter to send. Up/Down scroll the conversation.
 //                  Esc while it's thinking stops the request.
@@ -10,8 +10,10 @@
 // The request runs on a worker thread (curl), so the screen never freezes;
 // leaving the app stops it.
 #include <sys/stat.h>
+#include <unistd.h>
 
 #include <csignal>
+#include <cstdio>
 #include <ctime>
 #include <functional>
 #include <memory>
@@ -19,7 +21,7 @@
 #include <thread>
 
 #include "apps/common.h"
-#include "apps/zclaw/ai.h"
+#include "apps/ai/chat.h"
 #include "ui/fileio.h"
 
 namespace zs {
@@ -27,12 +29,18 @@ namespace {
 using namespace theme;
 
 // The conversation outlives the app screen: leave and come back to it.
-std::vector<zclaw::Message>& history() {
-    static std::vector<zclaw::Message> h;
+std::vector<ai::Message>& history() {
+    static std::vector<ai::Message> h;
     return h;
 }
 
-std::string conf_path() { return home_dir() + "/.config/zeroos/zclaw.conf"; }
+// Keys saved under the app's old name (ZClaw) move to the new file once.
+std::string conf_path() {
+    std::string dir = home_dir() + "/.config/zeroos";
+    std::string path = dir + "/ai.conf";
+    if (access(path.c_str(), F_OK) != 0) rename((dir + "/zclaw.conf").c_str(), path.c_str());
+    return path;
+}
 
 // Shared with the worker thread.
 struct Job {
@@ -42,9 +50,9 @@ struct Job {
     std::atomic<int> pid{0};
 };
 
-class ZClawApp : public App {
+class AiApp : public App {
 public:
-    ~ZClawApp() override {
+    ~AiApp() override {
         lv_async_call_cancel(rebuild_cb, this);
         lv_async_call_cancel(run_pending_cb, this);
         stop();
@@ -52,8 +60,8 @@ public:
 
     void build(lv_obj_t* root) override {
         root_ = root;
-        cfg_ = zclaw::load(conf_path());
-        const zclaw::Provider* p = zclaw::find_provider(cfg_.provider);
+        cfg_ = ai::load(conf_path());
+        const ai::Provider* p = ai::find_provider(cfg_.provider);
         // First run: straight to settings to pick a provider and add a key.
         if (p && p->needs_key && cfg_.key.empty() && history().empty()) page_ = Page::Settings;
         rebuild();
@@ -127,7 +135,7 @@ private:
     enum class Page { Chat, Settings, Providers };
 
     void defer_rebuild() { lv_async_call(rebuild_cb, this); }
-    static void rebuild_cb(void* p) { static_cast<ZClawApp*>(p)->rebuild(); }
+    static void rebuild_cb(void* p) { static_cast<AiApp*>(p)->rebuild(); }
 
     void rebuild() {
         if (ta_) draft_ = lv_textarea_get_text(ta_);
@@ -145,12 +153,12 @@ private:
     // ---- chat ----------------------------------------------------------------
 
     std::string provider_name() const {
-        const zclaw::Provider* p = zclaw::find_provider(cfg_.provider);
+        const ai::Provider* p = ai::find_provider(cfg_.provider);
         return p ? p->name : "?";
     }
 
     void build_chat() {
-        lv_obj_t* head = label(root_, (provider_name() + "  |  " + zclaw::effective_model(cfg_)).c_str(),
+        lv_obj_t* head = label(root_, (provider_name() + "  |  " + ai::effective_model(cfg_)).c_str(),
                                &zs_font_12, kMuted);
         lv_obj_set_pos(head, 8, 2);
         lv_label_set_long_mode(head, LV_LABEL_LONG_DOT);
@@ -181,7 +189,7 @@ private:
     }
 
     static void on_send(lv_event_t* e) {
-        auto* self = static_cast<ZClawApp*>(lv_event_get_user_data(e));
+        auto* self = static_cast<AiApp*>(lv_event_get_user_data(e));
         std::string text = lv_textarea_get_text(self->ta_);
         if (self->job_) {
             shell_toast("Still thinking (Esc stops it)");
@@ -206,11 +214,11 @@ private:
         failed_ = false;
         job_ = std::make_shared<Job>();
         auto job = job_;
-        zclaw::Settings cfg = cfg_;
-        std::vector<zclaw::Message> h = history();
+        ai::Settings cfg = cfg_;
+        std::vector<ai::Message> h = history();
         auto run = [job, cfg, h] {
             std::string reply, error;
-            bool ok = zclaw::chat(cfg, h, reply, error, &job->pid);
+            bool ok = ai::chat(cfg, h, reply, error, &job->pid);
             std::lock_guard<std::mutex> l(job->m);
             job->ok = ok;
             job->reply = std::move(reply);
@@ -268,8 +276,8 @@ private:
     // ---- settings ------------------------------------------------------------
 
     void build_settings() {
-        const zclaw::Provider* p = zclaw::find_provider(cfg_.provider);
-        lv_obj_t* t = label(root_, LV_SYMBOL_SETTINGS " ZClaw settings", &zs_font_12, kAccent);
+        const ai::Provider* p = ai::find_provider(cfg_.provider);
+        lv_obj_t* t = label(root_, LV_SYMBOL_SETTINGS " AI settings", &zs_font_12, kAccent);
         lv_obj_set_pos(t, 8, 2);
         lv_obj_t* hint = label(root_, p ? p->key_hint : "", &zs_font_12, kMuted);
         lv_obj_set_pos(hint, 8, kContentH - 16);
@@ -282,30 +290,30 @@ private:
                               : "set, ends " + (cfg_.key.size() > 4 ? cfg_.key.substr(cfg_.key.size() - 4) : "");
         std::string url = cfg_.url.empty() ? "default" : cfg_.url;
         if (p && !*p->url && cfg_.url.empty()) url = "not set";
-        add_row(LV_SYMBOL_LIST, "Provider: " + provider_name(), [](ZClawApp* s) {
+        add_row(LV_SYMBOL_LIST, "Provider: " + provider_name(), [](AiApp* s) {
             s->page_ = Page::Providers;
             s->defer_rebuild();
         });
-        add_row(LV_SYMBOL_KEYBOARD, "API key: " + key, [](ZClawApp* s) {
+        add_row(LV_SYMBOL_KEYBOARD, "API key: " + key, [](AiApp* s) {
             s->ask("API key (paste or type it; empty removes it)", "", true, [s](const std::string& v) {
                 s->cfg_.key = v;
                 s->store("Key saved");
             });
         });
-        add_row(LV_SYMBOL_EDIT, "Model: " + zclaw::effective_model(cfg_), [](ZClawApp* s) {
-            s->ask("Model (empty: the default)", zclaw::effective_model(s->cfg_), false,
+        add_row(LV_SYMBOL_EDIT, "Model: " + ai::effective_model(cfg_), [](AiApp* s) {
+            s->ask("Model (empty: the default)", ai::effective_model(s->cfg_), false,
                    [s](const std::string& v) {
                        s->cfg_.model = v;
                        s->store("Model saved");
                    });
         });
-        add_row(LV_SYMBOL_WIFI, "Server: " + url, [](ZClawApp* s) {
+        add_row(LV_SYMBOL_WIFI, "Server: " + url, [](AiApp* s) {
             s->ask("Server address (empty: the default)", s->cfg_.url, false, [s](const std::string& v) {
-                s->cfg_.url = zclaw::normalize_url(s->cfg_.provider, v);
+                s->cfg_.url = ai::normalize_url(s->cfg_.provider, v);
                 s->store("Server saved");
             });
         });
-        add_row(LV_SYMBOL_REFRESH, "New chat", [](ZClawApp* s) {
+        add_row(LV_SYMBOL_REFRESH, "New chat", [](AiApp* s) {
             s->stop();
             history().clear();
             s->failed_ = false;
@@ -313,9 +321,9 @@ private:
             s->defer_rebuild();
             shell_toast("New chat");
         });
-        add_row(LV_SYMBOL_SAVE, "Save chat to Notes", [](ZClawApp* s) { s->save_to_notes(); });
-        add_row(LV_SYMBOL_EDIT, "Personality (system prompt)", [](ZClawApp* s) {
-            s->ask("How ZClaw should answer (empty: the default)", s->cfg_.system, false,
+        add_row(LV_SYMBOL_SAVE, "Save chat to Notes", [](AiApp* s) { s->save_to_notes(); });
+        add_row(LV_SYMBOL_EDIT, "Personality (system prompt)", [](AiApp* s) {
+            s->ask("How AI should answer (empty: the default)", s->cfg_.system, false,
                    [s](const std::string& v) {
                        s->cfg_.system = v;
                        s->store("Saved");
@@ -328,17 +336,17 @@ private:
         lv_obj_t* t = label(root_, "Pick an AI provider", &zs_font_12, kAccent);
         lv_obj_set_pos(t, 8, 2);
         list_ = make_list(root_, 4, 18, kScreenW - 8, kContentH - 22);
-        const auto& all = zclaw::providers();
+        const auto& all = ai::providers();
         lv_obj_t* current = nullptr;
         for (size_t i = 0; i < all.size(); ++i) {
             bool on = cfg_.provider == all[i].id;
             lv_obj_t* b = list_button(list_, on ? LV_SYMBOL_OK : LV_SYMBOL_RIGHT, all[i].name, [](lv_event_t* e) {
-                auto* s = static_cast<ZClawApp*>(lv_event_get_user_data(e));
+                auto* s = static_cast<AiApp*>(lv_event_get_user_data(e));
                 size_t i = size_t((intptr_t)lv_obj_get_user_data(lv_event_get_target_obj(e)));
                 s->stop();
-                zclaw::save(conf_path(), s->cfg_);
-                zclaw::switch_provider(conf_path(), s->cfg_, zclaw::providers()[i].id);
-                s->store(std::string("Using ") + zclaw::providers()[i].name);
+                ai::save(conf_path(), s->cfg_);
+                ai::switch_provider(conf_path(), s->cfg_, ai::providers()[i].id);
+                s->store(std::string("Using ") + ai::providers()[i].name);
                 s->page_ = Page::Settings;
                 s->defer_rebuild();
             }, this);
@@ -349,14 +357,14 @@ private:
         if (current) lv_group_focus_obj(current);
     }
 
-    using RowFn = void (*)(ZClawApp*);
+    using RowFn = void (*)(AiApp*);
     static void run_pending_cb(void* p) {
-        auto* s = static_cast<ZClawApp*>(p);
+        auto* s = static_cast<AiApp*>(p);
         if (s->pending_) s->pending_(s);
     }
     void add_row(const char* sym, const std::string& text, RowFn fn) {
         lv_obj_t* b = list_button(list_, sym, text.c_str(), [](lv_event_t* e) {
-            auto* s = static_cast<ZClawApp*>(lv_event_get_user_data(e));
+            auto* s = static_cast<AiApp*>(lv_event_get_user_data(e));
             auto f = reinterpret_cast<RowFn>(lv_obj_get_user_data(lv_event_get_target_obj(e)));
             // Deferred: a row may rebuild the list it's in.
             s->pending_ = f;
@@ -368,7 +376,7 @@ private:
     }
 
     void store(const std::string& msg) {
-        if (zclaw::save(conf_path(), cfg_)) shell_toast(msg);
+        if (ai::save(conf_path(), cfg_)) shell_toast(msg);
         else shell_toast("Couldn't save the settings");
         if (page_ == Page::Settings) defer_rebuild();
     }
@@ -383,10 +391,10 @@ private:
         char stamp[32];
         std::time_t now = std::time(nullptr);
         std::strftime(stamp, sizeof stamp, "%Y-%m-%d %H%M", std::localtime(&now));
-        std::string path = dir + "/ZClaw " + stamp + ".txt";
-        std::string out = "ZClaw chat, " + provider_name() + " (" + zclaw::effective_model(cfg_) + ")\n\n";
-        for (auto& m : history()) out += (m.user ? "You: " : "ZClaw: ") + m.text + "\n\n";
-        shell_toast(write_file_atomic(path, out) ? "Saved to Notes/ZClaw " + std::string(stamp) + ".txt"
+        std::string path = dir + "/AI " + stamp + ".txt";
+        std::string out = "AI chat, " + provider_name() + " (" + ai::effective_model(cfg_) + ")\n\n";
+        for (auto& m : history()) out += (m.user ? "You: " : "AI: ") + m.text + "\n\n";
+        shell_toast(write_file_atomic(path, out) ? "Saved to Notes/AI " + std::string(stamp) + ".txt"
                                                  : "Couldn't save (card full?)");
     }
 
@@ -411,7 +419,7 @@ private:
         lv_obj_set_width(ta, 280);
         lv_obj_align(ta, LV_ALIGN_BOTTOM_MID, 0, 0);
         lv_obj_add_event_cb(ta, [](lv_event_t* e) {
-            auto* self = static_cast<ZClawApp*>(lv_event_get_user_data(e));
+            auto* self = static_cast<AiApp*>(lv_event_get_user_data(e));
             std::string v = lv_textarea_get_text(lv_event_get_target_obj(e));
             Done d = std::move(self->done_);
             if (lv_indev_t* in = lv_indev_active()) lv_indev_wait_release(in);
@@ -439,7 +447,7 @@ private:
     lv_obj_t* input_ = nullptr;
     lv_obj_t* list_ = nullptr;
     Page page_ = Page::Chat;
-    zclaw::Settings cfg_;
+    ai::Settings cfg_;
     std::string draft_;
     std::shared_ptr<Job> job_;
     std::thread worker_;
@@ -450,6 +458,6 @@ private:
 };
 }  // namespace
 
-std::unique_ptr<App> make_zclaw_app() { return std::make_unique<ZClawApp>(); }
+std::unique_ptr<App> make_ai_app() { return std::make_unique<AiApp>(); }
 
 }  // namespace zs

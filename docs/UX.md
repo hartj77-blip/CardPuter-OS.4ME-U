@@ -67,7 +67,7 @@ What a plain letter does depends on the kind of screen. The soft-key bar shows w
 | Kind | Plain letters | Examples |
 | --- | --- | --- |
 | **List** | Filter the list (type-ahead). Backspace removes a letter; with no filter, Backspace is the list's own back action (Files: up a folder) | Files, Apps, Wi-Fi networks, Settings, Media library, IR brands |
-| **Text** | Type | Notes, Wi-Fi password, ZClaw and Mesh message boxes, search |
+| **Text** | Type | Notes, Wi-Fi password, AI and Mesh message boxes, search |
 | **Control** | Shortcuts, declared in the screen's action list and shown in the soft-key bar | Media's player, Clock, Camera, IR remote keypad, GPS |
 | **Game** | Belong to the game. Only hold Esc (to its pause menu) and Ctrl + Space escape | Games while playing |
 
@@ -191,7 +191,7 @@ slower (a file index) is built in the background and searched from memory. Built
 | Files | File and folder names under the home folder |
 
 Apps add their own: Notes (titles and text), Media (songs, albums), IR Remote (remotes), Wi-Fi
-(networks), Remote (devices), ZClaw (past chats).
+(networks), Remote (devices), AI (past chats).
 
 ## Taskbar panel (Ctrl + Space)
 
@@ -283,7 +283,7 @@ letter, and Ctrl + the letter runs it straight away.
 | Sync | Enter accept, Del ignore, "Del twice" stops | ListDetail. Menu: A Accept, D Stop syncing (Confirm), I Show my device ID |
 | Tether | "Del again" forgets | List. Menu: D Forget (Confirm) |
 | Mesh | `Tab: info`, Tab switches Chat / Info | Tabs on Left / Right; chat is Text. Menu: I Node info, C Channel, P Radio settings |
-| ZClaw | `Tab: settings`, Up / Down history | Chat is Text; Up / Down history in an empty box. Menu: N New chat, H History, M Model, P Settings |
+| AI | `Tab: settings`, Up / Down history | Chat is Text; Up / Down history in an empty box. Menu: N New chat, H History, M Model, P Settings |
 | Dev Tools | Code: `G` `N` `R` `T`; Git: `C` `D` `F` `L` `P` `S` `T` `U` `V`; Serial: `E`, Tab | Projects and files are Lists; every letter moves to the menu with the same letter (Git: C Commit, P Push, U Pull, L Log, D Changes…) |
 | Games | `C` cores, pad uses most letters | Library is a List. Menu: C Cores, D Delete save. In a game: Game screen, hold Esc = pause menu |
 | System | Left / Right switch pages | Tabs on Left / Right |
