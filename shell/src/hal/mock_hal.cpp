@@ -546,6 +546,27 @@ public:
             case JfView::SeasonEpisodes:
                 out = episodes(arg.substr(arg.find(':') + 1) == "f2" ? 2 : 1);
                 break;
+            case JfView::Libraries: {
+                // Like a real server: more than one of a kind, and kinds
+                // the old fixed menu had no row for.
+                out = {folder("l1", "Music", "music"),         folder("l2", "Vinyl rips", "music"),
+                       folder("l3", "Movies", "movies"),       folder("l4", "Kids movies", "movies"),
+                       folder("l5", "Shows", "tvshows"),       folder("l6", "Home videos", "homevideos"),
+                       folder("l7", "Music videos", "musicvideos"), folder("l8", "Audiobooks", "books"),
+                       folder("l9", "Collections", "boxsets")};
+                break;
+            }
+            case JfView::Library: {
+                std::string type = arg.substr(arg.find(':') + 1);
+                type = type.substr(0, type.find('@'));
+                if (type == "music") out = albums;
+                else if (type == "movies") out = movies();
+                else if (type == "tvshows") out = {mk(K::Series, "e1", "Bench Talk", "", -1)};
+                else if (type == "books") out = {mk(K::Track, "b8", "The Art of Electronics (ch. 1)", "Horowitz", 3605)};
+                else out = {folder("fa", "2024", ""), folder("fb", "2025", ""),
+                            mk(K::Video, "v1", "Beach day", "", 95), mk(K::Video, "v2", "First steps", "", 41)};
+                break;
+            }
             case JfView::Resume: {
                 JfItem ep = episodes(2)[1];
                 ep.resume_s = 754;
@@ -565,6 +586,9 @@ public:
         x.detail = std::move(detail);
         x.duration_s = dur;
         return x;
+    }
+    static JfItem folder(std::string id, std::string name, std::string type) {
+        return mk(JfItem::Folder, std::move(id), std::move(name), std::move(type), -1);
     }
     static const std::vector<JfItem>& movies() {
         static const std::vector<JfItem> v = [] {

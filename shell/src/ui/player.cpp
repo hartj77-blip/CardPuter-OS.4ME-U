@@ -51,6 +51,21 @@ const QueueItem* player_current() {
 }
 
 void player_media_key(MediaKey k) {
+    // A video is on (Media's Jellyfin player): the buttons are for it.
+    // Starting music here would talk over it.
+    VideoState v = hal().video();
+    if (v.open) {
+        switch (k) {
+            case MediaKey::PlayPause: hal().video_pause(!v.paused); break;
+            case MediaKey::Play: hal().video_pause(false); break;
+            case MediaKey::Pause:
+            case MediaKey::Stop: hal().video_pause(true); break;
+            case MediaKey::Next: hal().video_seek(+30, false); break;
+            case MediaKey::Previous: hal().video_seek(-10, false); break;
+            case MediaKey::None: break;
+        }
+        return;
+    }
     // Play pressed in the car with nothing queued: queue everything in ~/Music.
     if (g_queue.empty() && k != MediaKey::Pause && k != MediaKey::Stop)
         for (auto& t : hal().music_library()) g_queue.push_back({t.path, t.title, t.artist, t.duration_s, ""});

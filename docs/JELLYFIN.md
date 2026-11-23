@@ -1,11 +1,11 @@
 # Jellyfin
 
-The **Media** app plays music and video (movies and TV shows) from a Jellyfin
-server, as well as music from `~/Music`.
+The **Media** app plays music and video (movies, TV shows, home videos...) from
+every library on a Jellyfin server, as well as music from `~/Music`.
 
 ## Sign in
 
-1. Open **Media** and press **Right** twice for the **Jellyfin** tab.
+1. Open **Media** and press **Right** for the **Jellyfin** tab.
 2. Press **Enter** on **Sign in...** and answer three questions:
    - **Server**: its name or address. `nas` or `192.168.1.20` means
      `http://nas:8096` (Jellyfin's usual port); type the whole address, such as
@@ -17,21 +17,29 @@ which is saved in `~/.config/zeroos/settings.conf` (readable only by you).
 **Sign out** forgets it; you can also remove "Cardputer Zero" under Devices in
 Jellyfin's dashboard.
 
-The Jellyfin tab's first list: **Search**, **Continue watching**, **Movies**,
-**TV shows**, then the music lists (**Latest albums**, **Albums**, **Artists**,
-**Playlists**) and **Sign out**.
+The Jellyfin tab's first list: **Search**, **Continue watching**, then every
+library on your server, by the names you gave them (two music libraries, Kids
+movies, Home videos, Music videos, Audiobooks, Collections...), then **Latest
+albums**, **Artists** and **Playlists**. **Sign out** and **Refresh libraries**
+are in the menu (**Tab**).
+
+| A library of | Opens as |
+| --- | --- |
+| Music | its albums |
+| Movies | its movies |
+| Shows | its shows, then seasons, then episodes |
+| Anything else (home videos, music videos, books, mixed, collections) | its folders and files, folders first |
+
+Live TV libraries aren't listed: there's no tuner support. On ZeroOS 0.4.0 and older
+the library rows aren't there; you get the fixed **Movies**,
+**TV shows** and **Albums** rows instead, as before.
 
 ## Playing music
 
-| Key | Does |
-| --- | --- |
-| Enter | Open an album, artist or playlist; play a track |
-| Esc or ` | Back one level |
-| / | Search tracks, albums and artists |
-| Space | Pause / resume |
-| N / P | Next / previous track |
-| S | Stop |
-| + / - | Volume |
+The keys are the player's (see the Media app's README in CardPuter-Apps.4ME-U): **Enter** opens an
+album, artist, playlist or folder and plays a track, **Esc** goes back one
+level, and **/** searches the whole server: tracks, albums, artists, playlists,
+movies, shows, episodes, music videos and audiobooks.
 
 Playing a track queues the rest of the album or playlist after it. The queue
 belongs to ZeroShell, not the Media app, so music carries on to the next track
@@ -39,8 +47,8 @@ after you leave the app and while the screen is off. Wi-Fi stays on while
 something is playing.
 
 Tracks in mp3, flac, ogg, opus, m4a or wav play as they are; the server
-converts anything else to mp3. Lists show the first 200 entries, so use search
-in a big library.
+converts anything else to mp3. Long lists come 200 at a time: **More...** at
+the bottom fetches the next 200.
 
 ## Watching video
 
@@ -50,8 +58,9 @@ the headphone jack or Bluetooth, whichever music would use.
 
 | Key | Does |
 | --- | --- |
-| Space or Enter | Pause / resume |
+| Space, Enter or Fn + Q | Pause / resume |
 | Left / Right | Back / forward 10 seconds |
+| Fn + W / Fn + E | Back 10 / forward 30 seconds |
 | Down / Up | Back / forward a minute |
 | 0 | From the start |
 | + / - | Volume |
@@ -67,6 +76,8 @@ while paused or loading.
 - The Cardputer tells the server what it is playing: it shows in Jellyfin's
   dashboard, and the place you stopped is saved for every device.
 - An episode that plays to the end goes on to the next one in the season.
+- A Bluetooth headset's or car's play and skip buttons pause and skip the
+  video too (ZeroOS newer than 0.4.0), instead of starting your music over it.
 - The screen stays on while a video plays (not while paused). Turning the
   Cardputer face down, or the screen turning off, pauses it.
 - Video belongs to the Media app, unlike music: leaving the app stops it.
@@ -97,6 +108,7 @@ network. Set **Settings > Tailscale** to **Always on** so it stays connected.
 
 - No album art or posters, and no subtitle or audio track choice (the
   server's defaults are used).
+- No photos, e-books or Live TV.
 - Video needs Wi-Fi that keeps up with about 1 Mbit/s.
 - Names in scripts the built-in font lacks (Chinese, Japanese, Cyrillic...)
   show as boxes.

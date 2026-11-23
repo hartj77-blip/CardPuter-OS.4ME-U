@@ -1,5 +1,5 @@
-// A small Jellyfin client: sign in, browse music (albums, artists,
-// playlists) and video (movies, shows, continue watching), search, build the
+// A small Jellyfin client: sign in, browse your libraries, music (albums,
+// artists, playlists) and video (movies, shows, continue watching), search, build the
 // URLs tracks and videos stream from, and tell the server what is playing. HTTP goes
 // through the curl command, as the rest of the hardware layer uses system
 // tools; the JSON reader is hand-written so ZeroShell needs no library.
@@ -22,10 +22,13 @@ struct JfSession {
 };
 
 struct JfItem {
-    enum Kind { Album, Artist, Playlist, Track, Movie, Series, Season, Episode, Video } kind = Track;
+    // Folder (added last, so modules built before it keep their numbers): a
+    // library, or a folder or collection inside one. Opened with JfView::Library.
+    enum Kind { Album, Artist, Playlist, Track, Movie, Series, Season, Episode, Video, Folder } kind = Track;
     std::string id;
     std::string name;
-    std::string detail;      // artist for albums and tracks; series name for seasons and episodes
+    std::string detail;      // artist for albums and tracks; series name for seasons and episodes;
+                             // a folder's library type ("music", "movies", "tvshows", "" ...)
     int duration_s = -1;     // tracks and videos
     int resume_s = 0;        // videos: where you stopped watching, 0 = from the start
     int number = -1;         // episode number (seasons: the season's)
@@ -43,10 +46,21 @@ struct JfItem {
 
 // What to list. arg: an item id for the *Tracks, ArtistAlbums and Seasons
 // views, "seriesId:seasonId" for SeasonEpisodes, the text for Search.
+// Libraries lists the user's libraries (every one, as Jellyfin's home
+// screen does). Library opens one, or a folder in one: arg is
+// "id:type", type being the folder's detail (its library type, may be
+// empty). A music library lists its albums, movies its movies, TV its
+// shows; any other kind lists what is in the folder, sub-folders included.
+// Lists stop at a page (kJfPage rows). The long lists (Albums, Artists,
+// Playlists, Movies, Shows, and Library) take the row to start at after a
+// '@': "@200" for Albums, "id:type@200" for Library. A list that comes
+// back a whole page long may have more.
+// (Libraries and Library were added last, so older modules keep their numbers.)
 enum class JfView {
     Latest, Albums, Artists, Playlists, Search, AlbumTracks, ArtistAlbums, PlaylistTracks,
-    Resume, Movies, Shows, Seasons, SeasonEpisodes
+    Resume, Movies, Shows, Seasons, SeasonEpisodes, Libraries, Library
 };
+constexpr int kJfPage = 200;
 
 // Telling the server about playback: shows as "now playing" in its
 // dashboard, keeps the resume point, and lets it stop transcoding.

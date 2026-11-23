@@ -89,6 +89,48 @@ int main() {
         CHECK(items[4].kind == JfItem::Video && items[4].playable_video());
     }
 
+    // Every library the user has, and what is in one.
+    CHECK(jf::list_path(s, JfView::Libraries, "").rfind("/UserViews?userId=", 0) == 0);
+    std::string lib = jf::list_path(s, JfView::Library, "aa11:music");
+    CHECK(has(lib, "parentId=aa11") && has(lib, "includeItemTypes=MusicAlbum") && has(lib, "recursive=true"));
+    CHECK(has(jf::list_path(s, JfView::Library, "aa11:movies"), "includeItemTypes=Movie"));
+    CHECK(has(jf::list_path(s, JfView::Library, "aa11:tvshows"), "includeItemTypes=Series"));
+    std::string folder = jf::list_path(s, JfView::Library, "aa11:homevideos");
+    CHECK(has(folder, "parentId=aa11") && !has(folder, "recursive") && !has(folder, "includeItemTypes"));
+    CHECK(has(jf::list_path(s, JfView::Library, "aa11:"), "parentId=aa11"));
+    CHECK(has(jf::list_path(s, JfView::Library, "aa11"), "parentId=aa11"));
+    CHECK(jf::list_path(s, JfView::Library, "a/b:music").empty());
+    // Pages after the first.
+    CHECK(has(jf::list_path(s, JfView::Albums, "@200"), "&startIndex=200"));
+    CHECK(!has(jf::list_path(s, JfView::Albums, ""), "startIndex"));
+    CHECK(has(jf::list_path(s, JfView::Library, "aa11:music@400"), "&startIndex=400"));
+    CHECK(has(jf::list_path(s, JfView::Library, "aa11:music@400"), "parentId=aa11&"));
+    CHECK(!has(jf::list_path(s, JfView::Albums, "@2x"), "startIndex"));
+    // Search text keeps its '@'.
+    CHECK(has(jf::list_path(s, JfView::Search, "a@200"), "searchTerm=a%40200"));
+    CHECK(!has(jf::list_path(s, JfView::Search, "a@200"), "startIndex"));
+
+    const std::string views = R"({"Items":[
+        {"Name":"Music","Id":"f1","Type":"CollectionFolder","CollectionType":"music"},
+        {"Name":"Vinyl","Id":"f2","Type":"CollectionFolder","CollectionType":"music"},
+        {"Name":"Home Videos","Id":"f3","Type":"CollectionFolder","CollectionType":"homevideos"},
+        {"Name":"Live TV","Id":"f4","Type":"UserView","CollectionType":"livetv"},
+        {"Name":"Collections","Id":"f5","Type":"BoxSet"},
+        {"Name":"2024","Id":"f6","Type":"Folder"},
+        {"Name":"Dune","Id":"f7","Type":"AudioBook","AlbumArtist":"Frank Herbert","RunTimeTicks":360000000000}
+    ]})";
+    items.clear();
+    CHECK(jf::parse_items(views, items));
+    CHECK(items.size() == 6);   // not Live TV
+    if (items.size() == 6) {
+        CHECK(items[0].kind == JfItem::Folder && items[0].detail == "music");
+        CHECK(items[1].kind == JfItem::Folder && items[1].name == "Vinyl");
+        CHECK(items[2].detail == "homevideos");
+        CHECK(items[3].kind == JfItem::Folder && items[3].detail == "boxsets");
+        CHECK(items[4].kind == JfItem::Folder && items[4].detail.empty());
+        CHECK(items[5].kind == JfItem::Track && items[5].detail == "Frank Herbert");
+    }
+
     // Playback reports.
     std::string body = jf::report_body("a1", "sess1", 90, true);
     CHECK(has(body, "\"ItemId\":\"a1\""));
