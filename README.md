@@ -60,18 +60,19 @@ Arrow keys move, Enter opens, Esc goes back. The \` key also works as Esc.
 | --- | --- |
 | Esc | Back. Hold it to go to the home screen from anywhere |
 | Ctrl + Space | Taskbar panel: Wi-Fi, Bluetooth, volume, brightness, battery |
-| 1 to 9 | Pick the 1st to 9th item on screen (when you're not typing) |
+| 1 to 9 | Pick an item. In a list, the 1st to 9th row, like a phone menu (when you're not typing) |
 | 0 | Show the keys for the current screen |
 | Tab | Menu of everything you can do on the current screen (on screens using the new layout) |
+| Letters | In a list, find a row: only the rows that match stay |
 
 On the home screen:
 
 | Key | What it does |
 | --- | --- |
-| F / Z / X / C | Up / Left / Down / Right (no need to hold Fn here) |
-| Shift + a letter | Jump to the next app starting with that letter |
-| 1 to 7 | Open the dock's apps, top to bottom |
-| A / S / D | Mute / volume down / volume up |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute"). Enter opens the first |
+| 1 to 7 | Open the pinned apps. While searching, 1 to 9 pick a result |
+| Esc | Clear the search |
+| Tab | Pin or unpin an app, move a pin, or open All apps (every app, A to Z) |
 
 Ctrl, Shift, Fn and Sym are sticky: tap one and then press the next key. Apps show their own keys
 on screen. For example, in Media Space pauses and N skips, and in IR Remote L learns a button from

@@ -1,6 +1,6 @@
 # Hardware test checklist
 
-Flash `zeroos-cardputerzero-arm64.img.xz` from the newest release, join Wi-Fi, then open **Apps** (in the dock). For each app below: select it, press **Enter**, choose **Install**, wait for "installed", open it from the home screen, do the test, then press **Esc** until you're home. Tick the box if it worked; if not, note what you saw.
+Flash `zeroos-cardputerzero-arm64.img.xz` from the newest release, join Wi-Fi, then open **Apps** (pinned on the home screen). For each app below: select it, press **Enter**, choose **Install**, wait for "installed", open it from the home screen, do the test, then press **Esc** until you're home. Tick the box if it worked; if not, note what you saw.
 
 If something freezes or crashes, connect over SSH and run `journalctl -u zeroshell -b | tail -50` (it logs which app was open).
 
@@ -11,8 +11,8 @@ override afterwards with `sudo systemctl revert zeroshell`.
 
 ## Already on the SD card image
 
-- [ ] **Home screen**: arrow keys move, and so do F, Z, X and C without Fn. Shift + a letter jumps to an app, Enter opens, Esc comes back, 1 to 7 open the dock's apps, 0 shows their numbers. Type fast in Notes later to check no keys are dropped.
-- [ ] **Keys** ([KEYS.md](KEYS.md)): on the home screen S/D change the volume and U/I the brightness (a message says the new level); in any app Fn+S/D and Fn+U/I do the same, and Fn+Q plays or pauses music. Ctrl + Space opens the taskbar panel, and 1 there turns Wi-Fi off and on. In Settings, 0 shows numbers and 2 switches Bluetooth. Holding Esc goes home from anywhere. In Notes, numbers still type.
+- [ ] **Home screen**: typing "wi" lists Wi-Fi, Turn Wi-Fi off and Wi-Fi networks; Enter opens the first; Esc clears. 1 to 7 open the pinned apps. Up from the pinned apps reaches All apps, where typing finds an app. Tab > P pins or unpins the app in focus. Type fast in Notes later to check no keys are dropped.
+- [ ] **Keys** ([KEYS.md](KEYS.md)): Fn+S/D change the volume and Fn+U/I the brightness (a message says the new level); in any app Fn+S/D and Fn+U/I do the same, and Fn+Q plays or pauses music. Ctrl + Space opens the taskbar panel, and 1 there turns Wi-Fi off and on. In Settings, 0 shows numbers and 2 switches Bluetooth. Holding Esc goes home from anywhere. In Notes, numbers still type.
 - [ ] **New keys** ([UX.md](UX.md)): in Notes, type something, then Ctrl + Space opens the taskbar panel and nothing extra is typed; Ctrl + Space again closes it. Try it both ways: Ctrl held down, and Ctrl tapped (the status bar shows Ctrl) then Space. In Wi-Fi, open a network's password box and hold Esc for a second: you land on the home screen. A quick Esc there only goes back to the list.
 - [ ] **Wi-Fi**: the list of networks shows; the password shows as you type it; Enter joins.
 - [ ] **Settings**: brightness and volume change, Bluetooth toggles.
@@ -20,7 +20,7 @@ override afterwards with `sudo systemctl revert zeroshell`.
 - [ ] **Terminal**: Enter opens a console; type `ls`; Ctrl+Q or `exit` comes back to the home screen.
 - [ ] **Update**: says you're on the newest version.
 - [ ] **Dock**: with an HDMI monitor plugged in, Start Dock mode shows the desktop; without one it says No monitor.
-- [ ] **Apps**: R refreshes the list; you see the installable apps listed.
+- [ ] **Apps**: Tab > R refreshes the list; you see the installable apps listed.
 
 ## Installed from Apps
 
@@ -41,4 +41,4 @@ override afterwards with `sudo systemctl revert zeroshell`.
 
 ## Remove
 
-- [ ] Remove one app in **Apps** (Enter > Remove): it disappears from the home screen and `zeroos-apps list` no longer shows it installed.
+- [ ] Remove one app in **Apps** (Enter > Remove, then Enter to confirm): it disappears from All apps and `zeroos-apps list` no longer shows it installed.

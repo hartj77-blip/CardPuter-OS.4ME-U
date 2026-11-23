@@ -1,15 +1,26 @@
-// Home screen, after Ubuntu's: wallpaper, a dock of favourites down the left
-// edge and the app grid in pages of ten beside it.
-// Nothing here is typed, so the keyboard's Fn layer is on without Fn held:
-// f/z/x/c (or the arrows) move, Enter opens, k/n go to the first/last app,
-// l/m to the page before/after. 1-7 open the dock's apps (as Ubuntu's
-// Super+1..9), 0 shows which is which. Shift + a letter jumps to the next
-// app that starts with it.
+// Home (docs/UX.md): a search box, the pinned apps on 1 to 7, what you opened
+// last, and All apps. Typing searches apps, settings and actions; Enter (or
+// the result's number) opens the one in focus.
+//
+//   home      letters search; 1-7 pinned; Up/Down/Left/Right move; Enter opens
+//   search    1-9 pick a result; Backspace edits; Esc clears
+//   all apps  A-Z, typing filters (ui/list_view.h); Esc back
+//   Tab       P pin or unpin, L / R move a pinned app, A all apps
+//
+// Pinned and recent apps are kept in ~/.config/zeroos/settings.conf
+// (home.pinned, home.recent: app ids, comma-separated).
 #include <algorithm>
 #include <cctype>
+#include <functional>
+#include <map>
+#include <sstream>
 
+#include "hal/hal.h"
 #include "platform/keys.h"
-#include "ui/numkeys.h"
+#include "ui/list_view.h"
+#include "ui/power.h"
+#include "ui/prefs.h"
+#include "ui/quick_panel.h"
 #include "ui/shell.h"
 #include "ui/theme.h"
 
@@ -19,22 +30,70 @@ using namespace theme;
 
 namespace {
 
-constexpr int kDockW = 32;
-constexpr int kCols = 5;
-constexpr int kRows = 2;
-constexpr int kPerPage = kCols * kRows;
-constexpr int kCellW = (kScreenW - kDockW) / kCols;   // 57
-constexpr int kCellH = 66;
-constexpr int kGridY = 3;
-constexpr int kDotsY = kGridY + kRows * kCellH + 5;
+constexpr int kPins = 7;           // keys 1..7
+constexpr int kPinW = kScreenW / kPins;
+constexpr int kSearchH = 22, kPinsY = kSearchH + 5, kPinsH = 36, kRecentY = kPinsY + kPinsH + 2;
+constexpr int kRowH = 19, kRecents = 5;
+// A fresh ZeroOS pins the first of these that are installed, then Settings.
+const char* const kDefaultPins[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
 
-// The dock's favourites, top to bottom, on keys 1 to 7.
-// The first six installed of these, then Settings. Missing ones (not
-// installed) are skipped, so Apps fills in on a fresh ZeroOS.
-const char* const kFavourites[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
-constexpr int kDockSlots = 7;   // keys 1..7
-constexpr int kDockIcon = 17;
-constexpr int kFavCount = int(sizeof kFavourites / sizeof kFavourites[0]);
+std::vector<std::string> split(const std::string& s) {
+    std::vector<std::string> out;
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, ','))
+        if (!item.empty()) out.push_back(item);
+    return out;
+}
+
+std::string join(const std::vector<std::string>& v) {
+    std::string s;
+    for (auto& x : v) s += (s.empty() ? "" : ",") + x;
+    return s;
+}
+
+std::vector<std::string> pinned() {
+    std::vector<std::string> out;
+    // "\x01": never set (a fresh device). An empty string is "nothing pinned".
+    std::string saved = prefs::get_str("home.pinned", "\x01");
+    if (saved != "\x01") {
+        for (auto& id : split(saved))
+            if (app_find(id) && int(out.size()) < kPins) out.push_back(id);
+        return out;
+    }
+    for (const char* id : kDefaultPins)
+        if (app_find(id) && int(out.size()) < kPins - 1) out.push_back(id);
+    if (app_find("settings")) out.push_back("settings");
+    return out;
+}
+
+void save_pinned(const std::vector<std::string>& v) { prefs::set_str("home.pinned", join(v)); }
+
+std::vector<std::string> recent() {
+    std::vector<std::string> out;
+    for (auto& id : split(prefs::get_str("home.recent", "")))
+        if (app_find(id)) out.push_back(id);
+    return out;
+}
+
+// Lower case, letters and digits only: "Wi-Fi" and "wifi" are the same word.
+std::string norm(const std::string& s) {
+    std::string out;
+    for (char ch : s)
+        if (std::isalnum((unsigned char)ch) || ch == ' ') out += char(std::tolower((unsigned char)ch));
+    return out;
+}
+
+bool matches(const std::string& text, const std::string& q) {
+    std::string t = norm(text), n = norm(q);
+    if (n.empty()) return false;
+    // Each word of the query is in the text ("bt off" finds "Turn Bluetooth off" via "bluetooth").
+    std::stringstream ss(n);
+    std::string w;
+    while (ss >> w)
+        if (t.find(w) == std::string::npos) return false;
+    return true;
+}
 
 // A Yaru-style icon: a white glyph on a coloured rounded square.
 lv_obj_t* app_icon(lv_obj_t* parent, const AppInfo& info, int size) {
@@ -45,229 +104,536 @@ lv_obj_t* app_icon(lv_obj_t* parent, const AppInfo& info, int size) {
     lv_obj_set_style_bg_color(box, c(info.color), 0);
     lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
     lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_t* glyph = label(box, info.symbol, size >= 30 ? &zs_font_16 : &zs_font_12, 0xffffff);
-    lv_obj_center(glyph);
+    lv_obj_remove_flag(box, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_center(label(box, info.symbol, size >= 30 ? &zs_font_16 : &zs_font_12, 0xffffff));
     return box;
 }
 
-// Translucent white behind the selected item, as in GNOME's app grid.
-void style_highlight(lv_obj_t* o, int radius) {
+// Translucent white behind the item in focus, as in GNOME.
+void style_item(lv_obj_t* o, int radius) {
     style_plain(o);
     lv_obj_set_style_radius(o, radius, 0);
     lv_obj_set_style_bg_color(o, c(0xffffff), 0);
-    lv_obj_set_style_bg_opa(o, LV_OPA_30, LV_STATE_USER_1);
+    lv_obj_set_style_bg_opa(o, LV_OPA_30, LV_STATE_FOCUSED);
+    lv_obj_set_style_outline_width(o, 0, LV_STATE_FOCUS_KEY);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
 }
+
+// ---- Search ---------------------------------------------------------------
+
+struct Result {
+    const char* icon;
+    std::string text;
+    std::string kind;                      // "App", "Setting", "Action"
+    std::function<void()> run;             // Enter
+    std::vector<std::string> choices;      // a value row (Volume): Left/Right
+    int at = 0;
+    std::function<void(int)> change;
+};
+
+struct SettingEntry {
+    const char* text;
+    const char* words;   // more to match on
+    const char* app;     // the app to open
+    const char* arg;     // and what to hand it (a Settings section)
+    const char* icon;
+};
+const SettingEntry kSettings[] = {
+    {"Wi-Fi networks", "wireless internet join", "wifi", "", LV_SYMBOL_WIFI},
+    {"Bluetooth", "bt", "settings", "bluetooth", LV_SYMBOL_BLUETOOTH},
+    {"Bluetooth devices", "bt pair keyboard gamepad speaker headphones", "bluetooth", "", LV_SYMBOL_BLUETOOTH},
+    {"Brightness", "screen display", "settings", "display", LV_SYMBOL_EYE_OPEN},
+    {"Dim screen after", "display sleep timeout", "settings", "display", LV_SYMBOL_EYE_CLOSE},
+    {"Screen off after", "display sleep timeout", "settings", "display", LV_SYMBOL_POWER},
+    {"Volume", "sound audio", "settings", "sound", LV_SYMBOL_VOLUME_MAX},
+    {"Power profile", "battery saver performance", "settings", "battery", LV_SYMBOL_CHARGE},
+    {"Battery & power", "charge", "settings", "battery", LV_SYMBOL_BATTERY_3},
+    {"Tailscale", "remote vpn", "settings", "remote", LV_SYMBOL_SHUFFLE},
+    {"Sync", "syncthing", "settings", "remote", LV_SYMBOL_LOOP},
+    {"Software update", "upgrade version zeroos", "update", "", LV_SYMBOL_DOWNLOAD},
+    {"About this device", "system memory storage cpu", "sysmon", "", LV_SYMBOL_LIST},
+    {"Restart or shut down", "reboot power off", "settings", "power", LV_SYMBOL_POWER},
+};
+
+std::vector<std::string> percents() {
+    std::vector<std::string> v;
+    for (int p = 0; p <= 100; p += 5) v.push_back(std::to_string(p) + "%");
+    return v;
+}
+
+std::vector<Result> search(const std::string& q) {
+    std::vector<Result> out;
+    // Apps.
+    for (const AppInfo& a : app_registry())
+        if (matches(a.name + " " + a.id, q)) {
+            std::string id = a.id;
+            out.push_back({a.symbol, a.name, "App", [id] { shell_open_app(id); }});
+        }
+    // Actions: done right here, without opening anything.
+    auto& h = hal();
+    NetStatus n = h.net();
+    auto toggle = [&](const char* icon, const std::string& text, const char* words, std::function<void()> run) {
+        if (matches(text + " " + words, q)) out.push_back({icon, text, "Action", std::move(run)});
+    };
+    // Each reads the state when it runs (the row is relabelled after).
+    toggle(LV_SYMBOL_WIFI, n.wifi_enabled ? "Turn Wi-Fi off" : "Turn Wi-Fi on", "wireless", [] {
+        bool on = hal().net().wifi_enabled;
+        hal().set_wifi_enabled(!on);
+        shell_toast(on ? "Wi-Fi off" : "Wi-Fi on");
+    });
+    toggle(LV_SYMBOL_BLUETOOTH, n.bt_enabled ? "Turn Bluetooth off" : "Turn Bluetooth on", "bt", [] {
+        bool on = hal().net().bt_enabled;
+        hal().set_bt_enabled(!on);
+        shell_toast(on ? "Bluetooth off" : "Bluetooth on");
+    });
+    toggle(LV_SYMBOL_MUTE, h.muted() ? "Sound on" : "Mute", "sound volume silent", [] {
+        bool m = hal().muted();
+        hal().set_muted(!m);
+        shell_toast(m ? "Sound on" : "Sound off");
+    });
+    if (matches("Volume sound audio", q)) {
+        Result r{LV_SYMBOL_VOLUME_MAX, "Volume", "Action", nullptr, percents(), (h.volume() + 2) / 5};
+        r.change = [](int i) { hal().set_volume(i * 5); };
+        out.push_back(r);
+    }
+    if (matches("Brightness screen display", q)) {
+        Result r{LV_SYMBOL_EYE_OPEN, "Brightness", "Action", nullptr, percents(), (power().user_brightness() + 2) / 5};
+        r.change = [](int i) { power().set_user_brightness(i * 5); };
+        out.push_back(r);
+    }
+    // Settings: open the section.
+    for (const SettingEntry& s : kSettings) {
+        if (!matches(std::string(s.text) + " " + s.words, q) || !app_find(s.app)) continue;
+        std::string app = s.app, arg = s.arg;
+        out.push_back({s.icon, s.text, "Setting", [app, arg] {
+                           if (arg.empty()) shell_open_app(app);
+                           else shell_open_app(app, arg);
+                       }});
+    }
+    return out;
+}
+
+// ---- Home -------------------------------------------------------------------
 
 class Launcher : public App {
 public:
+    ~Launcher() override { lv_async_call_cancel(all_apps_cb, this); }
+
     void build(lv_obj_t* root) override {
-        shell_set_fn_layer(true);
-        // Wallpaper: aubergine fading up from the bottom left, like Ubuntu's.
+        root_ = root;
+        // Wallpaper: aubergine fading up from the left, like Ubuntu's.
         lv_obj_set_style_bg_color(root, c(kAubergine), 0);
         lv_obj_set_style_bg_grad_color(root, c(kAubergineLight), 0);
         lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_HOR, 0);
         lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
-
-        const auto& apps = app_registry();
-
-        lv_obj_t* dock = lv_obj_create(root);
-        style_plain(dock);
-        lv_obj_set_size(dock, kDockW, kContentH);
-        lv_obj_set_style_bg_color(dock, c(0x000000), 0);
-        lv_obj_set_style_bg_opa(dock, LV_OPA_60, 0);
-        lv_obj_remove_flag(dock, LV_OBJ_FLAG_SCROLLABLE);
-        const int pitch = kContentH / kDockSlots;
-        std::vector<std::string> favs;
-        for (int fav = 0; fav < kFavCount && int(favs.size()) < kDockSlots - 1; ++fav)
-            if (app_find(kFavourites[fav])) favs.push_back(kFavourites[fav]);
-        favs.push_back("settings");
-        for (auto& fav : favs) {
-            for (size_t i = 0; i < apps.size(); ++i) {
-                if (apps[i].id != fav) continue;
-                const int f = int(dock_.size());
-                lv_obj_t* slot = lv_obj_create(dock);
-                style_highlight(slot, 5);
-                lv_obj_set_size(slot, kDockIcon + 4, kDockIcon + 4);
-                lv_obj_set_pos(slot, (kDockW - kDockIcon - 4) / 2, f * pitch + (pitch - kDockIcon - 4) / 2);
-                lv_obj_center(app_icon(slot, apps[i], kDockIcon));
-                dock_.push_back(slot);
-                dock_app_.push_back(int(i));
-            }
-        }
-
-        int n = int(apps.size());
-        pages_ = (n + kPerPage - 1) / kPerPage;
-        for (int p = 0; p < pages_; ++p) {
-            lv_obj_t* page = lv_obj_create(root);
-            style_plain(page);
-            lv_obj_set_pos(page, kDockW, 0);
-            lv_obj_set_size(page, kScreenW - kDockW, kDotsY);
-            lv_obj_remove_flag(page, LV_OBJ_FLAG_SCROLLABLE);
-            page_objs_.push_back(page);
-        }
-        for (int i = 0; i < n; ++i) {
-            int slot = i % kPerPage;
-            lv_obj_t* cell = lv_obj_create(page_objs_[i / kPerPage]);
-            style_highlight(cell, 10);
-            lv_obj_set_size(cell, kCellW - 1, kCellH - 4);
-            lv_obj_set_pos(cell, 1 + (slot % kCols) * kCellW, kGridY + (slot / kCols) * kCellH + 2);
-            lv_obj_align(app_icon(cell, apps[i], 32), LV_ALIGN_TOP_MID, 0, 5);
-            lv_obj_t* name = label(cell, apps[i].name.c_str(), &zs_font_12, 0xffffff);
-            // A name a hair wider than its cell ("IR Remote") is set tighter.
-            lv_obj_update_layout(name);
-            if (lv_obj_get_width(name) > kCellW - 3) lv_obj_set_style_text_letter_space(name, -1, 0);
-            lv_obj_align(name, LV_ALIGN_BOTTOM_MID, 0, -5);
-            cells_.push_back(cell);
-        }
-
-        // Page dots, centred under the grid.
-        for (int p = 0; p < pages_ && pages_ > 1; ++p) {
-            lv_obj_t* dot = lv_obj_create(root);
-            style_plain(dot);
-            lv_obj_set_size(dot, 5, 5);
-            lv_obj_set_style_radius(dot, LV_RADIUS_CIRCLE, 0);
-            lv_obj_set_style_bg_color(dot, c(0xffffff), 0);
-            lv_obj_set_pos(dot, kDockW + (kScreenW - kDockW) / 2 - pages_ * 5 + 3 + p * 10, kDotsY);
-            dots_.push_back(dot);
-        }
-        select(0);
+        show_home();
     }
 
     bool on_key(uint32_t key) override {
-        int n = int(cells_.size());
-        if (key >= '1' && key <= '7') {
-            size_t f = key - '1';
-            if (f < dock_.size()) shell_open_app(app_registry()[dock_app_[f]].id);
+        if (all_apps_) return all_.key(key);
+        // Typing: the search. Digits pick (pinned apps, or the results).
+        if (key == LV_KEY_BACKSPACE || key == LV_KEY_DEL) {
+            if (query_.empty()) return true;
+            query_.pop_back();
+            refresh();
             return true;
         }
-        if (key == '0') {
-            if (number_hints_shown()) {
-                number_hints_hide();
-            } else {
-                for (size_t f = 0; f < dock_.size(); ++f) {
-                    lv_area_t a;
-                    lv_obj_get_coords(dock_[f], &a);
-                    number_badge(int(f) + 1, a.x2 - 4, a.y1 - 3);
-                }
-            }
+        if (key >= 32 && key < 127 && !std::isdigit(int(key)) && !(key == ' ' && query_.empty())) {
+            if (query_.size() < 24) query_ += char(key);
+            refresh();
             return true;
         }
-        if (in_dock_) return dock_key(key);
-        if (n == 0) return false;   // no apps at all (a build with every app a module)
-        int col = sel_ % kCols;
-        switch (key) {
-            case LV_KEY_RIGHT: select((sel_ + 1) % n); return true;
-            case LV_KEY_LEFT:
-                // Off the left edge of the first page is the dock.
-                if (col == 0 && sel_ < kPerPage && !dock_.empty()) enter_dock();
-                else select((sel_ + n - 1) % n);
-                return true;
-            case LV_KEY_DOWN: {
-                int t = sel_ + kCols;
-                select(t < n ? t : col);
-                return true;
-            }
-            case LV_KEY_UP: {
-                int t = sel_ - kCols;
-                if (t < 0) {
-                    t = col + ((n - 1) / kCols) * kCols;
-                    if (t >= n) t -= kCols;
-                }
-                select(t);
-                return true;
-            }
-            case LV_KEY_ENTER:
-            case '\r':
-                shell_open_app(app_registry()[sel_].id);
-                return true;
-            case LV_KEY_HOME: select(0); return true;
-            case LV_KEY_END: select(n - 1); return true;
-            case kKeyPageUp:
-            case kKeyPageDown: {
-                int page = sel_ / kPerPage + (key == kKeyPageDown ? 1 : -1);
-                page = (page + pages_) % pages_;
-                select(std::min(page * kPerPage + sel_ % kPerPage, n - 1));
-                return true;
-            }
-            default:
-                break;
+        if (!query_.empty()) return results_.key(key);   // 1-9, Left/Right on a value row
+        if (key >= '1' && key <= '9') {   // the pinned apps (8 and 9: nothing)
+            size_t i = key - '1';
+            if (i < pins_.size()) shell_open_app(pins_[i]);
+            return true;
         }
-        // Shift + a letter (a plain one is a Fn key here: the shell turned it
-        // into that key already).
-        if (key < 128 && std::isalpha(int(key))) {
-            int lower = std::tolower(int(key));
-            for (int i = 1; i <= n; ++i) {
-                int j = (sel_ + i) % n;
-                if (std::tolower(app_registry()[j].name[0]) == lower) {
-                    select(j);
+        return home_nav(key);
+    }
+
+    bool on_back() override {
+        if (all_apps_) {
+            show_home();
+            return true;
+        }
+        if (!query_.empty()) {
+            query_.clear();
+            refresh();
+            return true;
+        }
+        return true;   // home: Esc has nowhere further to go
+    }
+
+private:
+    // ---- The page --------------------------------------------------------
+
+    void clear() {
+        lv_obj_clean(root_);
+        lv_group_remove_all_objs(group);
+        pin_objs_.clear();
+        row_objs_.clear();
+        row_ids_.clear();
+        open_ids_.clear();
+        row_runs_.clear();
+        results_.reset();   // their rows went with the screen
+        all_.reset();
+        box_ = nullptr;
+    }
+
+    void show_home() {
+        all_apps_ = false;
+        query_.clear();
+        refresh();
+    }
+
+    void search_box() {
+        box_ = lv_obj_create(root_);
+        style_plain(box_);
+        lv_obj_set_size(box_, kScreenW - 8, kSearchH);
+        lv_obj_set_pos(box_, 4, 3);
+        lv_obj_set_style_radius(box_, 5, 0);
+        lv_obj_set_style_bg_color(box_, c(0x000000), 0);
+        lv_obj_set_style_bg_opa(box_, LV_OPA_40, 0);
+        lv_obj_remove_flag(box_, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_t* p = label(box_, LV_SYMBOL_RIGHT, &zs_font_12, kAccent);
+        lv_obj_align(p, LV_ALIGN_LEFT_MID, 7, 0);
+        bool empty = query_.empty();
+        lv_obj_t* t = label(box_, empty ? "Type to search apps, settings, actions" : (query_ + "_").c_str(),
+                            empty ? &zs_font_12 : &zs_font_14, empty ? 0x9a8a96 : kText);
+        lv_obj_set_width(t, kScreenW - 40);
+        lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
+        lv_obj_align(t, LV_ALIGN_LEFT_MID, 22, 0);
+    }
+
+    void refresh() {
+        clear();
+        search_box();
+        if (query_.empty()) home_page();
+        else results_page();
+    }
+
+    void home_page() {
+        const auto& apps = app_registry();
+        (void)apps;
+        pins_ = pinned();
+        for (int i = 0; i < int(pins_.size()); ++i) {
+            const AppInfo* a = app_find(pins_[size_t(i)]);
+            if (!a) continue;
+            lv_obj_t* cell = lv_obj_create(root_);
+            style_item(cell, 6);
+            lv_obj_set_size(cell, kPinW - 2, kPinsH);
+            lv_obj_set_pos(cell, 1 + i * kPinW, kPinsY);
+            lv_obj_t* ic = app_icon(cell, *a, 20);
+            lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, 1);
+            lv_obj_t* name = label(cell, a->name.c_str(), &zs_font_12, 0xffffff);
+            lv_obj_set_width(name, kPinW - 2);
+            lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
+            lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+            lv_obj_set_style_text_letter_space(name, -1, 0);
+            lv_obj_align(name, LV_ALIGN_BOTTOM_MID, 0, 0);
+            // The number key, in the corner.
+            lv_obj_t* badge = lv_obj_create(cell);
+            style_plain(badge);
+            lv_obj_set_size(badge, 11, 11);
+            lv_obj_set_style_radius(badge, 3, 0);
+            lv_obj_set_style_bg_color(badge, c(0x000000), 0);
+            lv_obj_set_style_bg_opa(badge, LV_OPA_60, 0);
+            lv_obj_remove_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+            char d[2] = {char('1' + i), 0};
+            lv_obj_center(label(badge, d, &zs_font_12, 0xffffff));
+            lv_obj_set_pos(badge, 1, 0);
+            add_open(cell, pins_[size_t(i)]);
+            pin_objs_.push_back(cell);
+        }
+
+        lv_obj_t* head = label(root_, "RECENT", &zs_font_12, 0xb8a8b4);
+        lv_obj_set_pos(head, 9, kRecentY);
+
+        rows_box_ = lv_obj_create(root_);
+        style_plain(rows_box_);
+        lv_obj_set_pos(rows_box_, 4, kRecentY + 14);
+        lv_obj_set_size(rows_box_, kScreenW - 8, kBodyH - kRecentY - 14);
+        lv_obj_set_flex_flow(rows_box_, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_row(rows_box_, 1, 0);
+        lv_obj_set_scrollbar_mode(rows_box_, LV_SCROLLBAR_MODE_OFF);
+        int shown = 0;
+        for (auto& id : recent()) {
+            if (shown == kRecents) break;
+            const AppInfo* a = app_find(id);
+            if (!a) continue;
+            add_row(a->symbol, a->color, a->name, id, [id] { shell_open_app(id); });
+            ++shown;
+        }
+        if (shown == 0) {
+            lv_obj_t* tip = label(rows_box_, "Apps you open show up here", &zs_font_12, 0xb8a8b4);
+            lv_obj_set_style_pad_left(tip, 5, 0);
+        }
+        add_row(ZS_ICON_GRID, 0x5e6c7b, "All apps", "",
+                [this] { lv_async_call(all_apps_cb, this); }, std::to_string(app_registry().size()));
+
+        if (!pin_objs_.empty()) lv_group_focus_obj(pin_objs_[std::min<size_t>(pin_sel_, pin_objs_.size() - 1)]);
+        set_home_actions();
+    }
+
+    void add_open(lv_obj_t* obj, const std::string& id) {
+        open_ids_[obj] = id;
+        lv_obj_add_event_cb(
+            obj,
+            [](lv_event_t* e) {
+                auto* self = static_cast<Launcher*>(lv_event_get_user_data(e));
+                auto it = self->open_ids_.find(lv_event_get_current_target_obj(e));
+                if (it != self->open_ids_.end()) shell_open_app(it->second);
+            },
+            LV_EVENT_CLICKED, this);
+        shell_add_focus(obj);
+    }
+
+    void add_row(const char* icon, uint32_t color, const std::string& text, const std::string& id,
+                 std::function<void()> run, const std::string& value = "") {
+        lv_obj_t* row = lv_obj_create(rows_box_);
+        style_item(row, 4);
+        lv_obj_set_size(row, kScreenW - 8, kRowH);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+        lv_obj_t* ic = lv_obj_create(row);
+        style_plain(ic);
+        lv_obj_set_size(ic, 15, 15);
+        lv_obj_set_style_radius(ic, 4, 0);
+        lv_obj_set_style_bg_color(ic, c(color), 0);
+        lv_obj_set_style_bg_opa(ic, LV_OPA_COVER, 0);
+        lv_obj_remove_flag(ic, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_center(label(ic, icon, &zs_font_12, 0xffffff));
+        lv_obj_align(ic, LV_ALIGN_LEFT_MID, 4, 0);
+        lv_obj_t* t = label(row, text.c_str(), &zs_font_14, 0xffffff);
+        lv_obj_align(t, LV_ALIGN_LEFT_MID, 26, 0);
+        if (!value.empty()) {
+            lv_obj_t* v = label(row, value.c_str(), &zs_font_12, 0xb8a8b4);
+            lv_obj_align(v, LV_ALIGN_RIGHT_MID, -6, 0);
+        }
+        row_runs_[row] = std::move(run);
+        lv_obj_add_event_cb(
+            row,
+            [](lv_event_t* e) {
+                auto* self = static_cast<Launcher*>(lv_event_get_user_data(e));
+                auto it = self->row_runs_.find(lv_event_get_current_target_obj(e));
+                if (it != self->row_runs_.end() && it->second) {
+                    std::function<void()> fn = it->second;
+                    fn();
+                }
+            },
+            LV_EVENT_CLICKED, this);
+        shell_add_focus(row);
+        row_objs_.push_back(row);
+        row_ids_.push_back(id);
+    }
+
+    // Up/Down between the pinned apps and the rows, Left/Right along the pins.
+    bool home_nav(uint32_t key) {
+        lv_obj_t* f = lv_group_get_focused(group);
+        auto pin = std::find(pin_objs_.begin(), pin_objs_.end(), f);
+        auto row = std::find(row_objs_.begin(), row_objs_.end(), f);
+        if (pin != pin_objs_.end()) {
+            int i = int(pin - pin_objs_.begin()), n = int(pin_objs_.size());
+            switch (key) {
+                case LV_KEY_LEFT: focus_pin((i + n - 1) % n); return true;
+                case LV_KEY_RIGHT: focus_pin((i + 1) % n); return true;
+                case LV_KEY_DOWN:
+                    if (!row_objs_.empty()) lv_group_focus_obj(row_objs_.front());
                     return true;
-                }
+                case LV_KEY_UP:
+                    if (!row_objs_.empty()) lv_group_focus_obj(row_objs_.back());
+                    return true;
+                default: return false;
             }
-            return true;
+        }
+        if (row != row_objs_.end()) {
+            int i = int(row - row_objs_.begin()), n = int(row_objs_.size());
+            switch (key) {
+                case LV_KEY_DOWN:
+                    if (i + 1 < n) lv_group_focus_obj(row_objs_[size_t(i + 1)]);
+                    else if (!pin_objs_.empty()) focus_pin(pin_sel_);
+                    return true;
+                case LV_KEY_UP:
+                    if (i > 0) lv_group_focus_obj(row_objs_[size_t(i - 1)]);
+                    else if (!pin_objs_.empty()) focus_pin(pin_sel_);
+                    return true;
+                case LV_KEY_LEFT:
+                case LV_KEY_RIGHT: return true;
+                default: return false;
+            }
         }
         return false;
     }
 
-private:
-    bool dock_key(uint32_t key) {
-        int n = int(dock_.size());
-        switch (key) {
-            case LV_KEY_DOWN: dock_select((dock_sel_ + 1) % n); return true;
-            case LV_KEY_UP: dock_select((dock_sel_ + n - 1) % n); return true;
-            case LV_KEY_RIGHT:
-            case LV_KEY_ESC:
-                in_dock_ = false;
-                lv_obj_remove_state(dock_[dock_sel_], LV_STATE_USER_1);
-                select(sel_);
-                return true;
-            case LV_KEY_LEFT: return true;
-            case LV_KEY_ENTER:
-            case '\r':
-                shell_open_app(app_registry()[dock_app_[dock_sel_]].id);
-                return true;
-            default:
-                return key < 128 && std::isalpha(int(key));
+    void focus_pin(int i) {
+        if (pin_objs_.empty()) return;
+        pin_sel_ = std::clamp(i, 0, int(pin_objs_.size()) - 1);
+        lv_group_focus_obj(pin_objs_[size_t(pin_sel_)]);
+    }
+
+    // The app in focus on the home page: a pinned one or a recent one.
+    std::string focused_app() {
+        lv_obj_t* f = lv_group_get_focused(group);
+        for (size_t i = 0; i < pin_objs_.size(); ++i)
+            if (pin_objs_[i] == f) return pins_[i];
+        for (size_t i = 0; i < row_objs_.size(); ++i)
+            if (row_objs_[i] == f) return row_ids_[i];
+        return "";
+    }
+
+    int focused_pin() {
+        lv_obj_t* f = lv_group_get_focused(group);
+        for (size_t i = 0; i < pin_objs_.size(); ++i)
+            if (pin_objs_[i] == f) return int(i);
+        return -1;
+    }
+
+    void set_home_actions() {
+        shell_set_actions({
+            {"Open", 0, "Enter", nullptr},
+            {"Search", 0, "a-z", nullptr},
+            {"Pin or unpin", 'p', nullptr, [this] { toggle_pin(focused_app()); }},
+            {"Move left", 'l', nullptr, [this] { move_pin(-1); }},
+            {"Move right", 'r', nullptr, [this] { move_pin(+1); }},
+            {"All apps", 'a', nullptr, [this] { show_all_apps(); }},
+        });
+    }
+
+    void toggle_pin(const std::string& id) {
+        if (id.empty()) {
+            shell_toast("Pick an app first");
+            return;
+        }
+        std::vector<std::string> p = pinned();
+        auto it = std::find(p.begin(), p.end(), id);
+        const AppInfo* a = app_find(id);
+        std::string name = a ? a->name : id;
+        if (it != p.end()) {
+            p.erase(it);
+            shell_toast("Unpinned " + name);
+        } else if (int(p.size()) >= kPins) {
+            shell_toast("Seven are pinned: unpin one first");
+            return;
+        } else {
+            p.push_back(id);
+            shell_toast("Pinned " + name + fmt_key(int(p.size())));
+        }
+        save_pinned(p);
+        if (all_apps_) relabel_all();   // in place: the filter and focus stay
+        else refresh();
+    }
+
+    // All apps' "Pinned n" labels, after a pin or unpin.
+    void relabel_all() {
+        std::vector<std::string> p = pinned();
+        for (size_t i = 0; i < all_ids_.size(); ++i) {
+            auto at = std::find(p.begin(), p.end(), all_ids_[i]);
+            all_.set_value(int(i), at == p.end() ? "" : "Pinned " + std::to_string(int(at - p.begin()) + 1));
         }
     }
 
-    void enter_dock() {
-        lv_obj_remove_state(cells_[sel_], LV_STATE_USER_1);
-        in_dock_ = true;
-        // Land on the dock icon level with the row you came from.
-        int row = (sel_ % kPerPage) / kCols;
-        dock_select(row == 0 ? 0 : int(dock_.size()) - 1);
+    static std::string fmt_key(int n) { return " on " + std::to_string(n); }
+
+    void move_pin(int dir) {
+        int i = focused_pin();
+        std::vector<std::string> p = pinned();
+        int j = i + dir;
+        if (i < 0 || j < 0 || j >= int(p.size())) return;
+        std::swap(p[size_t(i)], p[size_t(j)]);
+        save_pinned(p);
+        pin_sel_ = j;
+        refresh();
     }
 
-    void dock_select(int i) {
-        lv_obj_remove_state(dock_[dock_sel_], LV_STATE_USER_1);
-        dock_sel_ = i;
-        lv_obj_add_state(dock_[dock_sel_], LV_STATE_USER_1);
-    }
+    // ---- Search results --------------------------------------------------
 
-    void select(int i) {
-        if (cells_.empty()) return;
-        if (sel_ >= 0 && sel_ < int(cells_.size())) lv_obj_remove_state(cells_[sel_], LV_STATE_USER_1);
-        sel_ = i;
-        lv_obj_add_state(cells_[sel_], LV_STATE_USER_1);
-        int page = sel_ / kPerPage;
-        for (int p = 0; p < pages_; ++p) {
-            if (p == page) lv_obj_remove_flag(page_objs_[p], LV_OBJ_FLAG_HIDDEN);
-            else lv_obj_add_flag(page_objs_[p], LV_OBJ_FLAG_HIDDEN);
-            if (p < int(dots_.size())) lv_obj_set_style_bg_opa(dots_[p], p == page ? LV_OPA_COVER : LV_OPA_40, 0);
+    void results_page() {
+        results_.build(root_, 2, kSearchH + 5, kScreenW - 4, kBodyH - kSearchH - 6);
+        results_.set_empty_text("Nothing found for \"" + query_ + "\"");
+        for (Result& r : search(query_)) {
+            if (!r.choices.empty()) {
+                results_.add_choice(r.icon, r.text, r.choices, r.at, r.change);
+            } else if (r.kind == "Action") {
+                // Done in place: show the results again, relabelled ("Turn Wi-Fi on").
+                std::function<void()> run = r.run;
+                results_.add(r.icon, r.text, r.kind, [this, run] {
+                    int at = results_.focused();
+                    run();
+                    refresh();
+                    results_.focus(at);
+                });
+            } else {
+                results_.add(r.icon, r.text, r.kind, r.run);
+            }
         }
+        results_.finish();
+        shell_set_actions({{"Open", 0, "Enter", nullptr}, {"Pick", 0, "1-9", nullptr}, {"Clear", 0, "Esc", nullptr}});
     }
 
-    std::vector<lv_obj_t*> cells_, dock_, page_objs_, dots_;
-    std::vector<int> dock_app_;
-    int pages_ = 0;
-    int sel_ = -1;
-    int dock_sel_ = 0;
-    bool in_dock_ = false;
+    // ---- All apps --------------------------------------------------------
+
+    static void all_apps_cb(void* p) { static_cast<Launcher*>(p)->show_all_apps(); }
+
+    void show_all_apps() {
+        all_apps_ = true;
+        query_.clear();
+        clear();
+        std::vector<const AppInfo*> apps;
+        for (const AppInfo& a : app_registry()) apps.push_back(&a);
+        std::sort(apps.begin(), apps.end(), [](const AppInfo* x, const AppInfo* y) { return norm(x->name) < norm(y->name); });
+        lv_obj_t* head = label(root_, fmt_count(int(apps.size())).c_str(), &zs_font_12, 0xb8a8b4);
+        lv_obj_set_pos(head, 9, 3);
+        all_.build(root_, 2, 18, kScreenW - 4, kBodyH - 19);
+        all_ids_.clear();
+        std::vector<std::string> p = pinned();
+        for (const AppInfo* a : apps) {
+            std::string id = a->id;
+            auto at = std::find(p.begin(), p.end(), id);
+            std::string value = at == p.end() ? "" : "Pinned " + std::to_string(int(at - p.begin()) + 1);
+            all_.add(a->symbol, a->name, value, [id] { shell_open_app(id); });
+            all_ids_.push_back(id);
+        }
+        all_.set_empty_text("No app by that name");
+        all_.finish();
+        shell_set_actions({
+            {"Open", 0, "Enter", nullptr},
+            {"Find", 0, "a-z", nullptr},
+            {"Pin or unpin", 'p', nullptr, [this] {
+                 int i = all_.focused();
+                 if (i >= 0) toggle_pin(all_ids_[size_t(i)]);
+             }},
+        });
+    }
+
+    static std::string fmt_count(int n) { return "ALL APPS  (" + std::to_string(n) + ")"; }
+
+    lv_obj_t* root_ = nullptr;
+    lv_obj_t* box_ = nullptr;
+    lv_obj_t* rows_box_ = nullptr;
+    std::string query_;
+    bool all_apps_ = false;
+    std::vector<std::string> pins_;
+    std::vector<lv_obj_t*> pin_objs_, row_objs_;
+    std::vector<std::string> row_ids_, all_ids_;
+    std::map<lv_obj_t*, std::string> open_ids_;
+    std::map<lv_obj_t*, std::function<void()>> row_runs_;
+    int pin_sel_ = 0;
+    ListView results_, all_;
 };
 
 }  // namespace
 
 std::unique_ptr<App> make_launcher() { return std::make_unique<Launcher>(); }
+
+// An app was opened: it goes to the front of Recent.
+void home_opened(const std::string& id) {
+    if (id == "home" || id.empty()) return;
+    std::vector<std::string> r = split(prefs::get_str("home.recent", ""));
+    r.erase(std::remove(r.begin(), r.end(), id), r.end());
+    r.insert(r.begin(), id);
+    if (r.size() > 12) r.resize(12);
+    prefs::set_str("home.recent", join(r));
+}
 
 }  // namespace zs

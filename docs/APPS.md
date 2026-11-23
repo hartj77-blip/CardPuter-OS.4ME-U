@@ -9,7 +9,7 @@ Tether and ZClaw, the [Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and 
 
 Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
 with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**
-and press **U** (which that update needs anyway, for the new app ABI). Their system parts stay
+and press **Tab > U** (which that update needs anyway, for the new app ABI). Their system parts stay
 in ZeroOS: the desktop on the monitor (`zeroos-dock`), which Files, Camera, Mesh and Remote also
 use, and the console service behind Terminal. Remote's SSH and mosh need the Terminal app.
 
@@ -26,14 +26,17 @@ needs them.
 
 ## Using it
 
-Open **Apps** (it's in the dock). It looks for new apps when its list is more than 6 hours old.
+Open **Apps** (pinned on the home screen, or type "apps" there). It looks for new apps when its
+list is more than 6 hours old. Type to find an app.
 
 | Key | |
 | --- | --- |
-| Enter | an app's page: **Install**, **Update**, **Open**, **Remove** |
-| U | update every app that has a newer version |
-| R | look for new apps now |
-| S | sources: where apps come from. **D** removes one; **Add a GitHub repo** adds one |
+| Enter | an app's page: **Install**, **Update**, **Open**, **Remove** (Remove asks first) |
+| Tab > U | update every app that has a newer version |
+| Tab > R | look for new apps now |
+| Tab > P | sources: where apps come from. Tab > D removes one (it asks first); **Add a GitHub repo** adds one |
+
+Ctrl and the letter does the same without opening the menu (Ctrl + U updates every app).
 
 Installing needs a connection (Wi-Fi, Ethernet or a tethered phone). A new app appears on the home
 screen as soon as it's installed. After an update to an app you already opened, the screen
@@ -69,7 +72,7 @@ from the apps repository whenever it has a build for this ZeroOS. A device updat
 that updates every installed app once, to the apps repository's builds.
 
 Any other repository that publishes the same files works too: add it in
-**Apps > S > Add a GitHub repo**, or add a line to `/etc/zeroos/apps.sources` (an `owner/repo`,
+**Apps > Tab > P > Add a GitHub repo**, or add a line to `/etc/zeroos/apps.sources` (an `owner/repo`,
 or any `https://` address that serves the index).
 
 **Trust.** An app runs with the same access as the home screen, and installing one runs its
@@ -137,7 +140,7 @@ Release workflow by hand.
 
 - Nothing here has run on a Cardputer yet: the installer is tested against stand-ins for apt and
   GitHub (`image/tests/apps-test.sh`), and the modules in a headless ZeroShell on a PC.
-- A ZeroOS update doesn't update apps by itself; open **Apps** and press **U**.
+- A ZeroOS update doesn't update apps by itself; open **Apps** and press **Tab > U**.
 - Removing Terminal also removes one-key SSH from Remote (Remote says so); removing Dock leaves
   Dock mode reachable through Settings' "On HDMI" option.
 - The store shows an app's real icon only once it's installed (until then, a grid).

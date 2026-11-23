@@ -24,6 +24,9 @@ public:
     ListView& operator=(const ListView&) = delete;
     ~ListView();
 
+    // Forget the rows (their widgets were deleted with the screen), and any
+    // row action still waiting to run.
+    void reset();
     // The list, in `parent` at x, y, w x h. Building again starts it afresh.
     void build(lv_obj_t* parent, int x, int y, int w, int h);
     // A row: an icon (LV_SYMBOL_* / ZS_ICON_* or nullptr), its text, a value

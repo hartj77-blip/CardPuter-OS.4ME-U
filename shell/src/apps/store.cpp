@@ -312,13 +312,13 @@ private:
         lv_obj_t* sum = label(root_, e->summary.c_str(), &zs_font_12, kText);
         lv_obj_set_width(sum, kScreenW - 16);
         lv_label_set_long_mode(sum, LV_LABEL_LONG_WRAP);
-        lv_obj_set_pos(sum, 8, 46);
+        lv_obj_set_pos(sum, 8, 44);
         std::string from = e->source.empty() ? "" : "From " + e->source;
         if (!e->needs.empty()) from += (from.empty() ? "" : ".  ") + std::string("Brings ") + e->needs;
         lv_obj_t* f = label(root_, from.c_str(), &zs_font_12, kMuted);
         lv_obj_set_size(f, kScreenW - 16, 15);   // one line, cut with "..."
         lv_label_set_long_mode(f, LV_LABEL_LONG_DOT);
-        lv_obj_set_pos(f, 8, 80);
+        lv_obj_set_pos(f, 8, 74);
 
         int x = 8;
         auto button = [&](const char* text, bool accent, lv_event_cb_t cb) {
@@ -332,7 +332,7 @@ private:
             lv_obj_set_style_shadow_width(b, 0, 0);
             lv_obj_t* l = label(b, text, &zs_font_12, kText);
             lv_obj_center(l);
-            lv_obj_set_pos(b, x, 98);
+            lv_obj_set_pos(b, x, 90);   // above the progress line (kBodyH)
             lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, this);
             shell_add_focus(b);
             lv_obj_update_layout(b);
