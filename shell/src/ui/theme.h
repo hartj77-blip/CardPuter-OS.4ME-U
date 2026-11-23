@@ -41,6 +41,8 @@ constexpr int kScreenW = 320;
 constexpr int kScreenH = 170;
 constexpr int kStatusH = 20;
 constexpr int kContentH = kScreenH - kStatusH;
+constexpr int kSoftkeyH = 14;                    // soft-key bar (docs/UX.md)
+constexpr int kBodyH = kContentH - kSoftkeyH;    // an app area with the bar
 
 // Yaru dark.
 constexpr uint32_t kBg = 0x1e1e1e;        // window background

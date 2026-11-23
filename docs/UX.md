@@ -254,8 +254,8 @@ built from these:
 | `SearchProvider` | Adds results to home search |
 | `Recent` | Tell home what to reopen: `recent_push(title, detail, arg)` |
 
-The kit is part of the app ABI, so landing it bumps `ZS_APP_ABI` from 3 to 4. Apps in
-CardPuter-Apps.4ME-U rebuild against it, and the Apps store offers only builds that match.
+The kit is part of what apps compile against. `ZS_APP_ABI` goes from 3 to 4 when the first app in
+CardPuter-Apps.4ME-U uses it (see How it gets built); the Apps store offers only builds that match.
 
 ## Every app, before and after
 
@@ -301,9 +301,18 @@ letter, and Ctrl + the letter runs it straight away.
 | 5 | Port the apps: Files, Notes, Media, Apps, IR Remote, then the rest | both repos |
 | 6 | First-run tour, new KEYS.md, polish | |
 
-Each phase keeps the device usable: phases 1 and 2 land together (the keys need the soft-key bar
-to be learnable), and an app not yet ported keeps working, with the shell drawing a soft-key bar of
-just `⏎ Select  Esc Back`.
+Each phase keeps the device usable. The soft-key bar is opt-in: a screen gets it by setting its
+actions (`shell_set_actions()` in `ui/app.h`) and is then laid out `kBodyH` high. An app not yet
+ported has no bar and keeps its full height, so nothing moves until it's ported.
+
+The kit needs no app-level (`ZS_APP_ABI`) bump on its own: it only adds to the headers, and
+already-built modules never call it. The level goes to 4 in the first change that moves an
+installable app (CardPuter-Apps.4ME-U) onto the kit, since that app can't run on an older ZeroOS.
+
+Done so far: hold Esc and Ctrl + Space (0.3.8); actions, the soft-key bar, the Tab menu and
+Ctrl + a letter; 1 to 9 pick, 0 the key sheet; `ListView` (numbered rows, type to filter) and
+`shell_confirm()`. Wi-Fi is the first screen on all of it; the Apps store asks before removing a
+source. Tabs and value rows come with the Settings tree (phase 4).
 
 ### Testing
 

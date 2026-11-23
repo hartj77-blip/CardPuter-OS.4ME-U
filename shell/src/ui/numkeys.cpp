@@ -56,7 +56,7 @@ int number_hints_show(const std::vector<lv_obj_t*>& targets) {
         // (a switch, a slider): just left of it, on its row's label side.
         int h = lv_area_get_height(&a);
         int x = lv_area_get_width(&a) < kScreenW / 2 ? a.x1 - 16 : a.x1 + 2;
-        number_badge(int(i) + 3, x, a.y1 + (h > 13 ? (h - 13) / 2 : 0));
+        number_badge(int(i) + 1, x, a.y1 + (h > 13 ? (h - 13) / 2 : 0));
     }
     return int(targets.size());
 }

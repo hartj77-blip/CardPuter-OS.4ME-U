@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "lvgl.h"
 #include "ui/app.h"
@@ -32,6 +33,8 @@ public:
     uint32_t last_key() const { return last_key_; }
     // The open app needs no typing: plain letters are their Fn keys.
     void set_fn_layer(bool on) { fn_layer_ = on; }
+    // The open screen's actions (ui/actions.h): soft-key bar, Tab menu.
+    void set_actions(std::vector<Action> actions);
 
     static Shell& get();
 
@@ -57,10 +60,14 @@ private:
     void build_statusbar();
     void update_statusbar();
     void switch_to(std::unique_ptr<App> app, const std::string& title);
+    void remember_back(const std::string& id);
+    void go_back();
+    void fit_app_root();
     static void tick_cb(lv_timer_t* t);
 
     lv_obj_t* screen_ = nullptr;
     lv_obj_t* content_ = nullptr;
+    lv_obj_t* app_root_ = nullptr;   // the open app's area
     lv_obj_t* sb_time_ = nullptr;
     lv_obj_t* sb_title_ = nullptr;
     lv_obj_t* sb_home_ = nullptr;    // workspace pill, shown on the home screen
@@ -82,6 +89,7 @@ private:
     std::unique_ptr<App> app_;
     std::string app_id_;
     std::string pending_;
+    std::vector<std::string> back_;   // apps that opened the open one (Esc returns)
     std::string app_arg_;   // shell_open_app(id, arg): read once by the app
     lv_group_t* group_ = nullptr;
 };

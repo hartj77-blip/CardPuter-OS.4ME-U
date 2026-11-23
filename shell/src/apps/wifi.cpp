@@ -1,5 +1,6 @@
 // Wi-Fi: scan, pick a network, type the password, connect (NetworkManager).
 #include "apps/common.h"
+#include "ui/list_view.h"
 
 namespace zs {
 namespace {
@@ -13,7 +14,6 @@ public:
     }
 
     ~WifiApp() override {   // left before a deferred step ran: don't run it on a freed app
-        lv_async_call_cancel(show_password_cb, this);
         lv_async_call_cancel(connect_cb, this);
     }
 
@@ -27,12 +27,7 @@ public:
 
     bool on_key(uint32_t key) override {
         if (pw_page_) return password_key(key);
-        if (!pw_page_ && (key == 'r' || key == 'R')) {
-            show_list();
-            shell_toast("Rescanned");
-            return true;
-        }
-        return false;
+        return list_.key(key);   // typing filters the networks
     }
 
 private:
@@ -50,25 +45,34 @@ private:
         lv_obj_t* hdr = label(root_, st.wifi_connected ? ("Connected to " + st.wifi_ssid).c_str() : "Not connected",
                               &zs_font_12, st.wifi_connected ? kGood : kMuted);
         lv_obj_set_pos(hdr, 8, 4);
-        lv_obj_t* hint = label(root_, "R rescan", &zs_font_12, kMuted);
-        lv_obj_align(hint, LV_ALIGN_TOP_RIGHT, -8, 4);
 
-        lv_obj_t* list = make_list(root_, 4, 22, kScreenW - 8, kContentH - 26);
+        list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 21);
+        list_.set_empty_text("No networks found. Tab > R rescans.");
         for (size_t i = 0; i < nets_.size(); ++i) {
             auto& n = nets_[i];
-            std::string text = n.ssid + fmt("   %d%%", n.signal) + (n.secure ? "" : "   open");
-            lv_obj_t* b = list_button(list, n.connected ? LV_SYMBOL_OK : LV_SYMBOL_WIFI, text.c_str(), on_pick, this);
-            lv_obj_set_user_data(b, (void*)(intptr_t)i);
+            std::string value = fmt("%d%%", n.signal) + (n.secure ? "" : "  open");
+            list_.add(n.connected ? LV_SYMBOL_OK : LV_SYMBOL_WIFI, n.ssid, value, [this, i] {
+                pick_ = int(i);
+                show_password();
+            });
         }
-        finish_list(list);
+        list_.finish();
+
+        bool on = st.wifi_enabled;
+        std::vector<Action> acts;
+        acts.push_back({"Join", 0, "Enter", nullptr});
+        acts.push_back({"Rescan", 'r', nullptr, [this] { rescan(); }});
+        acts.push_back({on ? "Turn Wi-Fi off" : "Turn Wi-Fi on", 'w', nullptr, [this, on] {
+                            hal().set_wifi_enabled(!on);
+                            shell_toast(on ? "Wi-Fi off" : "Wi-Fi on");
+                            show_list();
+                        }});
+        shell_set_actions(std::move(acts));
     }
 
-    static void on_pick(lv_event_t* e) {
-        auto* self = static_cast<WifiApp*>(lv_event_get_user_data(e));
-        size_t i = (size_t)(intptr_t)lv_obj_get_user_data(lv_event_get_target_obj(e));
-        // Defer: we're inside an event of a widget that show_password() deletes.
-        self->pick_ = int(i);
-        lv_async_call(show_password_cb, self);
+    void rescan() {
+        show_list();
+        shell_toast("Rescanned");
     }
 
     void show_password() {
@@ -79,9 +83,10 @@ private:
             return;
         }
         clear();
+        shell_set_actions({{"Connect", 0, "Enter", nullptr}, {"Delete", 0, "Bksp", nullptr}, {"Back", 0, "Esc", nullptr}});
         pw_page_ = lv_obj_create(root_);
         style_plain(pw_page_);
-        lv_obj_set_size(pw_page_, kScreenW, kContentH);
+        lv_obj_set_size(pw_page_, kScreenW, kBodyH);
         lv_obj_t* t = label(pw_page_, ("Password for " + n.ssid).c_str(), &zs_font_14);
         lv_obj_set_pos(t, 10, 10);
         // A plain line of text, not a text box: shown as typed (easier to get
@@ -102,8 +107,7 @@ private:
         lv_obj_align(pw_label_, LV_ALIGN_LEFT_MID, 6, 0);
         pw_.clear();
         show_typed();
-        lv_obj_t* h = label(pw_page_, "Type the password, then Enter to connect.\nBackspace deletes. Esc goes back.",
-                            &zs_font_12, kMuted);
+        lv_obj_t* h = label(pw_page_, "Type the password. It shows as you type.", &zs_font_12, kMuted);
         lv_obj_set_pos(h, 10, 76);
     }
 
@@ -134,7 +138,6 @@ private:
         return true;
     }
 
-    static void show_password_cb(void* p) { static_cast<WifiApp*>(p)->show_password(); }
     static void connect_cb(void* p) {
         auto* s = static_cast<WifiApp*>(p);
         if (s->pick_ >= 0 && s->pick_ < int(s->nets_.size())) s->connect(s->nets_[size_t(s->pick_)].ssid, s->pw_);
@@ -151,6 +154,7 @@ private:
     lv_obj_t* pw_page_ = nullptr;
     lv_obj_t* pw_label_ = nullptr;
     std::vector<WifiNetwork> nets_;
+    ListView list_;
     int pick_ = -1;
     std::string pw_;
 };

@@ -31,10 +31,10 @@ The [roadmap](docs/ROADMAP.md) lists what is done and what is next.
 
 - Keyboard navigation. Use the arrow keys and Enter for everything, and Esc to go back. See
   [Keys](docs/KEYS.md).
-  - Number keys as buttons: 1 goes home, 2 opens the taskbar panel (Wi-Fi, Bluetooth, volume,
-    brightness and more), 3 to 9 pick the items on screen, and 0 shows which number is which.
+  - Number keys as buttons: 1 to 9 pick the items on screen, and 0 shows the keys. Hold Esc to go
+    home, and Ctrl + Space opens the taskbar panel (Wi-Fi, Bluetooth, volume, brightness and more).
   - On the home screen you don't need to hold Fn: F, Z, X and C are the arrows, A, S and D are mute
-    and volume, and so on. Shift and a letter jumps to an app, and 3 to 9 open the dock's apps.
+    and volume, and so on. Shift and a letter jumps to an app, and 1 to 7 open the dock's apps.
 - Install only what you need. Four apps are part of ZeroOS. Every other app is installed, updated
   and removed in the Apps app. See the [Apps guide](docs/APPS.md). The apps have their own
   repository, [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U).

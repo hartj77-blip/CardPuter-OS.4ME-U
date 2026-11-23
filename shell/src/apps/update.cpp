@@ -4,6 +4,8 @@
 // shows how far it has got.
 //
 //   Enter  look for an update / install the one found
+#include <cctype>
+
 #include "apps/common.h"
 
 namespace zs {
@@ -16,7 +18,7 @@ public:
         lv_obj_t* panel = lv_obj_create(root);
         style_panel(panel);
         lv_obj_set_pos(panel, 6, 6);
-        lv_obj_set_size(panel, kScreenW - 12, kContentH - 12);
+        lv_obj_set_size(panel, kScreenW - 12, kBodyH - 12);
         lv_obj_remove_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
         const int w = kScreenW - 12 - 24;
 
@@ -29,10 +31,8 @@ public:
         lv_label_set_long_mode(help_, LV_LABEL_LONG_WRAP);
         lv_obj_set_pos(help_, 0, 42);
         bar_ = thin_bar(panel, w, 6, kAccent);
-        lv_obj_align(bar_, LV_ALIGN_BOTTOM_LEFT, 0, -22);
+        lv_obj_align(bar_, LV_ALIGN_BOTTOM_LEFT, 0, -4);
         lv_bar_set_range(bar_, 0, 100);
-        hint_ = label(panel, "", &zs_font_12, kText);
-        lv_obj_align(hint_, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 
         st_ = hal().update();
         show();
@@ -170,7 +170,16 @@ private:
         lv_label_set_text(head_, head.c_str());
         lv_obj_set_style_text_color(head_, c(color), 0);
         lv_label_set_text(help_, help.c_str());
-        lv_label_set_text(hint_, hint.c_str());
+        // What Enter does now, in the soft-key bar ("Enter: install" -> Install).
+        if (hint != hint_) {
+            hint_ = hint;
+            std::string what = hint.rfind("Enter: ", 0) == 0 ? hint.substr(7) : "";
+            if (!what.empty()) what[0] = char(std::toupper((unsigned char)what[0]));
+            std::vector<Action> acts;
+            if (!what.empty()) acts.push_back({what, 0, "Enter", nullptr});
+            acts.push_back({"Back", 0, "Esc", nullptr});
+            shell_set_actions(std::move(acts));
+        }
         if (percent < 0) {
             lv_obj_add_flag(bar_, LV_OBJ_FLAG_HIDDEN);
         } else {
@@ -181,7 +190,8 @@ private:
 
     enum class Asked { None, Check, Install };
 
-    lv_obj_t *version_ = nullptr, *head_ = nullptr, *help_ = nullptr, *bar_ = nullptr, *hint_ = nullptr;
+    lv_obj_t *version_ = nullptr, *head_ = nullptr, *help_ = nullptr, *bar_ = nullptr;
+    std::string hint_ = "-";   // what the soft-key bar says Enter does
     UpdateStatus st_;
     Asked asked_ = Asked::None;
     bool offline_ = false;

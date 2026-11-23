@@ -8,6 +8,7 @@
 #include "hal/hal.h"
 #include "platform/keys.h"
 #include "platform/platform.h"
+#include "ui/actions.h"
 #include "ui/numkeys.h"
 #include "ui/player.h"
 #include "ui/power.h"
@@ -163,6 +164,7 @@ void Shell::start(lv_indev_t* keypad) {
     lv_obj_add_flag(toast_, LV_OBJ_FLAG_HIDDEN);
 
     quick_panel_build(screen_);
+    actions_build(screen_);
 
     // Simulator stand-in for the backlight: a black layer over everything.
     blank_ = lv_obj_create(lv_layer_top());
@@ -359,6 +361,9 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     fn_layer_ = false;
     number_hints_hide();
     quick_panel_close();
+    actions_confirm_close();
+    actions_clear();
+    app_root_ = nullptr;
     // Destroy the old app while its widgets still exist: destructors read
     // them (Notes saves its text), then the widgets and group go away.
     app_.reset();
@@ -379,7 +384,9 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     style_plain(root);
     lv_obj_set_size(root, kScreenW, kContentH);
     lv_obj_remove_flag(root, LV_OBJ_FLAG_SCROLLABLE);
+    app_root_ = root;
     app_->build(root);
+    fit_app_root();
 
     lv_label_set_text(sb_title_, title.c_str());
     update_statusbar();
@@ -390,11 +397,33 @@ void Shell::open_app(const std::string& id) {
     // destroys the calling app. apply_pending() runs once the call returns.
     pending_ = id;
     app_arg_.clear();
+    remember_back(id);
 }
 
 void Shell::open_app(const std::string& id, const std::string& arg) {
     pending_ = id;
     app_arg_ = arg;
+    remember_back(id);
+}
+
+// One app opening another (Settings > Wi-Fi, Files > Notes): Esc at the new
+// one's first screen comes back here, not home. Home itself isn't kept: it's
+// where an empty stack goes anyway.
+void Shell::remember_back(const std::string& id) {
+    if (app_id_.empty() || app_id_ == "home" || app_id_ == id) return;
+    if (!back_.empty() && back_.back() == app_id_) return;
+    back_.push_back(app_id_);
+    if (back_.size() > 8) back_.erase(back_.begin());
+}
+
+void Shell::go_back() {
+    if (back_.empty()) {
+        go_home();
+        return;
+    }
+    pending_ = back_.back();
+    back_.pop_back();
+    app_arg_.clear();
 }
 
 std::string Shell::take_app_arg() {
@@ -403,11 +432,27 @@ std::string Shell::take_app_arg() {
     return a;
 }
 
-void Shell::go_home() { pending_ = "home"; }
+void Shell::go_home() {
+    pending_ = "home";
+    back_.clear();
+}
+
+void Shell::set_actions(std::vector<Action> actions) {
+    actions_set(std::move(actions));
+    fit_app_root();
+}
+
+// A screen with actions has the soft-key bar under it: kBodyH, not kContentH.
+void Shell::fit_app_root() {
+    if (app_root_) lv_obj_set_height(app_root_, actions_bar_shown() ? kBodyH : kContentH);
+}
 
 void Shell::hold_home() {
     if (handoff_) return;   // the terminal or camera has the screen
     if (quick_panel_is_open()) quick_panel_close();
+    actions_menu_close();
+    actions_sheet_close();
+    actions_confirm_close();
     number_hints_hide();
     if (app_id_ != "home") go_home();
     apply_pending();
@@ -485,15 +530,30 @@ bool Shell::handle_key(uint32_t key) {
     if (key != '0') number_hints_hide();
     if (key == ctrl_key(' ')) {
         // Ctrl + Space: the taskbar panel, from anywhere, text box or not.
+        actions_menu_close();
         if (panel) quick_panel_close();
         else quick_panel_open();
         used = true;
+    } else if (actions_confirm_is_open() && actions_confirm_key(key)) {
+        used = true;   // the confirm box: Enter or Esc, nothing else
+    } else if (actions_sheet_is_open()) {
+        actions_sheet_close();   // the key sheet: any key closes it
+        used = true;
+    } else if (actions_menu_is_open() && actions_menu_key(key)) {
+        used = true;   // the Tab menu takes every key but the shell's own
     } else if (panel && quick_panel_key(key)) {
         used = true;
     } else if (!panel && app_ && app_->on_key(key)) {
         used = true;
+    } else if (!panel && key == kKeyNext && actions_have_menu()) {
+        // Tab: the screen's menu (docs/UX.md). Screens without one keep Tab.
+        actions_menu_open(focused, lv_label_get_text(sb_title_));
+        used = true;
     } else if (is_ctrl_key(key)) {
-        used = true;   // a Ctrl key nobody took: never to a widget (a text box would type it)
+        // Ctrl + a letter: that menu action. Never to a widget either (a
+        // text box would type it).
+        if (!panel) actions_run_letter(char(key - kKeyCtrl));
+        used = true;
     } else if (is_shell_key(key)) {
         system_key(key);
         used = true;   // never to a widget: a text box would type it
@@ -512,7 +572,7 @@ bool Shell::handle_key(uint32_t key) {
         if (app_ && app_->on_back()) {
             used = true;
         } else if (app_id_ != "home") {
-            go_home();
+            go_back();   // to the app that opened this one, else home
             used = true;
         }
     }
@@ -562,19 +622,16 @@ void Shell::system_key(uint32_t key) {
 
 bool Shell::number_key(uint32_t key) {
     switch (key) {
-        case '1':
-            if (app_id_ != "home") go_home();
-            return true;
-        case '2':
-            quick_panel_open();
-            return true;
         case '0':
-            if (number_hints_shown()) number_hints_hide();
+            // The key sheet where the screen has actions; elsewhere, badges on
+            // what 1 to 9 pick (lists show theirs all the time).
+            if (actions_bar_shown()) actions_sheet_open(lv_label_get_text(sb_title_));
+            else if (number_hints_shown()) number_hints_hide();
             else if (number_hints_show(number_targets(group_)) == 0) toast("Nothing to pick here");
             return true;
         default: {
             auto targets = number_targets(group_);
-            size_t i = key - '3';
+            size_t i = key - '1';
             if (i >= targets.size()) return true;
             lv_group_focus_obj(targets[i]);
             lv_obj_scroll_to_view(targets[i], LV_ANIM_OFF);
@@ -648,5 +705,10 @@ void shell_prepare_power_off() { Shell::get().prepare_power_off(); }
 bool shell_open_terminal(const std::string& command) { return Shell::get().open_terminal(command); }
 bool shell_open_camera() { return Shell::get().open_camera(); }
 void shell_set_fn_layer(bool on) { Shell::get().set_fn_layer(on); }
+void shell_set_actions(std::vector<Action> actions) { Shell::get().set_actions(std::move(actions)); }
+void shell_confirm(const std::string& question, const std::string& detail, const std::string& yes,
+                   std::function<void()> on_yes) {
+    actions_confirm(question, detail, yes, std::move(on_yes));
+}
 
 }  // namespace zs

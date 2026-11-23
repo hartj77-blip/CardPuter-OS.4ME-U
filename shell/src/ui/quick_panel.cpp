@@ -19,7 +19,7 @@ using namespace theme;
 namespace {
 
 enum Tile { Wifi, Bluetooth, Volume, Brightness, Battery, Clock, Settings, kTiles };
-static_assert(kTiles == kNumberSlots, "one tile per number key 3..9");
+static_assert(kTiles <= kNumberSlots, "one tile per number key 1..7");
 
 constexpr int kStep = 10;
 constexpr int kPanelH = 56;
@@ -100,7 +100,7 @@ void quick_panel_build(lv_obj_t* screen) {
         lv_obj_set_style_border_width(tile, 1, LV_STATE_USER_1);
         lv_obj_remove_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
         // The tile's number key, top left.
-        char num[2] = {char('3' + t), 0};
+        char num[2] = {char('1' + t), 0};
         lv_obj_align(label(tile, num, &zs_font_12, kMuted), LV_ALIGN_TOP_LEFT, 3, 1);
         g_icons[t] = label(tile, "", &zs_font_16, kText);
         lv_obj_align(g_icons[t], LV_ALIGN_TOP_MID, 0, 8);
@@ -173,16 +173,11 @@ bool quick_panel_key(uint32_t key) {
         case kKeyEnter:
         case '\r': activate(g_sel); break;
         case kKeyEsc:
-        case '`':
-        case '2': quick_panel_close(); break;
-        case '1':
-            quick_panel_close();
-            shell_go_home();
-            break;
+        case '`': quick_panel_close(); break;
         default:
-            if (key >= '3' && key <= '9') {
+            if (key >= '1' && key < '1' + kTiles) {
                 // Volume and brightness just take the arrows; the rest act.
-                select(int(key - '3'));
+                select(int(key - '1'));
                 if (g_sel != Volume && g_sel != Brightness) activate(g_sel);
             }
             break;
