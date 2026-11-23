@@ -58,12 +58,11 @@ Arrow keys move, Enter opens, Esc goes back. The \` key also works as Esc.
 
 | Key | What it does |
 | --- | --- |
-| Hold Esc | Home screen, from anywhere |
+| Esc | Back. Hold it to go to the home screen from anywhere |
 | Ctrl + Space | Taskbar panel: Wi-Fi, Bluetooth, volume, brightness, battery |
-| 1 | Home screen (when you're not typing) |
-| 2 | Taskbar panel (when you're not typing) |
-| 3 to 9 | Pick the 1st to 7th item on screen |
-| 0 | Show which number goes with which item |
+| 1 to 9 | Pick the 1st to 9th item on screen (when you're not typing) |
+| 0 | Show the keys for the current screen |
+| Tab | Menu of everything you can do on the current screen (on screens using the new layout) |
 
 On the home screen:
 
@@ -71,14 +70,14 @@ On the home screen:
 | --- | --- |
 | F / Z / X / C | Up / Left / Down / Right (no need to hold Fn here) |
 | Shift + a letter | Jump to the next app starting with that letter |
-| 3 to 9 | Open the dock's apps, top to bottom |
+| 1 to 7 | Open the dock's apps, top to bottom |
 | A / S / D | Mute / volume down / volume up |
 
 Ctrl, Shift, Fn and Sym are sticky: tap one and then press the next key. Apps show their own keys
 on screen. For example, in Media Space pauses and N skips, and in IR Remote L learns a button from
 another remote. The full list is in [Keys](docs/KEYS.md).
 
-**Installing apps:** open **Apps**, pick one and press Enter. **U** updates everything.
+**Installing apps:** open **Apps**, pick one and press Enter. **Update all** at the top of the list (or Ctrl + U) updates everything.
 **Updating ZeroOS:** open **Update**. No re-flashing needed, see [Updates](docs/UPDATE.md).
 
 ### Battery and memory
@@ -149,7 +148,7 @@ the project's old address. [Updates](docs/UPDATE.md#it-says-up-to-date-but-a-new
 has a one-line fix.
 
 **Apps won't install, or Terminal opens nothing, after updating from 0.1.x.** Open Update and
-install the newest version, then open Apps and press **U**.
+install the newest version, then open Apps and choose **Update all**.
 
 **"The package system needs repair first".** From 0.3.3 on, Update and Apps fix this themselves.
 On older versions see [Updates](docs/UPDATE.md#it-says-the-package-system-needs-repair-first).

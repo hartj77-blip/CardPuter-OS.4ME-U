@@ -113,6 +113,9 @@ It builds against this repository (pinned there as `base/`), using three things 
 | `shell/cmake/ZeroShellApps.cmake` | `zs_app()` and `zs_apps_build()`, which turn an app into a module |
 | `image/apps/make-app-deb.sh` | Packs a module into `zeroos-app-<id>.deb` and prints its block for the index |
 
+A screen says what its keys do with `shell_set_actions()` (`ui/app.h`): the shell then draws the
+soft-key bar, the Tab menu and Ctrl + letter shortcuts from that one list. See [UX.md](UX.md).
+
 New apps go there, not here. The apps still in `shell/src/apps/` and `image/apps/` are the
 fallback copies; they will be removed once a device has installed from the apps repository.
 Don't change an app in both places: change it in the apps repository.

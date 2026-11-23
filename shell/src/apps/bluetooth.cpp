@@ -1,7 +1,8 @@
 // Bluetooth: find, pair, connect and forget devices - keyboards, gamepads,
 // speakers, headphones (BlueZ). Opened from Settings or the home screen.
 //
-//   Enter  pair and connect / disconnect     S  scan (8 s)     X  forget
+//   Enter  pair and connect / disconnect.  Tab: S scan (8 s), D forget
+//   Typing finds a device (ui/list_view.h).
 //
 // Pairing is "just works" (nothing to type), which keyboards, gamepads and
 // speakers accept. A paired device is trusted, so it reconnects by itself
@@ -10,6 +11,7 @@
 #include <unistd.h>
 
 #include "apps/common.h"
+#include "ui/list_view.h"
 
 namespace zs {
 namespace {
@@ -23,25 +25,19 @@ public:
         show();
     }
 
-    ~BluetoothApp() override { lv_async_call_cancel(activate_cb, this); }
+    bool on_key(uint32_t key) override { return list_.key(key); }
 
-    bool on_key(uint32_t key) override {
-        if (key == 's' || key == 'S') {
-            scan();
-            return true;
+    void forget() {
+        int i = focused_device();
+        if (i < 0 || !devices_[size_t(i)].paired) {
+            shell_toast("Pick a paired device first");
+            return;
         }
-        if (key == 'x' || key == 'X' || key == LV_KEY_DEL) {
-            int i = focused_device();
-            if (i >= 0 && devices_[size_t(i)].paired) {
-                BtDevice d = devices_[size_t(i)];
-                hal().bt_forget(d.address);
-                shell_toast("Forgot " + d.name);
-                devices_ = hal().bt_devices();
-                show();
-            }
-            return true;
-        }
-        return false;
+        BtDevice d = devices_[size_t(i)];
+        hal().bt_forget(d.address);
+        shell_toast("Forgot " + d.name);
+        devices_ = hal().bt_devices();
+        show();
     }
 
     // Connections change by themselves (a keyboard switched off): look every
@@ -63,10 +59,17 @@ private:
     bool bt_on() { return hal().net().bt_enabled; }
 
     void show() {
-        int keep = focused_row();
+        int keep = list_.focused();
         lv_obj_clean(root_);
         lv_group_remove_all_objs(group);
         bool on = bt_on();
+
+        Action forget_act{"Forget", 'd', nullptr, [this] { forget(); }, on};
+        forget_act.danger = true;
+        forget_act.confirm = "Forget this device?";
+        shell_set_actions({{on ? "Connect" : "Turn on", 0, "Enter", nullptr},
+                           {"Scan for devices", 's', nullptr, [this] { scan(); }},
+                           forget_act});
 
         int connected = 0;
         for (auto& d : devices_) connected += d.connected;
@@ -75,43 +78,39 @@ private:
                                        : "Bluetooth is on";
         lv_obj_t* hdr = label(root_, head.c_str(), &zs_font_12, on ? kGood : kMuted);
         lv_obj_set_pos(hdr, 8, 4);
-        lv_obj_t* hint = label(root_, on ? "S scan   X forget" : "", &zs_font_12, kMuted);
-        lv_obj_align(hint, LV_ALIGN_TOP_RIGHT, -8, 4);
 
-        lv_obj_t* list = make_list(root_, 4, 22, kScreenW - 8, kContentH - 26);
+        list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 21);
         rows_.clear();
-        buttons_.clear();
         if (!on) {
-            add_row(list, LV_SYMBOL_BLUETOOTH, "Turn on Bluetooth", kTurnOn);
+            add_row(LV_SYMBOL_BLUETOOTH, "Turn on Bluetooth", "", kTurnOn);
         } else {
             for (size_t i = 0; i < devices_.size(); ++i) {
                 const BtDevice& d = devices_[i];
-                std::string text = d.name + (d.connected ? "   connected" : d.paired ? "   paired" : "");
-                add_row(list, d.connected ? LV_SYMBOL_OK : LV_SYMBOL_BLUETOOTH, text, int(i));
+                add_row(d.connected ? LV_SYMBOL_OK : LV_SYMBOL_BLUETOOTH, d.name,
+                        d.connected ? "connected" : d.paired ? "paired" : "", int(i));
             }
-            add_row(list, LV_SYMBOL_REFRESH, "Scan for devices   S", kScan);
-            if (devices_.empty())
-                lv_list_add_text(list, "Put the keyboard, gamepad or speaker in pairing mode, then scan.");
+            add_row(LV_SYMBOL_REFRESH, "Scan for devices", "", kScan);
         }
-        finish_list(list);
-        if (keep >= 0 && keep < int(buttons_.size())) lv_group_focus_obj(buttons_[size_t(keep)]);
+        list_.finish();
+        if (devices_.empty() && on) {
+            lv_obj_t* tip = label(root_, "Put the keyboard, gamepad or speaker in pairing mode, then scan.",
+                                  &zs_font_12, kMuted);
+            lv_obj_set_width(tip, kScreenW - 20);
+            lv_label_set_long_mode(tip, LV_LABEL_LONG_WRAP);
+            lv_obj_set_pos(tip, 10, 50);
+        }
+        if (keep >= 0) list_.focus(keep);
     }
 
     static constexpr int kTurnOn = -1, kScan = -2;
 
-    void add_row(lv_obj_t* list, const char* icon, const std::string& text, int what) {
-        lv_obj_t* b = list_button(list, icon, text.c_str(), on_click, this);
-        lv_obj_set_user_data(b, (void*)(intptr_t)rows_.size());
+    void add_row(const char* icon, const std::string& text, const std::string& value, int what) {
+        int row = int(rows_.size());
+        list_.add(icon, text, value, [this, row] { activate(row); });
         rows_.push_back(what);
-        buttons_.push_back(b);
     }
 
-    int focused_row() {
-        lv_obj_t* f = lv_group_get_focused(group);
-        for (size_t i = 0; i < buttons_.size(); ++i)
-            if (buttons_[i] == f) return int(i);
-        return -1;
-    }
+    int focused_row() { return list_.focused(); }
     int focused_device() {
         int r = focused_row();
         if (r < 0 || r >= int(rows_.size())) return -1;
@@ -160,22 +159,10 @@ private:
         show();
     }
 
-    static void on_click(lv_event_t* e) {
-        auto* self = static_cast<BluetoothApp*>(lv_event_get_user_data(e));
-        self->pending_ = int((intptr_t)lv_obj_get_user_data(lv_event_get_target_obj(e)));
-        // Deferred: activating rebuilds the list, which deletes the clicked button.
-        lv_async_call(activate_cb, self);
-    }
-    static void activate_cb(void* p) {
-        auto* s = static_cast<BluetoothApp*>(p);
-        s->activate(s->pending_);
-    }
-
     lv_obj_t* root_ = nullptr;
     std::vector<BtDevice> devices_;
-    std::vector<int> rows_;            // per list row: a device index, kTurnOn or kScan
-    std::vector<lv_obj_t*> buttons_;   // per list row
-    int pending_ = -1;
+    std::vector<int> rows_;   // per list row: a device index, kTurnOn or kScan
+    ListView list_;
     int n_ = 0;
 };
 }  // namespace

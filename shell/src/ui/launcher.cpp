@@ -2,9 +2,9 @@
 // edge and the app grid in pages of ten beside it.
 // Nothing here is typed, so the keyboard's Fn layer is on without Fn held:
 // f/z/x/c (or the arrows) move, Enter opens, k/n go to the first/last app,
-// l/m to the page before/after. 3-9 open the dock's apps (as Ubuntu's
+// l/m to the page before/after. 1-7 open the dock's apps (as Ubuntu's
 // Super+1..9), 0 shows which is which. Shift + a letter jumps to the next
-// app that starts with it. 1 and 2 are the shell's (ui/numkeys.h).
+// app that starts with it.
 #include <algorithm>
 #include <cctype>
 
@@ -28,11 +28,11 @@ constexpr int kCellH = 66;
 constexpr int kGridY = 3;
 constexpr int kDotsY = kGridY + kRows * kCellH + 5;
 
-// The dock's favourites, top to bottom, on keys 3 to 9.
+// The dock's favourites, top to bottom, on keys 1 to 7.
 // The first six installed of these, then Settings. Missing ones (not
 // installed) are skipped, so Apps fills in on a fresh ZeroOS.
 const char* const kFavourites[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
-constexpr int kDockSlots = kNumberSlots;
+constexpr int kDockSlots = 7;   // keys 1..7
 constexpr int kDockIcon = 17;
 constexpr int kFavCount = int(sizeof kFavourites / sizeof kFavourites[0]);
 
@@ -136,8 +136,8 @@ public:
 
     bool on_key(uint32_t key) override {
         int n = int(cells_.size());
-        if (key >= '3' && key <= '9') {
-            size_t f = key - '3';
+        if (key >= '1' && key <= '7') {
+            size_t f = key - '1';
             if (f < dock_.size()) shell_open_app(app_registry()[dock_app_[f]].id);
             return true;
         }
@@ -148,7 +148,7 @@ public:
                 for (size_t f = 0; f < dock_.size(); ++f) {
                     lv_area_t a;
                     lv_obj_get_coords(dock_[f], &a);
-                    number_badge(int(f) + 3, a.x2 - 4, a.y1 - 3);
+                    number_badge(int(f) + 1, a.x2 - 4, a.y1 - 3);
                 }
             }
             return true;
