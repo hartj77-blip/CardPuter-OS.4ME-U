@@ -448,13 +448,19 @@ int platform_run_script(const std::string&) {
 #elif defined(__EMSCRIPTEN__)
 // ---------------------------------------------------------------- web
 // Browser demo: LVGL renders into an RGBA frame that the page copies to a
-// canvas; the page feeds keys in through zs_web_key(). Simulated hardware.
+// canvas; the page feeds keys in through zs_web_evdev(). Simulated hardware.
 namespace {
 std::vector<uint8_t> g_rgba;
 int g_w = 0, g_h = 0;
-std::deque<uint32_t> g_keys;
-bool g_pressed = false;
+// Keys arrive as Linux key events, as on the device: the page runs a copy of
+// M5's keyboard driver for the keys drawn on screen (built-in keyboard), and
+// the computer's own keyboard counts as a USB keyboard plugged in. Each goes
+// through the same KeyTranslator the device uses, so Shift/Fn/Sym, the Sym
+// symbols, sticky Ctrl and held keys (hold Esc, hold Tab) all behave the same.
+KeyTranslator g_builtin{KeyLayout::Cardputer};
+KeyTranslator g_usb{KeyLayout::Us};
 uint32_t g_cur = 0;
+lv_indev_state_t g_state = LV_INDEV_STATE_RELEASED;
 int g_dirty = 0;
 
 void flush_cb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
@@ -474,23 +480,16 @@ void flush_cb(lv_display_t* d, const lv_area_t* a, uint8_t* px) {
     lv_display_flush_ready(d);
 }
 
+// One press or release per read, as keyboard_read_cb on the device.
 void read_cb(lv_indev_t*, lv_indev_data_t* data) {
-    if (g_pressed) {
-        data->key = g_cur;
-        data->state = LV_INDEV_STATE_RELEASED;
-        g_pressed = false;
-    } else if (!g_keys.empty()) {
-        g_cur = g_keys.front();
-        g_keys.pop_front();
-        data->key = g_cur;
-        data->state = LV_INDEV_STATE_PRESSED;
-        g_pressed = true;
-    } else {
-        data->key = g_cur;
-        data->state = LV_INDEV_STATE_RELEASED;
+    KeyEvent e;
+    if (g_builtin.next(e) || g_usb.next(e)) {
+        g_cur = e.key;
+        g_state = e.pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
     }
-    // Drain queued keys within one LVGL cycle so fast typing keeps up.
-    data->continue_reading = g_pressed || !g_keys.empty();
+    data->key = g_cur;
+    data->state = g_state;
+    data->continue_reading = g_builtin.pending() || g_usb.pending();
 }
 
 uint32_t tick_cb() { return uint32_t(emscripten_get_now()); }
@@ -519,18 +518,22 @@ void seed_home() {
 }  // namespace
 
 extern "C" {
-EMSCRIPTEN_KEEPALIVE void zs_web_key(uint32_t key) { g_keys.push_back(key); }
-EMSCRIPTEN_KEEPALIVE uint8_t* zs_web_frame() { return g_rgba.data(); }
-// Open an app by its position in the launcher (-1 = home).
-EMSCRIPTEN_KEEPALIVE void zs_web_open(int index) {
-    const auto& apps = app_registry();
-    if (index >= 0 && index < int(apps.size())) shell_open_app(apps[index].id);
-    else shell_go_home();
+// A Linux key event (value 1 down, 0 up) from the built-in keyboard (kbd 0)
+// or a USB keyboard (kbd 1).
+EMSCRIPTEN_KEEPALIVE void zs_web_evdev(int kbd, int code, int value) {
+    (kbd == 0 ? g_builtin : g_usb).feed(uint16_t(code), value);
 }
+// The power switch: off stops ZeroShell where it is (the page blanks the screen).
+EMSCRIPTEN_KEEPALIVE void zs_web_power(int on) {
+    if (on) emscripten_resume_main_loop();
+    else emscripten_pause_main_loop();
+}
+EMSCRIPTEN_KEEPALIVE uint8_t* zs_web_frame() { return g_rgba.data(); }
 // Pretend HDMI monitor for trying Dock mode in the browser.
 EMSCRIPTEN_KEEPALIVE void zs_web_hdmi(int connected) { mock_set_hdmi(connected != 0); }
 EMSCRIPTEN_KEEPALIVE void zs_web_pose(int pose) { mock_set_pose(pose); }
-// The launcher's apps, so the page's "Jump to an app" list matches this build.
+// The apps built into this simulator, so the page's app guide can say which
+// ones can be tried here.
 EMSCRIPTEN_KEEPALIVE int zs_web_app_count() { return int(app_registry().size()); }
 EMSCRIPTEN_KEEPALIVE const char* zs_web_app_id(int i) {
     const auto& apps = app_registry();
@@ -588,7 +591,7 @@ bool platform_capture(std::vector<uint8_t>& rgb, int& w, int& h) {
 }
 void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
-bool platform_ctrl_pending() { return false; }
+bool platform_ctrl_pending() { return g_builtin.ctrl_pending() || g_usb.ctrl_pending(); }
 
 #else
 // ---------------------------------------------------------------- headless
