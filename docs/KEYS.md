@@ -34,7 +34,7 @@ Home, Settings, Wi-Fi, Bluetooth, Apps and Update so far. A line along the botto
 | --- | --- |
 | Tab | A menu of everything you can do here, each with a letter: press the letter to do it |
 | Ctrl + a letter | Do that menu item straight away, without opening the menu |
-| Letters | In a list, type to find: only the rows that match stay. Backspace or Esc undoes it |
+| Letters | In a list, type to find: only the rows that match stay, best match first. Backspace or Esc undoes it |
 
 Every row shows its number key: 1 to 9 are the first nine rows of a list, like a phone menu.
 Esc in an app opened from another one (Settings > Wi-Fi) goes back to that one. Something that can't be undone (forgetting, removing) asks first:
@@ -46,7 +46,7 @@ Home is a search box, seven pinned apps and the apps you opened last.
 
 | Key | What it does |
 | --- | --- |
-| Letters | Search apps, settings and actions ("wifi", "bright", "mute"). Enter opens the first |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "music", "bt"). The best match is first, and Enter opens it |
 | 1 to 7 | Open a pinned app. While searching, 1 to 9 pick a result |
 | Arrows (Fn + F/Z/X/C) | Move between the pinned apps and the Recent list |
 | Esc | Clear the search |

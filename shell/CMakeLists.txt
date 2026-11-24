@@ -125,6 +125,11 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(desktop_entry_test PRIVATE src)
   target_compile_options(desktop_entry_test PRIVATE -Wall -Wextra)
   add_test(NAME desktop_entry_test COMMAND desktop_entry_test)
+  # What typed text finds: Home search and list filters.
+  add_executable(search_match_test tests/search_match_test.cpp src/ui/search_match.cpp)
+  target_include_directories(search_match_test PRIVATE src)
+  target_compile_options(search_match_test PRIVATE -Wall -Wextra)
+  add_test(NAME search_match_test COMMAND search_match_test)
   # A test-pattern libretro core for the Games app (tests/games/testcore.c):
   # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
   add_library(zstest_libretro MODULE tests/games/testcore.c)

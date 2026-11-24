@@ -53,7 +53,7 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
 
 ## Status: what is tested and what isn't
 
-ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.5.1. It is
+ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.6.0. It is
 being written faster than it can be tried on hardware, so this section says plainly where things
 stand.
 
@@ -144,7 +144,7 @@ On the home screen:
 
 | Key | What it does |
 | --- | --- |
-| Letters | Search apps, settings and actions ("wifi", "bright", "mute"). Enter opens the first |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "music", "bt"). The best match is first, and Enter opens it |
 | 1 to 7 | Open the pinned apps. While searching, 1 to 9 pick a result |
 | Esc | Clear the search |
 | Tab | Open All apps (every app, A to Z). There, Tab on an app, P, then 1 to 7 pins it on that key |
