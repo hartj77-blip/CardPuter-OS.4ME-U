@@ -1270,6 +1270,7 @@ ZeroOS's own code is MIT licensed, see [LICENSE](LICENSE). It builds on:
 | M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen) | Building the image | BSD-3 |
 | M5Stack's [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays) | Screen, keyboard and other hardware | See that repository |
 | The [Ubuntu font](https://design.ubuntu.com/font) | The UI's typeface | Ubuntu Font Licence |
+| Ansel Adams, [*The Tetons and the Snake River*](https://commons.wikimedia.org/wiki/File:Adams_The_Tetons_and_the_Snake_River.jpg) (1942), U.S. National Archives 79-AA-G01 | The home screen's photograph | Public domain |
 | Raspberry Pi OS and Debian | Everything underneath | Various free licences |
 
 The hardware notes draw on early owner reports, credited in [Hardware notes](docs/HARDWARE.md).

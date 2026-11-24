@@ -267,13 +267,13 @@ simulator.
   ships it; the shell only adds the focus.
 - **Photography** on home and the lock screen only: public-domain Ansel Adams prints from the
   National Park Service Mural Project (1941-42, National Archives series 79-AA), converted to
-  greyscale at build time. Built in; there are no custom wallpapers.
+  greyscale ahead of time (`shell/tools/wallpaper.py`). Built in; there are no custom wallpapers.
 
 | Step | Work | State |
 | --- | --- | --- |
 | 1 | Theme values and roles in `ui/theme.h`; lit focus, lifted menu/confirm/panel/toast, square chrome; UI 2 names kept as aliases | Done |
-| 2 | Wallpaper: `tools/wallpaper.py` makes greyscale 320 x 170 images at build time; home and lock use them | |
-| 3 | Home pins and Recent, lock screen, status bar over the photo | |
+| 2 | The photograph behind home: `shell/tools/wallpaper.py` crops, shades and dithers it to neutral greys and writes `ui/wallpaper_home.cpp` (committed, like the fonts). Search and All apps stand on plain black | Done |
+| 3 | Home pins and Recent, a lock screen with the photograph, status bar over the photo | |
 | 4 | Inter typeface; outline glyphs for system icons (not app icons) | |
 | 5 | Replace hex values in apps (both repositories) with roles; a CI check; drop the aliases | |
 | 6 | Mockups, emulator, release | |

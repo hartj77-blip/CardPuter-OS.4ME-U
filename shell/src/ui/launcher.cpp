@@ -26,6 +26,7 @@
 #include "ui/shell.h"
 #include "ui/suggest_bar.h"
 #include "ui/theme.h"
+#include "ui/wallpaper.h"
 
 namespace zs {
 
@@ -303,11 +304,11 @@ public:
 
     void build(lv_obj_t* root) override {
         root_ = root;
-        // Wallpaper: black fading to dark grey, until the photographs land.
-        lv_obj_set_style_bg_color(root, c(kAubergine), 0);
-        lv_obj_set_style_bg_grad_color(root, c(kAubergineLight), 0);
-        lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_HOR, 0);
+        // The photograph, as the background, so clearing the page keeps it.
+        // Search and All apps hide it and stand on plain black.
+        lv_obj_set_style_bg_color(root, c(kBg), 0);
         lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+        lv_obj_set_style_bg_image_src(root, wallpaper_home(), 0);
         show_home();
     }
 
@@ -394,7 +395,7 @@ private:
         lv_obj_set_pos(box_, 4, 3);
         lv_obj_set_style_radius(box_, 0, 0);
         lv_obj_set_style_bg_color(box_, c(0x000000), 0);
-        lv_obj_set_style_bg_opa(box_, LV_OPA_40, 0);
+        lv_obj_set_style_bg_opa(box_, LV_OPA_60, 0);
         lv_obj_remove_flag(box_, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_t* p = label(box_, LV_SYMBOL_RIGHT, &zs_font_12, kAccent);
         lv_obj_align(p, LV_ALIGN_LEFT_MID, 7, 0);
@@ -406,8 +407,13 @@ private:
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 22, 0);
     }
 
+    void photo(bool on) {
+        lv_obj_set_style_bg_image_opa(root_, on ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    }
+
     void refresh() {
         clear();
+        photo(query_.empty());
         search_box();
         if (query_.empty()) home_page();
         else results_page();
@@ -687,6 +693,7 @@ private:
         all_apps_ = true;
         query_.clear();
         clear();
+        photo(false);
         std::vector<const AppInfo*> apps;
         for (const AppInfo& a : app_registry()) apps.push_back(&a);
         std::sort(apps.begin(), apps.end(), [](const AppInfo* x, const AppInfo* y) { return norm(x->name) < norm(y->name); });
