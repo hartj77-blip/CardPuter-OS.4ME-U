@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Regenerate shell/src/ui/wallpaper_home.cpp, the photograph behind home.
+"""Regenerate shell/src/ui/wallpaper_data.cpp: the photographs behind home
+and the lock screen.
 
     python3 shell/tools/wallpaper.py [--preview out.png]
 
 Needs Pillow. The output is committed (like the fonts), so a build needs
 nothing but a compiler. Steps:
 
-1. Crop the source photograph (shell/tools/wallpapers/) to the home area,
-   320 x 150 (the screen under the status bar), and convert to greyscale.
-2. Bake in the scrim: a little darker overall so white text reads on it, and
-   fading to black where home's Recent list starts. Nothing is blended on the
-   device.
+1. Crop the source photograph (shell/tools/wallpapers/) for each target and
+   scale it to the whole screen, 320 x 170, in greyscale.
+2. Bake in the scrim: darker where text sits on it (the status bar, home's
+   search box, the lock screen's clock) and, on home, fading to black where
+   the Recent list starts. Nothing is blended on the device.
 3. Dither to 32 neutral greys with a 4 x 4 ordered dither. RGB565 has 5 bits
    of red and blue but 6 of green, so finer greys would tint green or
    magenta; 32 levels with the same value in every channel stay neutral and
@@ -24,38 +25,51 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(HERE, "wallpapers", "tetons-snake-river.jpg")
-OUT = os.path.join(HERE, "..", "src", "ui", "wallpaper_home.cpp")
-W, H = 320, 150          # theme::kScreenW x theme::kContentH
-CROP_Y = 120             # top of the crop in the 1280 px wide source
+OUT = os.path.join(HERE, "..", "src", "ui", "wallpaper_data.cpp")
+W, H = 320, 170          # the whole screen: the status bar sits on the photo
 BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
 
-def scrim(y):
-    """How much of the photo shows at row y (1 = all of it, 0 = black)."""
+def home_scrim(x, y):
+    """Home: how much of the photo shows at (x, y), 1 = all, 0 = black."""
     keep = 0.78                                  # overall, for white labels
-    if y < 26:                                   # behind the search box
-        keep *= 0.5 + 0.5 * y / 26
-    fade_from, fade_to = 58, 96                  # pins' names -> Recent
+    if y < 20:                                   # the status bar
+        keep *= 0.5
+    elif y < 46:                                 # the search box
+        keep *= 0.5 + 0.5 * (y - 20) / 26
+    fade_from, fade_to = 78, 116                 # pins' names -> Recent
     if y > fade_from:
         t = min(1.0, (y - fade_from) / (fade_to - fade_from))
         keep *= (1 - t) ** 1.6
     return keep
 
 
-def build():
-    img = Image.open(SRC).convert("L")
-    sw = img.width
-    ch = round(sw * H / W)
-    img = img.crop((0, CROP_Y, sw, CROP_Y + ch)).resize((W, H), Image.LANCZOS)
+def lock_scrim(x, y):
+    """Lock: darker on the left (the clock) and along the bottom (the hint)."""
+    keep = 0.4 + 0.6 * min(1.0, x / 180)
+    if y > 110:
+        keep *= 1 - 0.7 * (y - 110) / 60
+    if y < 20:
+        keep *= 0.6
+    return keep
+
+
+# name, crop box in the 1280 px wide source, scrim
+TARGETS = [
+    ("home", (0, 40, 1280, 40 + 680), home_scrim),
+    ("lock", (380, 0, 1280, 478), lock_scrim),
+]
+
+
+def build(box, scrim):
+    img = Image.open(SRC).convert("L").crop(box).resize((W, H), Image.LANCZOS)
     px = img.load()
     out = []
     for y in range(H):
-        k = scrim(y)
         for x in range(W):
-            v = px[x, y] * k / 255 * 31                   # 0..31 with fraction
+            v = px[x, y] * scrim(x, y) / 255 * 31          # 0..31 with fraction
             v5 = int(v + (BAYER[y % 4][x % 4] + 0.5) / 16)
-            v5 = max(0, min(31, v5))
-            out.append(v5)
+            out.append(max(0, min(31, v5)))
     return out
 
 
@@ -64,15 +78,23 @@ def rgb565(v5):
     return (v5 << 11) | (g6 << 5) | v5
 
 
-def write_cpp(levels):
-    data = bytearray()
-    for v in levels:
-        p = rgb565(v)
-        data += bytes((p & 0xFF, p >> 8))
-    lines = []
-    for i in range(0, len(data), 24):
-        lines.append("    " + ",".join("0x%02x" % b for b in data[i:i + 24]) + ",")
-    body = "\n".join(lines)
+def write_cpp(images):
+    parts = []
+    for name, levels in images:
+        data = bytearray()
+        for v in levels:
+            p = rgb565(v)
+            data += bytes((p & 0xFF, p >> 8))
+        rows = "\n".join("    " + ",".join("0x%02x" % b for b in data[i:i + 24]) + ","
+                         for i in range(0, len(data), 24))
+        parts.append(f"""const uint8_t k_{name}[{len(data)}] = {{
+{rows}
+}};""")
+    funcs = "\n\n".join(f"""const lv_image_dsc_t* wallpaper_{name}() {{
+    static const lv_image_dsc_t dsc = make(k_{name}, sizeof k_{name});
+    return &dsc;
+}}""" for name, _ in images)
+    body = "\n\n".join(parts)
     with open(OUT, "w") as f:
         f.write(f"""// Generated by shell/tools/wallpaper.py from
 // shell/tools/wallpapers/tetons-snake-river.jpg. Do not edit.
@@ -85,41 +107,42 @@ def write_cpp(levels):
 namespace zs {{
 
 namespace {{
-const uint8_t kPixels[{len(data)}] = {{
 {body}
-}};
+
+lv_image_dsc_t make(const uint8_t* px, uint32_t size) {{
+    lv_image_dsc_t d{{}};
+    d.header.magic = LV_IMAGE_HEADER_MAGIC;
+    d.header.cf = LV_COLOR_FORMAT_RGB565;
+    d.header.w = {W};
+    d.header.h = {H};
+    d.header.stride = {W * 2};
+    d.data_size = size;
+    d.data = px;
+    return d;
+}}
 }}  // namespace
 
-const lv_image_dsc_t* wallpaper_home() {{
-    static lv_image_dsc_t dsc;
-    if (!dsc.data) {{
-        dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-        dsc.header.cf = LV_COLOR_FORMAT_RGB565;
-        dsc.header.w = {W};
-        dsc.header.h = {H};
-        dsc.header.stride = {W * 2};
-        dsc.data_size = sizeof kPixels;
-        dsc.data = kPixels;
-    }}
-    return &dsc;
-}}
+{funcs}
 
 }}  // namespace zs
 """)
 
 
-def preview(levels, path):
-    img = Image.new("L", (W, H))
-    img.putdata([round(v * 255 / 31) for v in levels])
-    img.resize((W * 2, H * 2), Image.NEAREST).save(path)
+def preview(images, path):
+    sheet = Image.new("L", (W * 2, H * 2 * len(images)))
+    for i, (_, levels) in enumerate(images):
+        img = Image.new("L", (W, H))
+        img.putdata([round(v * 255 / 31) for v in levels])
+        sheet.paste(img.resize((W * 2, H * 2), Image.NEAREST), (0, i * H * 2))
+    sheet.save(path)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--preview", help="also save a 2x PNG of the result")
+    ap.add_argument("--preview", help="also save a 2x PNG of the results")
     a = ap.parse_args()
-    lv = build()
-    write_cpp(lv)
+    images = [(name, build(box, scrim)) for name, box, scrim in TARGETS]
+    write_cpp(images)
     if a.preview:
-        preview(lv, a.preview)
+        preview(images, a.preview)
     print("wrote", os.path.relpath(OUT))

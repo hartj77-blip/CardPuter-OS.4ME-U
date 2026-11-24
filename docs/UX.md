@@ -41,7 +41,7 @@ These work on every screen, in every app, including in a text box.
 | **Esc** (or \`) | Back one step. At an app's first screen, back to home. On home, clear the search |
 | **Hold Esc** (0.6 s) | Home, from anywhere |
 | **Tab** | The menu: every action for the item in focus and the screen |
-| **Hold Tab** (0.6 s) | Lock: screen off now (LOCK on the key). The next key only wakes it |
+| **Hold Tab** (0.6 s) | Lock: screen off now (LOCK on the key). The next key wakes it to the lock screen; the one after unlocks |
 | **Fn + J** (PRSC) | Screenshot to ~/Pictures/Screenshots, from anywhere, even the Terminal |
 | **Fn + H** (HELP) | The key help sheet, the same as 0 |
 | **Ctrl + Space** | The taskbar panel (Wi-Fi, Bluetooth, volume, brightness, battery, clock) |
@@ -272,8 +272,8 @@ simulator.
 | Step | Work | State |
 | --- | --- | --- |
 | 1 | Theme values and roles in `ui/theme.h`; lit focus, lifted menu/confirm/panel/toast, square chrome; UI 2 names kept as aliases | Done |
-| 2 | The photograph behind home: `shell/tools/wallpaper.py` crops, shades and dithers it to neutral greys and writes `ui/wallpaper_home.cpp` (committed, like the fonts). Search and All apps stand on plain black | Done |
-| 3 | Home pins and Recent, a lock screen with the photograph, status bar over the photo | |
+| 2 | The photograph behind home: `shell/tools/wallpaper.py` crops, shades and dithers it to neutral greys and writes `ui/wallpaper_data.cpp` (committed, like the fonts). Search and All apps stand on plain black | Done |
+| 3 | The photo runs under a see-through status bar on home; pins get a white frame in focus, Recent rows the lit focus; a lock screen (`ui/lock_face.cpp`) after hold Tab: the photo, a large clock and the date. The idle timeout still wakes straight to the app | Done |
 | 4 | Inter typeface; outline glyphs for system icons (not app icons) | |
 | 5 | Replace hex values in apps (both repositories) with roles; a CI check; drop the aliases | |
 | 6 | Mockups, emulator, release | |
