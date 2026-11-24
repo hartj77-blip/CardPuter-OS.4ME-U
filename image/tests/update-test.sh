@@ -124,6 +124,23 @@ PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3
 rm -rf "$FB/sys/class/graphics/fb1" "$FB/sys/class/vtconsole" "$T/con2fb.log"
 PATH="$T/fbbin:$PATH" ZEROOS_FB_ROOT=$FB sh "$C" 3 2>/dev/null
 [ $? = 0 ] && [ ! -e "$T/con2fb.log" ] && ok "console-on-lcd: no LCD found is not an error" || bad "console-on-lcd: no LCD"
+# m5-fb0-link: M5Stack's apps draw on /dev/fb0.
+L=$ROOT/image/stage-zeroos/files/apps/m5-fb0-link
+LR=$T/fb0root
+mkdir -p "$LR/dev"; touch "$LR/dev/fb1"; ln -s fb1 "$LR/dev/fb_lcd"
+ZEROOS_FB_ROOT=$LR sh "$L"
+[ "$(readlink "$LR/dev/fb0")" = fb1 ] && ok "m5-fb0-link: no fb0, the LCD is fb1: fb0 is the LCD" || bad "m5-fb0-link: no link to the LCD"
+rm "$LR/dev/fb0"; touch "$LR/dev/fb0"
+ZEROOS_FB_ROOT=$LR sh "$L"
+[ -f "$LR/dev/fb0" ] && [ ! -L "$LR/dev/fb0" ] && ok "m5-fb0-link: a real fb0 (HDMI) is left alone" || bad "m5-fb0-link: replaced a real fb0"
+rm "$LR/dev/fb0"; ln -s fb1 "$LR/dev/fb0"; rm "$LR/dev/fb_lcd" "$LR/dev/fb1"
+ZEROOS_FB_ROOT=$LR sh "$L"
+[ ! -e "$LR/dev/fb0" ] && [ ! -L "$LR/dev/fb0" ] && ok "m5-fb0-link: the link goes with the LCD" || bad "m5-fb0-link: link left behind"
+touch "$LR/dev/fb0"; ln -s fb0 "$LR/dev/fb_lcd"
+ZEROOS_FB_ROOT=$LR sh "$L"
+[ -f "$LR/dev/fb0" ] && [ ! -L "$LR/dev/fb0" ] && ok "m5-fb0-link: the LCD already fb0: nothing to do" || bad "m5-fb0-link: touched fb0 when the LCD is fb0"
+[ -x "$T/x/usr/lib/zeroos/m5-fb0-link" ] && grep -q 'RUN+="/usr/lib/zeroos/m5-fb0-link"' "$T/x/etc/udev/rules.d/90-zeroos.rules" &&
+    ok "m5-fb0-link: in the package and run by udev" || bad "m5-fb0-link: not packaged or not run"
 grep -q '^ExecStartPre=-+/usr/lib/zeroos/console-on-lcd 3$' "$ROOT/image/stage-zeroos/files/remote/zeroos-terminal.service" &&
     [ -x "$T/x/usr/lib/zeroos/console-on-lcd" ] &&
     ok "console-on-lcd: in the package and run before the Terminal" || bad "console-on-lcd: not packaged or not run"

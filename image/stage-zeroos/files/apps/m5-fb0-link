@@ -1,0 +1,27 @@
+#!/bin/sh
+# m5-fb0-link: make /dev/fb0 the LCD when no framebuffer has that number.
+#
+# M5Stack's apps (docs/APPS.md, "M5Stack's app store") draw on /dev/fb0: on
+# M5's system that is the LCD. Here the firmware's boot framebuffer is fb0
+# until vc4 starts and removes it, so the LCD comes up as fb1 and there is no
+# fb0 at all; those apps stop at once ("No such file: /dev/fb0"). A link
+# fixes that. A real fb0 (HDMI's, with a monitor connected at boot) is left
+# alone, and the link goes when the LCD does.
+#
+# udev runs this whenever a framebuffer comes or goes (90-zeroos.udev).
+# ZEROOS_FB_ROOT is for tests: a folder standing in for /.
+d=${ZEROOS_FB_ROOT:-}/dev
+lcd=$(readlink "$d/fb_lcd" 2>/dev/null)
+lcd=${lcd##*/}
+# Only our own link, or nothing, is ever replaced.
+if [ -L "$d/fb0" ] || [ ! -e "$d/fb0" ]; then
+    case $lcd in
+        fb[1-9]*)
+            if [ -e "$d/$lcd" ]; then
+                ln -sfn "$lcd" "$d/fb0"
+                exit 0
+            fi ;;
+    esac
+    rm -f "$d/fb0"
+fi
+exit 0

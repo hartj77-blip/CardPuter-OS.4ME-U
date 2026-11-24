@@ -141,6 +141,8 @@ if [ -d /run/systemd/system ]; then
     udevadm control --reload || true
     # New device permissions (Bluetooth's rfkill) apply now, not at the next reboot.
     udevadm trigger --subsystem-match=misc --sysname-match=rfkill || true
+    # M5Stack's apps find the LCD at /dev/fb0 now, not at the next reboot.
+    [ -x /usr/lib/zeroos/m5-fb0-link ] && /usr/lib/zeroos/m5-fb0-link || true
     # Memory tuning (docs/PERFORMANCE.md) applies now, not at the next reboot.
     sysctl -q -p /etc/sysctl.d/90-zeroos-memory.conf || true
     systemd-tmpfiles --create /etc/tmpfiles.d/zeroos-memory.conf 2>/dev/null || true

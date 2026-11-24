@@ -128,6 +128,9 @@ ZeroShell                one app per launcher entry (/usr/share/APPLaunch/applic
                          ui/m5_apps.cpp; Hal::external_open runs its Exec line with sh in
                          /usr/share/APPLaunch, as uid 1000, with LV_LINUX_FBDEV_DEVICE and
                          APPLAUNCH_LINUX_FBDEV_DEVICE set to the LCD's framebuffer
+udev (m5-fb0-link)       /dev/fb0 -> the LCD when nothing else is fb0: many apps open /dev/fb0
+                         directly, and here the LCD is usually fb1 (the firmware's boot
+                         framebuffer took fb0, then went away). A real fb0 (HDMI) is left alone
 ```
 
 An M5 package copied over by hand installs with `sudo zeroos-apps install-file <file>.deb`. M5's
