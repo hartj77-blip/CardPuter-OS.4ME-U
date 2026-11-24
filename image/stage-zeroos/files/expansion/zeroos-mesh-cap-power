@@ -21,6 +21,11 @@ for led in ext_5v_out grove_5v_out; do
     [ "$(cat "$f" 2>/dev/null || echo 0)" -gt 0 ] 2>/dev/null || echo 1 > "$f"
 done
 
+command -v i2cget >/dev/null || {   # part of every ZeroOS image (i2c-tools)
+    echo "zeroos-mesh: i2c-tools missing; can't switch the Cap LoRa-1262's antenna in (apt install i2c-tools)" >&2
+    exit 0
+}
+
 BUS=1
 ADDR=0x43
 P0=0x01
