@@ -47,9 +47,11 @@ Home is a search box, seven pinned apps and the apps you opened last.
 | 1 to 7 | Open a pinned app. While searching, 1 to 9 pick a result |
 | Arrows (Fn + F/Z/X/C) | Move between the pinned apps and the Recent list |
 | Esc | Clear the search |
-| Tab | Pin or unpin the app in focus (P), move a pin (L / R), All apps (A) |
+| Tab | All apps |
 
-**All apps**, the last row, lists every app A to Z: type to find one. Some search results change
+**All apps** (Tab, or the last row) lists every app A to Z: type to find one. To pin an app,
+highlight it and press Tab, P, then the key you want it on (1 to 7). The app already on that key
+swaps places with it, or is unpinned. Tab, U unpins. Some search results change
 in place: on Volume or Brightness, Left and Right turn it down or up.
 
 ## The taskbar panel

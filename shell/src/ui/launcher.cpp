@@ -2,10 +2,11 @@
 // last, and All apps. Typing searches apps, settings and actions; Enter (or
 // the result's number) opens the one in focus.
 //
-//   home      letters search; 1-7 pinned; Up/Down/Left/Right move; Enter opens
+//   home      letters search; 1-7 pinned; Up/Down/Left/Right move; Enter opens;
+//             Tab opens All apps
 //   search    1-9 pick a result; Backspace edits; Esc clears
-//   all apps  A-Z, typing filters (ui/list_view.h); Esc back
-//   Tab       P pin or unpin, L / R move a pinned app, A all apps
+//   all apps  A-Z, typing filters (ui/list_view.h); Esc back. Tab on an app:
+//             P then 1-7 pins it on that key (or moves it there), U unpins
 //
 // Pinned and recent apps are kept in ~/.config/zeroos/settings.conf
 // (home.pinned, home.recent: app ids, comma-separated).
@@ -254,7 +255,20 @@ public:
     }
 
     bool on_key(uint32_t key) override {
-        if (all_apps_) return all_.key(key);
+        if (all_apps_) {
+            if (!pin_pending_.empty()) {   // Tab, P: waiting for 1 to 7
+                std::string id = pin_pending_;
+                cancel_pin();
+                if (key >= '1' && key < '1' + kPins) pin_to(id, int(key - '1'));
+                else shell_toast("Not pinned");
+                return true;
+            }
+            return all_.key(key);
+        }
+        if (key == kKeyNext) {   // Tab: All apps, where pins are made
+            show_all_apps();
+            return true;
+        }
         // Typing: the search. Digits pick (pinned apps, or the results).
         if (key == LV_KEY_BACKSPACE || key == LV_KEY_DEL) {
             if (query_.empty()) return true;
@@ -277,6 +291,10 @@ public:
     }
 
     bool on_back() override {
+        if (all_apps_ && !pin_pending_.empty()) {
+            cancel_pin();
+            return true;
+        }
         if (all_apps_) {
             show_home();
             return true;
@@ -303,6 +321,7 @@ private:
         results_.reset();   // their rows went with the screen
         all_.reset();
         box_ = nullptr;
+        all_head_ = nullptr;
     }
 
     void show_home() {
@@ -495,56 +514,78 @@ private:
         lv_group_focus_obj(pin_objs_[size_t(pin_sel_)]);
     }
 
-    // The app in focus on the home page: a pinned one or a recent one.
-    std::string focused_app() {
-        lv_obj_t* f = lv_group_get_focused(group);
-        for (size_t i = 0; i < pin_objs_.size(); ++i)
-            if (pin_objs_[i] == f) return pins_[i];
-        for (size_t i = 0; i < row_objs_.size(); ++i)
-            if (row_objs_[i] == f) return row_ids_[i];
-        return "";
-    }
-
-    int focused_pin() {
-        lv_obj_t* f = lv_group_get_focused(group);
-        for (size_t i = 0; i < pin_objs_.size(); ++i)
-            if (pin_objs_[i] == f) return int(i);
-        return -1;
-    }
-
     void set_home_actions() {
         shell_set_actions({
             {"Open", 0, "Enter", nullptr},
             {"Search", 0, "a-z", nullptr},
-            {"Pin or unpin", 'p', nullptr, [this] { toggle_pin(focused_app()); }},
-            {"Move left", 'l', nullptr, [this] { move_pin(-1); }},
-            {"Move right", 'r', nullptr, [this] { move_pin(+1); }},
-            {"All apps", 'a', nullptr, [this] { show_all_apps(); }},
+            {"All apps", 0, "Tab", nullptr},
         });
     }
 
-    void toggle_pin(const std::string& id) {
-        if (id.empty()) {
+    static std::string app_name(const std::string& id) {
+        const AppInfo* a = app_find(id);
+        return a ? a->name : id;
+    }
+
+    // All apps, Tab, P: the next key 1 to 7 says where it goes.
+    void ask_pin_key() {
+        int i = all_.focused();
+        if (i < 0) {
             shell_toast("Pick an app first");
             return;
         }
+        pin_pending_ = all_ids_[size_t(i)];
+        if (all_head_) lv_label_set_text(all_head_, ("PIN " + app_name(pin_pending_) + ": PRESS 1 TO 7").c_str());
+    }
+
+    void cancel_pin() {
+        pin_pending_.clear();
+        if (all_head_) lv_label_set_text(all_head_, fmt_count(int(all_ids_.size())).c_str());
+    }
+
+    // Put an app on key `slot` (0-based). An app already there swaps places
+    // with it if it was pinned too, else is unpinned. Past the last pin, it
+    // goes on the next free key.
+    void pin_to(const std::string& id, int slot) {
         std::vector<std::string> p = pinned();
+        std::string name = app_name(id);
         auto it = std::find(p.begin(), p.end(), id);
-        const AppInfo* a = app_find(id);
-        std::string name = a ? a->name : id;
-        if (it != p.end()) {
-            p.erase(it);
-            shell_toast("Unpinned " + name);
-        } else if (int(p.size()) >= kPins) {
-            shell_toast("Seven are pinned: unpin one first");
-            return;
-        } else {
+        int old = it == p.end() ? -1 : int(it - p.begin());
+        if (old == slot) {
+            shell_toast(name + " is already on " + std::to_string(slot + 1));
+        } else if (slot >= int(p.size()) - (old >= 0 ? 1 : 0)) {
+            if (old >= 0) p.erase(it);
             p.push_back(id);
-            shell_toast("Pinned " + name + fmt_key(int(p.size())));
+            shell_toast("Pinned " + name + " on " + std::to_string(p.size()));
+        } else if (old >= 0) {
+            std::string other = p[size_t(slot)];
+            std::swap(p[size_t(old)], p[size_t(slot)]);
+            shell_toast(name + " on " + std::to_string(slot + 1) + ", " + app_name(other) + " on " +
+                        std::to_string(old + 1));
+        } else {
+            std::string other = p[size_t(slot)];
+            p[size_t(slot)] = id;
+            shell_toast("Pinned " + name + " on " + std::to_string(slot + 1) + " (" + app_name(other) +
+                        " unpinned)");
         }
         save_pinned(p);
-        if (all_apps_) relabel_all();   // in place: the filter and focus stay
-        else refresh();
+        relabel_all();   // in place: the filter and focus stay
+    }
+
+    void unpin_focused() {
+        int i = all_.focused();
+        if (i < 0) return;
+        const std::string& id = all_ids_[size_t(i)];
+        std::vector<std::string> p = pinned();
+        auto it = std::find(p.begin(), p.end(), id);
+        if (it == p.end()) {
+            shell_toast(app_name(id) + " isn't pinned");
+            return;
+        }
+        p.erase(it);
+        save_pinned(p);
+        shell_toast("Unpinned " + app_name(id));
+        relabel_all();
     }
 
     // All apps' "Pinned n" labels, after a pin or unpin.
@@ -554,19 +595,6 @@ private:
             auto at = std::find(p.begin(), p.end(), all_ids_[i]);
             all_.set_value(int(i), at == p.end() ? "" : "Pinned " + std::to_string(int(at - p.begin()) + 1));
         }
-    }
-
-    static std::string fmt_key(int n) { return " on " + std::to_string(n); }
-
-    void move_pin(int dir) {
-        int i = focused_pin();
-        std::vector<std::string> p = pinned();
-        int j = i + dir;
-        if (i < 0 || j < 0 || j >= int(p.size())) return;
-        std::swap(p[size_t(i)], p[size_t(j)]);
-        save_pinned(p);
-        pin_sel_ = j;
-        refresh();
     }
 
     // ---- Search results --------------------------------------------------
@@ -605,8 +633,9 @@ private:
         std::vector<const AppInfo*> apps;
         for (const AppInfo& a : app_registry()) apps.push_back(&a);
         std::sort(apps.begin(), apps.end(), [](const AppInfo* x, const AppInfo* y) { return norm(x->name) < norm(y->name); });
-        lv_obj_t* head = label(root_, fmt_count(int(apps.size())).c_str(), &zs_font_12, 0xb8a8b4);
-        lv_obj_set_pos(head, 9, 3);
+        pin_pending_.clear();
+        all_head_ = label(root_, fmt_count(int(apps.size())).c_str(), &zs_font_12, 0xb8a8b4);
+        lv_obj_set_pos(all_head_, 9, 3);
         all_.build(root_, 2, 18, kScreenW - 4, kBodyH - 19);
         all_ids_.clear();
         std::vector<std::string> p = pinned();
@@ -622,10 +651,8 @@ private:
         shell_set_actions({
             {"Open", 0, "Enter", nullptr},
             {"Find", 0, "a-z", nullptr},
-            {"Pin or unpin", 'p', nullptr, [this] {
-                 int i = all_.focused();
-                 if (i >= 0) toggle_pin(all_ids_[size_t(i)]);
-             }},
+            {"Pin to a key (1-7)", 'p', nullptr, [this] { ask_pin_key(); }},
+            {"Unpin", 'u', nullptr, [this] { unpin_focused(); }},
         });
     }
 
@@ -634,7 +661,9 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* box_ = nullptr;
     lv_obj_t* rows_box_ = nullptr;
+    lv_obj_t* all_head_ = nullptr;
     std::string query_;
+    std::string pin_pending_;   // All apps: Tab, P, then 1 to 7
     bool all_apps_ = false;
     std::vector<std::string> pins_;
     std::vector<lv_obj_t*> pin_objs_, row_objs_;

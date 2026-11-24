@@ -160,12 +160,14 @@ dock.
 └──────────────────────────────────┘
 ```
 
-- **Pinned**: up to 7 apps on 1 to 7 (as many as fit across). Tab: P Pin or unpin, L / R Move. Tab on any
-  app: Pin. A fresh ZeroOS pins Terminal, Files, Notes, Media, Apps and Settings, the ones installed.
+- **Pinned**: up to 7 apps on 1 to 7 (as many as fit across). Pins are made in All apps: Tab on an
+  app, P, then the key to put it on (1 to 7). An app already on that key swaps places with it, or
+  is unpinned if the new one wasn't pinned. U unpins. A fresh ZeroOS pins Terminal, Files, Notes,
+  Media, Apps and Settings, the ones installed.
 - **Recent**: the last few things you did, newest first. An app can say what to reopen (a track, a
   remote, a network, a file), so Enter goes straight back to it.
-- **All apps**: Down past the end of Recent, or Enter on an empty search, opens the A-Z list of
-  apps. It's a List screen, so typing filters it.
+- **All apps**: Tab on Home (Home has no menu of its own), or Enter on the All apps row, opens the
+  A-Z list of apps. It's a List screen, so typing filters it.
 - **Search**: any letter starts a search. Results are grouped: Apps, Settings, Actions, then each
   app's own results (files, notes, remotes, networks, songs). Enter runs the top result. Left /
   Right on a value result (Volume, Brightness) change it in place.
