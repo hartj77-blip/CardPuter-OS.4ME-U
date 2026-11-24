@@ -53,6 +53,13 @@ void Power::start() {
     sleep_face_down_ = prefs::get_int("motion.face_down", 1) != 0;
     z_sign_ = prefs::get_int("motion.z_sign", 1) < 0 ? -1 : 1;
     hal().set_brightness(brightness_);
+    // Wi-Fi sleep turned the radio off and ZeroShell stopped before the screen
+    // came back on (a watchdog restart, a reboot, a flat battery). NetworkManager
+    // keeps Wi-Fi off across boots, so without this it would stay off for good.
+    if (prefs::get_int("wifi.slept", 0)) {
+        hal().set_wifi_enabled(true);
+        prefs::set_int("wifi.slept", 0);
+    }
     apply_cpu();
 }
 
@@ -174,6 +181,7 @@ void Power::set_state(State s, uint32_t now_ms) {
             if (wifi_slept_) {
                 hal().set_wifi_enabled(true);
                 wifi_slept_ = false;
+                prefs::set_int("wifi.slept", 0);
             }
         }
         hal().set_brightness(brightness_);
@@ -317,6 +325,7 @@ void Power::tick(uint32_t now_ms) {
         !h.playback().playing) {
         NetStatus n = h.net();
         if (n.wifi_enabled) {
+            prefs::set_int("wifi.slept", 1);   // saved first: start() turns it back on
             h.set_wifi_enabled(false);
             wifi_slept_ = true;
         }
