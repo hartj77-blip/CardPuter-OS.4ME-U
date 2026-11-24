@@ -1,10 +1,9 @@
-// Home (docs/UX.md): a search box; the time and date beside the apps you
-// opened last (Recent); the pinned apps on 1 to 7 along the bottom. Typing
-// searches apps, settings and actions; Enter (or the result's number) opens
-// the one in focus.
+// Home (docs/UX.md): a search box, the pinned apps on 1 to 7, what you opened
+// last, and All apps, with the time and date in the corner. Typing searches apps, settings and actions; Enter (or
+// the result's number) opens the one in focus.
 //
-//   home      letters search; 1-7 pinned; Left/Right along a row, Up/Down
-//             between the pins and Recent; Enter opens; Tab opens All apps
+//   home      letters search; 1-7 pinned; Up/Down/Left/Right move; Enter opens;
+//             Tab opens All apps
 //   search    1-9 pick a result; Backspace edits; Esc clears
 //   all apps  A-Z, typing filters (ui/list_view.h); Esc back. Tab on an app:
 //             P then 1-7 pins it on that key (or moves it there), U unpins
@@ -36,14 +35,11 @@ using namespace theme;
 namespace {
 
 constexpr int kPins = 7;           // keys 1..7
-constexpr int kSearchH = 22;
-// The band under the search box: the clock on the left, Recent on the right.
-constexpr int kBandY = kSearchH + 5;
-constexpr int kRecentX = 166, kRecents = 3;
-constexpr int kRecentW = (kScreenW - 4 - kRecentX) / kRecents;
-constexpr int kRecentY = kBandY + 14, kRecentH = 42;
-// The pinned apps along the bottom, like a dock.
-constexpr int kPinsH = 48, kPinsY = kBodyH - kPinsH - 2;
+constexpr int kPinW = kScreenW / kPins;
+constexpr int kSearchH = 22, kPinsY = kSearchH + 5, kPinsH = 36, kRecentY = kPinsY + kPinsH + 2;
+constexpr int kRowH = 19, kRecents = 5;
+// Recent and All apps take the left of the screen; the clock, the bottom right.
+constexpr int kRowW = 204;
 // A fresh ZeroOS pins the first of these that are installed, then Settings.
 const char* const kDefaultPins[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
 
@@ -79,12 +75,10 @@ std::vector<std::string> pinned() {
 
 void save_pinned(const std::vector<std::string>& v) { prefs::set_str("home.pinned", join(v)); }
 
-// The apps opened last, newest first, leaving out the pinned ones (they are
-// a key away already).
-std::vector<std::string> recent(const std::vector<std::string>& pins) {
+std::vector<std::string> recent() {
     std::vector<std::string> out;
     for (auto& id : split(prefs::get_str("home.recent", "")))
-        if (app_find(id) && std::find(pins.begin(), pins.end(), id) == pins.end()) out.push_back(id);
+        if (app_find(id)) out.push_back(id);
     return out;
 }
 
@@ -113,14 +107,23 @@ void style_item(lv_obj_t* o) {
     lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
 }
 
-// A pinned or recent app: its icon as the author drew it; in focus, a white
-// frame round the cell over a faint lift of the photo.
+// A pinned app: its icon as the author drew it; in focus, a white frame
+// round the cell over a faint lift of the photo.
 void style_pin(lv_obj_t* o) {
     style_item(o);
     lv_obj_set_style_bg_color(o, c(kGrey8), LV_STATE_FOCUSED);
     lv_obj_set_style_bg_opa(o, LV_OPA_20, LV_STATE_FOCUSED);
     lv_obj_set_style_border_color(o, c(kGrey8), LV_STATE_FOCUSED);
     lv_obj_set_style_border_width(o, 1, LV_STATE_FOCUSED);
+}
+
+// A Recent row: lit white with black text in focus, like every list. Labels
+// that should follow it take their colour from the row (no colour of their own).
+void style_row(lv_obj_t* o) {
+    style_item(o);
+    lv_obj_set_style_text_color(o, c(kText), 0);
+    style_focus_fill(o, LV_STATE_FOCUSED);
+    lv_obj_set_style_text_color(o, c(kOnFocus), LV_STATE_FOCUSED);
 }
 
 // ---- Search ---------------------------------------------------------------
@@ -325,7 +328,7 @@ public:
         show_home();
     }
 
-    // The clock on home, once a minute.
+    // Home's clock, once a minute.
     void tick() override {
         if (!time_) return;
         time_t now = time(nullptr);
@@ -333,10 +336,10 @@ public:
         localtime_r(&now, &lt);
         if (lt.tm_min == shown_minute_) return;
         shown_minute_ = lt.tm_min;
-        char buf[48];
+        char buf[32];
         strftime(buf, sizeof buf, "%H:%M", &lt);
         lv_label_set_text(time_, buf);
-        strftime(buf, sizeof buf, "%A %-d %B", &lt);
+        strftime(buf, sizeof buf, "%a %-d %b", &lt);
         lv_label_set_text(date_, buf);
     }
 
@@ -400,10 +403,12 @@ private:
         lv_obj_clean(root_);
         lv_group_remove_all_objs(group);
         pin_objs_.clear();
-        recent_objs_.clear();
+        row_objs_.clear();
+        row_ids_.clear();
         open_ids_.clear();
-        time_ = date_ = nullptr;
+        row_runs_.clear();
         results_.reset();   // their rows went with the screen
+        time_ = date_ = nullptr;
         all_.reset();
         box_ = nullptr;
         all_head_ = nullptr;
@@ -448,12 +453,24 @@ private:
     }
 
     void home_page() {
+        const auto& apps = app_registry();
+        (void)apps;
         pins_ = pinned();
-        clock_page();
-        recent_page();
-        constexpr int w = kScreenW / kPins;
         for (int i = 0; i < int(pins_.size()); ++i) {
-            lv_obj_t* cell = app_cell(pins_[size_t(i)], 1 + i * w, kPinsY, w - 2, kPinsH, 26);
+            const AppInfo* a = app_find(pins_[size_t(i)]);
+            if (!a) continue;
+            lv_obj_t* cell = lv_obj_create(root_);
+            style_pin(cell);
+            lv_obj_set_size(cell, kPinW - 2, kPinsH);
+            lv_obj_set_pos(cell, 1 + i * kPinW, kPinsY);
+            lv_obj_t* ic = app_icon(cell, *a, 20);
+            lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, 1);
+            lv_obj_t* name = label(cell, a->name.c_str(), &zs_font_12, 0xffffff);
+            lv_obj_set_width(name, kPinW - 2);
+            lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
+            lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+            lv_obj_set_style_text_letter_space(name, -1, 0);
+            lv_obj_align(name, LV_ALIGN_BOTTOM_MID, 0, 0);
             // The number key, in the corner.
             lv_obj_t* badge = lv_obj_create(cell);
             style_plain(badge);
@@ -465,57 +482,45 @@ private:
             char d[2] = {char('1' + i), 0};
             lv_obj_center(label(badge, d, &zs_font_12, 0xffffff));
             lv_obj_set_pos(badge, 1, 0);
+            add_open(cell, pins_[size_t(i)]);
             pin_objs_.push_back(cell);
         }
-        if (!pin_objs_.empty()) focus_pin(pin_sel_);
-        else if (!recent_objs_.empty()) lv_group_focus_obj(recent_objs_.front());
-        set_home_actions();
-    }
 
-    // The time, large, over the photo, and the date under it.
-    void clock_page() {
+        lv_obj_t* head = label(root_, "RECENT", &zs_font_12, kMuted);
+        lv_obj_set_pos(head, 9, kRecentY);
+
+        rows_box_ = lv_obj_create(root_);
+        style_plain(rows_box_);
+        lv_obj_set_pos(rows_box_, 4, kRecentY + 14);
+        lv_obj_set_size(rows_box_, kRowW, kBodyH - kRecentY - 14);
+        lv_obj_set_flex_flow(rows_box_, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_row(rows_box_, 1, 0);
+        lv_obj_set_scrollbar_mode(rows_box_, LV_SCROLLBAR_MODE_OFF);
+        int shown = 0;
+        for (auto& id : recent()) {
+            if (shown == kRecents) break;
+            const AppInfo* a = app_find(id);
+            if (!a) continue;
+            add_row(a->symbol, a->color, a->name, id, [id] { shell_open_app(id); });
+            ++shown;
+        }
+        if (shown == 0) {
+            lv_obj_t* tip = label(rows_box_, "Apps you open show up here", &zs_font_12, kMuted);
+            lv_obj_set_style_pad_left(tip, 5, 0);
+        }
+        add_row(ZS_ICON_GRID, 0x5e6c7b, "All apps", "",
+                [this] { lv_async_call(all_apps_cb, this); }, std::to_string(app_registry().size()));
+
+        // The time and date, in the corner under the pins.
         time_ = label(root_, "", &zs_font_28, kText);
-        lv_obj_set_pos(time_, 10, kBandY + 3);
+        lv_obj_align(time_, LV_ALIGN_BOTTOM_RIGHT, -8, -18);
         date_ = label(root_, "", &zs_font_12, kGrey7);
-        lv_obj_set_width(date_, kRecentX - 14);   // a long date stops short of Recent
-        lv_label_set_long_mode(date_, LV_LABEL_LONG_DOT);
-        lv_obj_set_pos(date_, 11, kBandY + 36);
+        lv_obj_align(date_, LV_ALIGN_BOTTOM_RIGHT, -9, -3);
         shown_minute_ = -1;
         tick();
-    }
 
-    void recent_page() {
-        lv_obj_t* head = label(root_, "RECENT", &zs_font_12, kMuted);
-        lv_obj_set_pos(head, kRecentX + 4, kBandY);
-        std::vector<std::string> ids = recent(pins_);
-        if (ids.size() > size_t(kRecents)) ids.resize(size_t(kRecents));
-        for (size_t i = 0; i < ids.size(); ++i)
-            recent_objs_.push_back(
-                app_cell(ids[i], kRecentX + int(i) * kRecentW, kRecentY, kRecentW - 2, kRecentH, 22));
-        if (ids.empty()) {
-            lv_obj_t* tip = label(root_, "Apps you open show up here", &zs_font_12, kMuted);
-            lv_obj_set_width(tip, kScreenW - kRecentX - 8);
-            lv_obj_set_pos(tip, kRecentX + 4, kRecentY + 4);
-        }
-    }
-
-    // An app's icon with its name under it, opened by Enter.
-    lv_obj_t* app_cell(const std::string& id, int x, int y, int w, int h, int icon) {
-        const AppInfo* a = app_find(id);
-        lv_obj_t* cell = lv_obj_create(root_);
-        style_pin(cell);
-        lv_obj_set_size(cell, w, h);
-        lv_obj_set_pos(cell, x, y);
-        lv_obj_t* ic = app_icon(cell, *a, icon);
-        lv_obj_align(ic, LV_ALIGN_TOP_MID, 0, h > 44 ? 4 : 2);
-        lv_obj_t* name = label(cell, a->name.c_str(), &zs_font_12, 0xffffff);
-        lv_obj_set_size(name, w, 14);
-        lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
-        lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-        lv_obj_set_style_text_letter_space(name, -1, 0);
-        lv_obj_align(name, LV_ALIGN_BOTTOM_MID, 0, h > 44 ? -2 : 0);
-        add_open(cell, id);
-        return cell;
+        if (!pin_objs_.empty()) lv_group_focus_obj(pin_objs_[std::min<size_t>(pin_sel_, pin_objs_.size() - 1)]);
+        set_home_actions();
     }
 
     void add_open(lv_obj_t* obj, const std::string& id) {
@@ -531,36 +536,81 @@ private:
         shell_add_focus(obj);
     }
 
-    // Left/Right along a row (round the end), Up/Down between the pinned
-    // apps and Recent. Back on the pins, the one last in focus.
+    void add_row(const char* icon, uint32_t color, const std::string& text, const std::string& id,
+                 std::function<void()> run, const std::string& value = "") {
+        lv_obj_t* row = lv_obj_create(rows_box_);
+        style_row(row);
+        lv_obj_set_size(row, kRowW, kRowH);
+        lv_obj_add_flag(row, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
+        lv_obj_t* ic = lv_obj_create(row);
+        style_plain(ic);
+        lv_obj_set_size(ic, 15, 15);
+        lv_obj_set_style_radius(ic, 4, 0);
+        lv_obj_set_style_bg_color(ic, c(color), 0);
+        lv_obj_set_style_bg_opa(ic, LV_OPA_COVER, 0);
+        lv_obj_remove_flag(ic, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_center(label(ic, icon, &zs_font_12, 0xffffff));
+        lv_obj_align(ic, LV_ALIGN_LEFT_MID, 4, 0);
+        lv_obj_t* t = label(row, text.c_str(), &zs_font_14);
+        lv_obj_remove_local_style_prop(t, LV_STYLE_TEXT_COLOR, 0);   // the row's, so focus turns it black
+        lv_obj_align(t, LV_ALIGN_LEFT_MID, 26, 0);
+        if (!value.empty()) {
+            lv_obj_t* v = label(row, value.c_str(), &zs_font_12, kMuted);
+            lv_obj_align(v, LV_ALIGN_RIGHT_MID, -6, 0);
+        }
+        row_runs_[row] = std::move(run);
+        lv_obj_add_event_cb(
+            row,
+            [](lv_event_t* e) {
+                auto* self = static_cast<Launcher*>(lv_event_get_user_data(e));
+                auto it = self->row_runs_.find(lv_event_get_current_target_obj(e));
+                if (it != self->row_runs_.end() && it->second) {
+                    std::function<void()> fn = it->second;
+                    fn();
+                }
+            },
+            LV_EVENT_CLICKED, this);
+        shell_add_focus(row);
+        row_objs_.push_back(row);
+        row_ids_.push_back(id);
+    }
+
+    // Up/Down between the pinned apps and the rows, Left/Right along the pins.
     bool home_nav(uint32_t key) {
         lv_obj_t* f = lv_group_get_focused(group);
         auto pin = std::find(pin_objs_.begin(), pin_objs_.end(), f);
-        auto rec = std::find(recent_objs_.begin(), recent_objs_.end(), f);
-        bool on_pin = pin != pin_objs_.end();
-        if (!on_pin && rec == recent_objs_.end()) return false;
-        std::vector<lv_obj_t*>& row = on_pin ? pin_objs_ : recent_objs_;
-        int i = int((on_pin ? pin : rec) - row.begin()), n = int(row.size());
-        switch (key) {
-            case LV_KEY_LEFT:
-            case LV_KEY_RIGHT: {
-                int j = (i + (key == LV_KEY_RIGHT ? 1 : n - 1)) % n;
-                if (on_pin) focus_pin(j);
-                else lv_group_focus_obj(row[size_t(j)]);
-                return true;
+        auto row = std::find(row_objs_.begin(), row_objs_.end(), f);
+        if (pin != pin_objs_.end()) {
+            int i = int(pin - pin_objs_.begin()), n = int(pin_objs_.size());
+            switch (key) {
+                case LV_KEY_LEFT: focus_pin((i + n - 1) % n); return true;
+                case LV_KEY_RIGHT: focus_pin((i + 1) % n); return true;
+                case LV_KEY_DOWN:
+                    if (!row_objs_.empty()) lv_group_focus_obj(row_objs_.front());
+                    return true;
+                case LV_KEY_UP:
+                    if (!row_objs_.empty()) lv_group_focus_obj(row_objs_.back());
+                    return true;
+                default: return false;
             }
-            case LV_KEY_UP:
-            case LV_KEY_DOWN:
-                if (on_pin) {
-                    if (!recent_objs_.empty())
-                        lv_group_focus_obj(recent_objs_[size_t(std::min(rec_sel_, int(recent_objs_.size()) - 1))]);
-                } else {
-                    rec_sel_ = i;
-                    focus_pin(pin_sel_);
-                }
-                return true;
-            default: return false;
         }
+        if (row != row_objs_.end()) {
+            int i = int(row - row_objs_.begin()), n = int(row_objs_.size());
+            switch (key) {
+                case LV_KEY_DOWN:
+                    if (i + 1 < n) lv_group_focus_obj(row_objs_[size_t(i + 1)]);
+                    else if (!pin_objs_.empty()) focus_pin(pin_sel_);
+                    return true;
+                case LV_KEY_UP:
+                    if (i > 0) lv_group_focus_obj(row_objs_[size_t(i - 1)]);
+                    else if (!pin_objs_.empty()) focus_pin(pin_sel_);
+                    return true;
+                case LV_KEY_LEFT:
+                case LV_KEY_RIGHT: return true;
+                default: return false;
+            }
+        }
+        return false;
     }
 
     void focus_pin(int i) {
@@ -716,6 +766,7 @@ private:
 
     lv_obj_t* root_ = nullptr;
     lv_obj_t* box_ = nullptr;
+    lv_obj_t* rows_box_ = nullptr;
     lv_obj_t* time_ = nullptr;
     lv_obj_t* date_ = nullptr;
     int shown_minute_ = -1;
@@ -724,10 +775,11 @@ private:
     std::string pin_pending_;   // All apps: Tab, P, then 1 to 7
     bool all_apps_ = false;
     std::vector<std::string> pins_;
-    std::vector<lv_obj_t*> pin_objs_, recent_objs_;
-    std::vector<std::string> all_ids_;
+    std::vector<lv_obj_t*> pin_objs_, row_objs_;
+    std::vector<std::string> row_ids_, all_ids_;
     std::map<lv_obj_t*, std::string> open_ids_;
-    int pin_sel_ = 0, rec_sel_ = 0;
+    std::map<lv_obj_t*, std::function<void()>> row_runs_;
+    int pin_sel_ = 0;
     ListView results_, all_;
 };
 
@@ -739,8 +791,7 @@ void home_apps_changed() {
     if (g_home) g_home->apps_changed();
 }
 
-// An app was opened: it goes to the front of Recent (home shows the newest
-// few that aren't pinned).
+// An app was opened: it goes to the front of Recent.
 void home_opened(const std::string& id) {
     if (id == "home" || id.empty()) return;
     std::vector<std::string> r = split(prefs::get_str("home.recent", ""));

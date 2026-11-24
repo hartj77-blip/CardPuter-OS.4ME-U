@@ -30,7 +30,7 @@ import tempfile
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from device_test import KEY, Device  # noqa: E402
+from device_test import Device  # noqa: E402
 
 BASE_APPS = ["wifi", "settings", "update", "apps"]
 
@@ -96,11 +96,12 @@ def run(binary, shim, shots, hal, expect, apps_dir, settle, env_extra=None):
         home = d.frame()
         check("home screen draws", any(home), "framebuffer is all black")
 
-        # All apps (Tab on Home) lists every app A-Z; the n-th is n arrows
-        # down from the first.
+        # Home's All apps (Up from the pinned apps is its last row) lists every
+        # app A-Z; the n-th is n arrows down from the first.
         visited = []
         for i in range(len(want) + 2):   # +2: a few extra, to see it wrap round
-            d.tap(KEY["tab"])
+            d.nav("up")
+            d.nav("enter")
             time.sleep(0.5)
             d.nav("down", i)
             d.nav("enter")

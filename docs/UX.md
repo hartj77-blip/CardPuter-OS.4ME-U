@@ -149,16 +149,18 @@ This replaces today's "press D again" and "Del twice" patterns.
 
 ## Home
 
-Home is a search box, the time, what you used last, and the pinned apps. It replaces the app grid
-and the dock.
+Home is a search box, the pinned apps, what you used last, and the time and date in the bottom
+right corner. It replaces the app grid and the dock.
 
 ```
 ┌ 21:44 ─────────────────── ⚡78% ┐
 │ › _                              │  typing goes here
-│ 21:44          RECENT            │  the clock, over the photo
-│ Tuesday 24 Nov  Wi-Fi Batt. Sys. │  Down from the pins
-│ ①Term ②Files ③Notes ④Media ⑤…   │  pinned: 1 to 7, along the bottom
-│ ⏎ Open  a-z Search  ⇥ All apps   │
+│ ①Term ②Files ③Notes ④Media ⑤…   │  pinned: 1 to 9
+│ RECENT                           │
+│   Media · Night Drive ▶          │  opens where you left off
+│   IR Remote · Living    21:44    │  the time and date, bottom right
+│   All apps         28 Tue 24 Nov │
+│ ⏎ Open  ↓ All apps  ⇥ Menu       │
 └──────────────────────────────────┘
 ```
 
@@ -166,11 +168,9 @@ and the dock.
   app, P, then the key to put it on (1 to 7). An app already on that key swaps places with it, or
   is unpinned if the new one wasn't pinned. U unpins. A fresh ZeroOS pins Terminal, Files, Notes,
   Media, Apps and Settings, the ones installed.
-- **Recent**: the last three apps you opened that aren't pinned (a pinned app is already a key
-  away), newest first, beside the clock. Down (or Up) from the pins goes to them, Left / Right
-  moves along them, Down again goes back to the pin you were on. Later, an app will be able to
-  say what to reopen (a track, a remote, a network, a file), so Enter goes straight back to it.
-- **All apps**: Tab on Home (Home has no menu of its own) opens the
+- **Recent**: the last few things you did, newest first. An app can say what to reopen (a track, a
+  remote, a network, a file), so Enter goes straight back to it.
+- **All apps**: Tab on Home (Home has no menu of its own), or Enter on the All apps row, opens the
   A-Z list of apps. It's a List screen, so typing filters it.
 - **Search**: any letter starts a search. Results are grouped: Apps, Settings, Actions, then each
   app's own results (files, notes, remotes, networks, songs). Enter runs the top result. Left /
