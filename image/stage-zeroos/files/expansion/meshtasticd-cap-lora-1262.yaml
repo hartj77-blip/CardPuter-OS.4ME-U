@@ -1,15 +1,20 @@
 # ZeroOS: M5Stack Cap LoRa-1262 on the CardputerZero's EXT port
-# (docs/EXPANSION.md). SX1262 on SPI0 CE1 (GPIO 7, /dev/spidev0.1); pins as
-# M5's pin map and trail-mate's CardputerZero port use them. Confirm on
-# hardware.
+# (docs/EXPANSION.md). SX1262 on SPI0 CE1 (GPIO 7, /dev/spidev0.1), as in
+# Meshtastic's own config for this board (lora-cardputer-zero.yaml) and M5's
+# LoRa app. The 5 V and the antenna switch (an IO expander on the cap) aren't
+# set here: zeroos-mesh-cap-power does that before meshtasticd starts.
 Lora:
   Module: sx1262
-  spidev: spidev0.1
+  spidev: spidev0.1   # the kernel drives CE1; no CS pin. The LCD is on CE0.
+  spiSpeed: 1000000
+  gpiochip: 0
   Reset: 26
   Busy: 22
   IRQ: 23
   DIO2_AS_RF_SWITCH: true
-  DIO3_TCXO_VOLTAGE: true
+  # The cap's TCXO runs at 3.0 V. "true" would mean 1.8 V, too low for it to
+  # start, and the radio then fails to come up.
+  DIO3_TCXO_VOLTAGE: 3.0
 
 # No GPS section: meshtasticd (2.7) can't read gpsd, only a serial port
 # (GPS: SerialPath). gpsd already owns /dev/serial0 for ZeroShell's GPS app

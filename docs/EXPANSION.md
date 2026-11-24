@@ -91,15 +91,16 @@ uses its own battery: leave it off when you don't need it **(measure)**.
 | 5 V | An LED-class supply under `/sys/class/leds/` (`ext_5v_out` on M5's image). ZeroShell switches every `*5v*` one; `power-perms` lets it. |
 | `config.txt`, `cmdline.txt` | `enable_uart=1`; no serial console on the UART, so it's free for GPS. |
 | `gpsd` | Reads `/dev/serial0` at 115200 (and USB GPS dongles). Socket-activated: it starts when the GPS app connects and stops reading the receiver when they stop watching. Config: `/etc/default/gpsd`. |
-| `meshtasticd` | Meshtastic's Linux daemon, from Meshtastic's Debian repository (beta channel), installed with the Mesh app ([APPS.md](APPS.md)); the repository's key is checked against `MESHTASTIC_KEY_FPR` in `image/build.sh`. The repository keeps only its newest build, so that is what you get; to stay on one, `sudo apt-mark hold meshtasticd`. Off at boot; the Mesh app starts it (polkit allows `pi` exactly this unit). Radio config: `/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml` (SX1262 on `spidev0.1`, RESET 26, BUSY 22, IRQ 23, DIO2 as RF switch, DIO3 TCXO). It doesn't use the GPS (it can't read gpsd, and a second reader on the UART would garble gpsd's). It serves the web client on port 9443 and the app API on TCP 4403. |
+| `meshtasticd` | Meshtastic's Linux daemon, from Meshtastic's Debian repository (beta channel), installed with the Mesh app ([APPS.md](APPS.md)); the repository's key is checked against `MESHTASTIC_KEY_FPR` in `image/build.sh`. The repository keeps only its newest build, so that is what you get; to stay on one, `sudo apt-mark hold meshtasticd`. Off at boot; the Mesh app starts it (polkit allows `pi` exactly this unit). Radio config: `/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml` (SX1262 on `spidev0.1` at 1 MHz, RESET 26, BUSY 22, IRQ 23, DIO2 as RF switch, 3.0 V TCXO on DIO3), as in Meshtastic's own `lora-cardputer-zero.yaml`. Before every start, `/usr/lib/zeroos/mesh-cap-power` (run as root by the unit) turns on the expansion 5 V and drives P0 of the cap's IO expander (PI4IOE5V6408, I2C 0x43 on `/dev/i2c-1`) high: that is the antenna switch, and the expander forgets it whenever the 5 V goes off. Before Mesh 1.0.2 the TCXO was set to 1.8 V and the antenna switch was never set, so the radio couldn't work. It doesn't use the GPS (it can't read gpsd, and a second reader on the UART would garble gpsd's). It serves the web client on port 9443 and the app API on TCP 4403. |
 | Chat in ZeroShell | A small client for that API (`hal/meshtastic.cpp`, hand-written protobuf, no library): asks for the node list, reads text messages, sends to the primary channel. |
 
 ## To confirm on hardware
 
-- The radio pins and `/dev/spidev0.1`. If the Mesh app says **No radio**
-  or **Radio error** (the daemon keeps stopping; the app shows its last
-  error line), check `journalctl -u meshtasticd` and the pins in the config
-  file. `ls /dev/spidev0.*` should list `spidev0.1` (needs `dtparam=spi=on`;
+- The radio settings, now the same as Meshtastic's and M5's for this cap,
+  on a ZeroOS device. If the Mesh app says **No radio** or **Radio error**
+  (the daemon keeps stopping; the app shows its last error line), check
+  `journalctl -u meshtasticd -b`: the `zeroos-mesh:` lines say whether the
+  antenna switch was set, then come meshtasticd's own errors. `ls /dev/spidev0.*` should list `spidev0.1` (needs `dtparam=spi=on`;
   M5's overlay turns off only `spidev0.0`, which the LCD uses). GPIO 22
   (BUSY) is also M5's optional third chip select: don't load their
   `spi0-spidev2-gpio22` overlay with the LoRa cap fitted.

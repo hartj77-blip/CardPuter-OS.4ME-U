@@ -11,6 +11,7 @@ payload() {
                        "$D/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml"
     install -D -m 0644 "$F/expansion/meshtasticd-zeroos.conf" \
                        "$D/etc/systemd/system/meshtasticd.service.d/zeroos.conf"
+    install -D -m 0755 "$F/expansion/zeroos-mesh-cap-power" "$D/usr/lib/zeroos/mesh-cap-power"
     # Checked against the fingerprint pinned in build.sh when it was fetched.
     install -D -m 0644 "$KEYS/meshtastic.asc" "$D/usr/share/keyrings/zeroos-app-mesh.asc"
     install -d "$D/etc/apt/sources.list.d"
