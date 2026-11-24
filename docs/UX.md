@@ -149,15 +149,15 @@ This replaces today's "press D again" and "Del twice" patterns.
 
 ## Home
 
-Home is a search box, the pinned apps, what you used last, and the time and date in the bottom
-right corner. It replaces the app grid and the dock.
+Home is a search box, the pinned apps, what you used last, and in the bottom right corner the
+track playing (or paused), the time and the date. It replaces the app grid and the dock.
 
 ```
 ┌ 21:44 ─────────────────── ⚡78% ┐
 │ › _                              │  typing goes here
 │ ①Term ②Files ③Notes ④Media ⑤…   │  pinned: 1 to 9
 │ RECENT                           │
-│   Media · Night Drive ▶          │  opens where you left off
+│   Media · Night   ▶ Night Drive  │  what is playing, over the clock
 │   IR Remote · Living    21:44    │  the time and date, bottom right
 │   All apps         28 Tue 24 Nov │
 │ ⏎ Open  ↓ All apps  ⇥ Menu       │

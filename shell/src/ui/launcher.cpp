@@ -1,5 +1,6 @@
 // Home (docs/UX.md): a search box, the pinned apps on 1 to 7, what you opened
-// last, and All apps, with the time and date in the corner. Typing searches apps, settings and actions; Enter (or
+// last, and All apps, with what is playing, the time and the date in the
+// corner. Typing searches apps, settings and actions; Enter (or
 // the result's number) opens the one in focus.
 //
 //   home      letters search; 1-7 pinned; Up/Down/Left/Right move; Enter opens;
@@ -20,6 +21,7 @@
 #include "hal/hal.h"
 #include "platform/keys.h"
 #include "ui/list_view.h"
+#include "ui/player.h"
 #include "ui/power.h"
 #include "ui/prefs.h"
 #include "ui/quick_panel.h"
@@ -328,9 +330,20 @@ public:
         show_home();
     }
 
-    // Home's clock, once a minute.
+    // Home's clock, once a minute, and what is playing.
     void tick() override {
         if (!time_) return;
+        PlaybackState pb = hal().playback();
+        std::string playing;
+        if (!pb.path.empty()) {
+            const QueueItem* q = player_current();
+            playing = std::string(pb.paused ? LV_SYMBOL_PAUSE "  " : LV_SYMBOL_PLAY "  ") +
+                      (q ? q->title : pb.path.substr(pb.path.rfind('/') + 1));
+        }
+        if (playing != shown_playing_) {
+            shown_playing_ = playing;
+            lv_label_set_text(playing_, playing.c_str());
+        }
         time_t now = time(nullptr);
         tm lt{};
         localtime_r(&now, &lt);
@@ -408,7 +421,7 @@ private:
         open_ids_.clear();
         row_runs_.clear();
         results_.reset();   // their rows went with the screen
-        time_ = date_ = nullptr;
+        time_ = date_ = playing_ = nullptr;
         all_.reset();
         box_ = nullptr;
         all_head_ = nullptr;
@@ -516,6 +529,13 @@ private:
         lv_obj_align(time_, LV_ALIGN_BOTTOM_RIGHT, -8, -18);
         date_ = label(root_, "", &zs_font_12, kGrey7);
         lv_obj_align(date_, LV_ALIGN_BOTTOM_RIGHT, -9, -3);
+        // Above them, the track playing or paused (none: nothing).
+        playing_ = label(root_, "", &zs_font_12, kGrey7);
+        lv_obj_set_size(playing_, kScreenW - kRowW - 14, 14);
+        lv_label_set_long_mode(playing_, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_align(playing_, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_align(playing_, LV_ALIGN_BOTTOM_RIGHT, -9, -50);
+        shown_playing_.clear();
         shown_minute_ = -1;
         tick();
 
@@ -769,6 +789,8 @@ private:
     lv_obj_t* rows_box_ = nullptr;
     lv_obj_t* time_ = nullptr;
     lv_obj_t* date_ = nullptr;
+    lv_obj_t* playing_ = nullptr;
+    std::string shown_playing_;
     int shown_minute_ = -1;
     lv_obj_t* all_head_ = nullptr;
     std::string query_;
