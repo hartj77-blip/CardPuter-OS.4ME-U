@@ -1,5 +1,7 @@
 # Hardware test checklist
 
+Latest results on real hardware: [TESTED.md](TESTED.md).
+
 Flash `zeroos-cardputerzero-arm64.img.xz` from the newest release, join Wi-Fi, then open **Apps** (pinned on the home screen). For each app below: select it, press **Enter**, choose **Install**, wait for "installed", open it from the home screen, do the test, then press **Esc** until you're home. Tick the box if it worked; if not, note what you saw.
 
 If something freezes or crashes, connect over SSH and run `journalctl -u zeroshell -b | tail -50` (it logs which app was open).
