@@ -10,6 +10,8 @@
 #   zeroos-apps sources                 where apps come from
 #   zeroos-apps add-source <owner/repo | https://... | m5stack>
 #   zeroos-apps remove-source <owner/repo | https://... | m5stack>
+#   zeroos-apps source-up <source>      move a source up the list (it wins over the ones below)
+#   zeroos-apps source-down <source>    move a source down the list
 #   zeroos-apps run <action[:arg]>      what zeroos-apps@<action[:arg]>.service runs
 #
 # A source is a GitHub repository (owner/repo) whose newest release holds
@@ -590,6 +592,26 @@ remove_source() {
     refresh
 }
 
+# Swap a source with the one above (up) or below (down) it. Comments and
+# blank lines stay where they are. The first source to offer an app wins,
+# so the catalog is made again.
+move_source() {
+    local dir=$1 s=$2 tmp
+    list_sources | grep -qxF -- "$s" || fail "Not one of your sources: $s"
+    tmp=$(mktemp)
+    awk -v s="$s" -v dir="$dir" '
+        { line[NR] = $0; l = $0; sub(/#.*/, "", l); sub(/^[ \t]+/, "", l); sub(/[ \t]+$/, "", l)
+          if (l != "") { src[++n] = NR; if (l == s && !found) { found = 1; at = n } } }
+        END {
+            t = dir == "up" ? at - 1 : at + 1
+            if (found && t >= 1 && t <= n) { a = src[at]; b = src[t]; x = line[a]; line[a] = line[b]; line[b] = x }
+            for (i = 1; i <= NR; i++) print line[i]
+        }' "$SOURCES" > "$tmp"
+    cat "$tmp" > "$SOURCES"
+    rm -f -- "${tmp:?}"
+    refresh
+}
+
 list() {
     local id
     printf '%-20s %-12s %-12s %s\n' APP INSTALLED OFFERED SOURCE
@@ -617,6 +639,8 @@ job() {
         upgrade) upgrade_all ;;
         add-source) add_source "$arg" ;;
         remove-source) remove_source "$arg" ;;
+        source-up) move_source up "$arg" ;;
+        source-down) move_source down "$arg" ;;
         *) fail "Unknown job: $words" ;;
     esac
 }
@@ -637,7 +661,7 @@ case "${1:-}" in
         setup
         job "$1"
         ;;
-    install|remove|add-source|remove-source)
+    install|remove|add-source|remove-source|source-up|source-down)
         need_root "$1"
         [ -n "${2:-}" ] || { echo "usage: zeroos-apps $1 <name>" >&2; exit 1; }
         setup
@@ -661,7 +685,7 @@ case "${1:-}" in
         install_debs "$app" "$2"
         ;;
     *)
-        sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+        sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
         exit 1
         ;;
 esac
