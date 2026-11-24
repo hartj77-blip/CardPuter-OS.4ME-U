@@ -215,7 +215,7 @@ separate package with its own version, so updating one app never touches another
 | Compass | Compass and spirit level |
 | Battery | Time left, power draw and power profiles ([guide](docs/PERFORMANCE.md)) |
 | System | CPU, memory, storage and temperature |
-| Media | Music from the SD card, USB drives and server shares, in a classic MP3-player look with eight themes |
+| Media | Music from the SD card, USB drives and server shares, in a classic MP3-player look, with other looks to switch to (T) |
 | Jellyfin | Music, movies and shows from your Jellyfin server ([guide](docs/JELLYFIN.md)) |
 | Recorder | Voice notes: record, play back, rename, delete |
 | Camera | Photos, a gallery, and a QR reader that can join Wi-Fi. Needs a model with a camera ([guide](docs/CAMERA.md)) |
