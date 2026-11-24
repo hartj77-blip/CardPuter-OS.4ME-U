@@ -1,7 +1,12 @@
 #include "ui/power.h"
 
+#include <unistd.h>
+
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <string>
 
 #include "ui/app.h"
 #include "ui/prefs.h"
@@ -26,6 +31,18 @@ constexpr uint32_t kPickupGraceMs = 8000;      // no key after a pickup wake: of
 constexpr uint32_t kFalseWakeWindowMs = 5 * 60 * 1000;
 constexpr uint32_t kPickupPauseMs = 15 * 60 * 1000;   // 3 false wakes (a bag, a pocket): pause
 constexpr uint32_t kLockPickupPauseMs = 5000;   // LOCK (Tab held): no pickup wake while still in hand
+
+// An open app that drives the HDMI port itself (Games puts the game on a TV)
+// says so in $XDG_RUNTIME_DIR/zeroos-hdmi-app: "<pid> <app id>". A monitor
+// plugged in then is for that app, so Dock isn't opened over it. Apps run in
+// this process, so the pid is ours while the file is current; one left by a
+// crash names a process that's gone and counts for nothing.
+bool hdmi_claimed_by_app() {
+    const char* run = std::getenv("XDG_RUNTIME_DIR");
+    std::ifstream f(std::string(run && *run ? run : "/tmp") + "/zeroos-hdmi-app");
+    long pid = 0;
+    return f >> pid && pid == long(getpid());
+}
 }  // namespace
 
 Power& Power::get() {
@@ -270,13 +287,14 @@ void Power::set_docked(bool docked, uint32_t now_ms) {
 }
 
 // HDMI plugged in: open the Dock app, or start Dock mode (dock.on_hdmi =
-// ask | auto | off). Monitor unplugged for 3 s: stop Dock mode.
+// ask | auto | off), unless the open app uses HDMI itself (Games on a TV).
+// Monitor unplugged for 3 s: stop Dock mode.
 void Power::watch_dock(uint32_t now_ms) {
     if (now_ms - last_dock_check_ < 1000) return;
     last_dock_check_ = now_ms;
     auto& h = hal();
     DisplayStatus d = h.display();
-    if (d.hdmi_connected && !hdmi_was_ && !d.dock_running) {
+    if (d.hdmi_connected && !hdmi_was_ && !d.dock_running && !hdmi_claimed_by_app()) {
         std::string mode = prefs::get_str("dock.on_hdmi", "ask");
         if (mode == "auto") {
             h.dock_start();
