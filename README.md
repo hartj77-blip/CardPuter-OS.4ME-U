@@ -144,7 +144,7 @@ On the home screen:
 
 | Key | What it does |
 | --- | --- |
-| Letters | Search apps, settings and actions ("wifi", "bright", "mute"). Enter opens the first |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "music", "bt"). The best match is first, and Enter opens it |
 | 1 to 7 | Open the pinned apps. While searching, 1 to 9 pick a result |
 | Esc | Clear the search |
 | Tab | Open All apps (every app, A to Z). There, Tab on an app, P, then 1 to 7 pins it on that key |

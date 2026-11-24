@@ -22,6 +22,7 @@
 #include "ui/power.h"
 #include "ui/prefs.h"
 #include "ui/quick_panel.h"
+#include "ui/search_match.h"
 #include "ui/shell.h"
 #include "ui/theme.h"
 
@@ -78,23 +79,7 @@ std::vector<std::string> recent() {
 }
 
 // Lower case, letters and digits only: "Wi-Fi" and "wifi" are the same word.
-std::string norm(const std::string& s) {
-    std::string out;
-    for (char ch : s)
-        if (std::isalnum((unsigned char)ch) || ch == ' ') out += char(std::tolower((unsigned char)ch));
-    return out;
-}
-
-bool matches(const std::string& text, const std::string& q) {
-    std::string t = norm(text), n = norm(q);
-    if (n.empty()) return false;
-    // Each word of the query is in the text ("bt off" finds "Turn Bluetooth off" via "bluetooth").
-    std::stringstream ss(n);
-    std::string w;
-    while (ss >> w)
-        if (t.find(w) == std::string::npos) return false;
-    return true;
-}
+std::string norm(const std::string& s) { return search_norm(s); }
 
 // A Yaru-style icon: a white glyph on a coloured rounded square.
 lv_obj_t* app_icon(lv_obj_t* parent, const AppInfo& info, int size) {
@@ -131,6 +116,42 @@ struct Result {
     std::vector<std::string> choices;      // a value row (Volume): Left/Right
     int at = 0;
     std::function<void(int)> change;
+    int score = 0;                         // how well it matched (ui/search_match.h)
+};
+
+// More words an app is found by ("music" finds Media). Ids of apps that may
+// not be installed are fine: only apps on the device are searched.
+const std::map<std::string, const char*> kAppWords = {
+    {"media", "music songs video player jellyfin audio podcast"},
+    {"terminal", "shell console command ssh bash"},
+    {"files", "folder documents browse storage"},
+    {"notes", "text write memo editor"},
+    {"settings", "preferences options config setup"},
+    {"apps", "store install download add remove"},
+    {"wifi", "wireless internet network"},
+    {"bluetooth", "bt pair headphones speaker"},
+    {"update", "upgrade version software"},
+    {"sysmon", "system memory cpu task processes about"},
+    {"battery", "power charge"},
+    {"clock", "time alarm timer stopwatch date"},
+    {"camera", "photo picture qr scan"},
+    {"ir", "remote tv infrared"},
+    {"remote", "tailscale vnc pc control"},
+    {"games", "play emulator retro"},
+    {"ai", "chat claude assistant"},
+    {"gps", "location map track"},
+    {"mesh", "meshtastic lora radio message"},
+    {"tether", "hotspot phone usb internet share"},
+    {"dock", "desk monitor hdmi"},
+    {"car", "obd vehicle drive"},
+    {"compass", "heading north direction"},
+    {"sync", "syncthing backup"},
+    {"code", "programming editor python dev"},
+    {"repl", "python console dev"},
+    {"git", "repository commit dev"},
+    {"serial", "uart usb console dev"},
+    {"browser", "web internet"},
+    {"recorder", "voice audio record microphone"},
 };
 
 struct SettingEntry {
@@ -144,9 +165,11 @@ const SettingEntry kSettings[] = {
     {"Wi-Fi networks", "wireless internet join", "wifi", "", LV_SYMBOL_WIFI},
     {"Bluetooth", "bt", "settings", "bluetooth", LV_SYMBOL_BLUETOOTH},
     {"Bluetooth devices", "bt pair keyboard gamepad speaker headphones", "bluetooth", "", LV_SYMBOL_BLUETOOTH},
+    {"Display", "screen brightness dim", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Brightness", "screen display", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Dim screen after", "display sleep timeout", "settings", "display", LV_SYMBOL_EYE_CLOSE},
     {"Screen off after", "display sleep timeout", "settings", "display", LV_SYMBOL_POWER},
+    {"Sound", "audio volume mute output speaker", "settings", "sound", LV_SYMBOL_VOLUME_MAX},
     {"Volume", "sound audio", "settings", "sound", LV_SYMBOL_VOLUME_MAX},
     {"Power profile", "battery saver performance", "settings", "battery", LV_SYMBOL_CHARGE},
     {"Battery & power", "charge", "settings", "battery", LV_SYMBOL_BATTERY_3},
@@ -166,16 +189,23 @@ std::vector<std::string> percents() {
 std::vector<Result> search(const std::string& q) {
     std::vector<Result> out;
     // Apps.
-    for (const AppInfo& a : app_registry())
-        if (matches(a.name + " " + a.id, q)) {
+    for (const AppInfo& a : app_registry()) {
+        auto w = kAppWords.find(a.id);
+        int sc = search_score(a.name, a.id + " " + (w == kAppWords.end() ? "" : w->second), q);
+        if (sc) {
             std::string id = a.id;
             out.push_back({a.symbol, a.name, "App", [id] { shell_open_app(id); }});
+            out.back().score = sc;
         }
+    }
     // Actions: done right here, without opening anything.
     auto& h = hal();
     NetStatus n = h.net();
     auto toggle = [&](const char* icon, const std::string& text, const char* words, std::function<void()> run) {
-        if (matches(text + " " + words, q)) out.push_back({icon, text, "Action", std::move(run)});
+        if (int sc = search_score(text, words, q)) {
+            out.push_back({icon, text, "Action", std::move(run)});
+            out.back().score = sc;
+        }
     };
     // Each reads the state when it runs (the row is relabelled after).
     toggle(LV_SYMBOL_WIFI, n.wifi_enabled ? "Turn Wi-Fi off" : "Turn Wi-Fi on", "wireless", [] {
@@ -193,25 +223,36 @@ std::vector<Result> search(const std::string& q) {
         hal().set_muted(!m);
         shell_toast(m ? "Sound on" : "Sound off");
     });
-    if (matches("Volume sound audio", q)) {
+    if (int sc = search_score("Volume", "sound audio louder quieter", q)) {
         Result r{LV_SYMBOL_VOLUME_MAX, "Volume", "Action", nullptr, percents(), (h.volume() + 2) / 5};
         r.change = [](int i) { hal().set_volume(i * 5); };
+        r.score = sc;
         out.push_back(r);
     }
-    if (matches("Brightness screen display", q)) {
+    if (int sc = search_score("Brightness", "screen display light dim", q)) {
         Result r{LV_SYMBOL_EYE_OPEN, "Brightness", "Action", nullptr, percents(), (power().user_brightness() + 2) / 5};
         r.change = [](int i) { power().set_user_brightness(i * 5); };
+        r.score = sc;
         out.push_back(r);
     }
     // Settings: open the section.
     for (const SettingEntry& s : kSettings) {
-        if (!matches(std::string(s.text) + " " + s.words, q) || !app_find(s.app)) continue;
+        int sc = search_score(s.text, s.words, q);
+        if (!sc || !app_find(s.app)) continue;
         std::string app = s.app, arg = s.arg;
         out.push_back({s.icon, s.text, "Setting", [app, arg] {
                            if (arg.empty()) shell_open_app(app);
                            else shell_open_app(app, arg);
                        }});
+        out.back().score = sc;
     }
+    // Best match first; equally good ones as docs/UX.md groups them: apps,
+    // then settings, then actions (each group in the order found).
+    auto group = [](const Result& r) { return r.kind == "App" ? 0 : r.kind == "Setting" ? 1 : 2; };
+    std::stable_sort(out.begin(), out.end(), [&](const Result& a, const Result& b) {
+        if (a.score != b.score) return a.score > b.score;
+        return group(a) < group(b);
+    });
     return out;
 }
 

@@ -5,6 +5,7 @@
 
 #include "platform/keys.h"
 #include "ui/app.h"
+#include "ui/search_match.h"
 #include "ui/theme.h"
 
 namespace zs {
@@ -301,8 +302,19 @@ void ListView::apply_filter() {
     int was = focused();
     std::string f = lower(filter_);
     shown_.clear();
-    for (int i = 0; i < int(rows_.size()); ++i)
-        if (f.empty() || lower(rows_[size_t(i)].text).find(f) != std::string::npos) shown_.push_back(i);
+    // The same rule as Home search (ui/search_match.h): every typed word
+    // somewhere in the row, best matches first, ties in the list's order.
+    // Text with no letters or digits (".") is looked for as it is.
+    bool words = search_norm(filter_).find_first_not_of(' ') != std::string::npos;
+    std::vector<int> score(rows_.size(), 0);
+    for (int i = 0; i < int(rows_.size()); ++i) {
+        const std::string& t = rows_[size_t(i)].text;
+        if (f.empty()) score[size_t(i)] = 1;
+        else if (words) score[size_t(i)] = search_score(t, "", filter_);
+        else score[size_t(i)] = lower(t).find(f) != std::string::npos ? 1 : 0;
+        if (score[size_t(i)]) shown_.push_back(i);
+    }
+    std::stable_sort(shown_.begin(), shown_.end(), [&](int a, int b) { return score[size_t(a)] > score[size_t(b)]; });
 
     if (filter_.empty()) {
         lv_obj_add_flag(chip_, LV_OBJ_FLAG_HIDDEN);

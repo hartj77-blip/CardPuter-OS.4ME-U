@@ -174,6 +174,12 @@ dock.
 - **Search**: any letter starts a search. Results are grouped: Apps, Settings, Actions, then each
   app's own results (files, notes, remotes, networks, songs). Enter runs the top result. Left /
   Right on a value result (Volume, Brightness) change it in place.
+- **Matching** (`shell/src/ui/search_match.h`, the same rule for Home search and every list's
+  filter): each typed word has to be in the name, or in the words it's also known by ("bt" for
+  Bluetooth, "music" for Media), in any order; capitals and punctuation don't count ("wifi" is
+  Wi-Fi). The best match comes first: the whole name, then names that start with what was typed,
+  then names with a word that starts with it ("fi": Files, then Wi-Fi), then names that only
+  contain it, then keyword matches. Equally good results keep the Apps, Settings, Actions order.
 
 ```
 › wi
