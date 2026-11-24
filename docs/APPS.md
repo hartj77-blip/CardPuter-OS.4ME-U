@@ -34,7 +34,7 @@ list is more than 6 hours old. Type to find an app.
 | Enter | an app's page: **Install**, **Update**, **Open**, **Remove** (Remove asks first) |
 | Tab > U | update every app that has a newer version |
 | Tab > R | look for new apps now |
-| Tab > P | sources: where apps come from. Tab > D removes one (it asks first); **Add a GitHub repo** adds one |
+| Tab > P | sources: where apps come from, in order (the higher one wins). Tab > K / Tab > J moves the highlighted one up / down; Tab > D removes one (it asks first); **Add a GitHub repo** adds one |
 
 Ctrl and the letter does the same without opening the menu (Ctrl + U updates every app).
 
@@ -53,6 +53,7 @@ sudo zeroos-apps install media
 sudo zeroos-apps remove media
 sudo zeroos-apps upgrade         # every app with a newer version
 sudo zeroos-apps add-source someone/cardputer-apps
+sudo zeroos-apps source-up someone/cardputer-apps     # move it up the list (source-down: down)
 sudo zeroos-apps install-file zeroos-app-media_0.5.0_arm64.deb   # a package you copied over
 ```
 
@@ -72,7 +73,9 @@ order:
 | `m5stack` | [M5Stack's app store](#m5stacks-app-store): community apps made for M5's own launcher. |
 
 When two sources offer an app with the same name, the one higher in the list wins, so apps come
-from the apps repository whenever it has a build for this ZeroOS. A device updated from ZeroOS
+from the apps repository whenever it has a build for this ZeroOS. To change the order, highlight a
+source in **Apps > Tab > P** and press **Tab > K** (up) or **Tab > J** (down); the list of apps is
+fetched again in the new order. A device updated from ZeroOS
 0.3.4 or older gets the apps repository added to its list by the update. The first **U** after
 that updates every installed app once, to the apps repository's builds.
 

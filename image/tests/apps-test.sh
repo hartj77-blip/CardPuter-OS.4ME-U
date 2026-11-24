@@ -319,6 +319,18 @@ grep -q 'rm -rf' "$T/sources" && bad "add-source, junk: written" || ok "add-sour
 apps run remove-source:someone/cardputer-apps || true
 grep -qx 'someone/cardputer-apps' "$T/sources" && bad "remove-source" || ok "remove-source: removed"
 apps sources | grep -qx 'other/apps' && ok "sources: lists them" || bad "sources"
+printf '# mine\nfile://%s/a\n\nfile://%s/b\nother/apps\n' "$T" "$T" > "$T/sources"
+apps run source-up:other/apps || true
+[ "$(apps sources | tr '\n' ' ')" = "file://$T/a other/apps file://$T/b " ] && ok "source-up: moved above the one before" ||
+    bad "source-up: $(apps sources | tr '\n' ' ')"
+head -1 "$T/sources" | grep -qx '# mine' && ok "source-up: comments stay" || bad "source-up: comment moved"
+apps run source-down:file://$T/a || true
+[ "$(apps sources | tr '\n' ' ')" = "other/apps file://$T/a file://$T/b " ] && ok "source-down: moved below the next" ||
+    bad "source-down: $(apps sources | tr '\n' ' ')"
+apps run source-up:other/apps || true
+[ "$(apps sources | head -1)" = other/apps ] && ok "source-up: the first stays first" || bad "source-up: top moved"
+apps run source-up:nobody/here || true
+expect "source-up, not a source: failed" state failed
 
 # --- M5Stack's app store (registry.json) --------------------------------------
 m5deb() {   # m5deb <package> <version> <arch>: an app made for M5's launcher, in $T/m5

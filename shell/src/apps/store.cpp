@@ -3,7 +3,8 @@
 //
 //   list     Enter: details. Tab: U update all, R look for new apps, P sources
 //   details  Enter: the highlighted button. Tab: I install, U update, O open, D remove
-//   sources  Enter on "Add a GitHub repo". Tab: N add one, D remove the highlighted one
+//   sources  Enter on "Add a GitHub repo". Tab: N add one, K/J move the highlighted one
+//            up/down (the higher one wins), D remove it
 // Typing finds an app or a source (ui/list_view.h).
 //
 // Apps from M5Stack's app store (made for M5's own launcher) are marked "M5"
@@ -393,15 +394,42 @@ private:
         Action rm{"Remove", 'd', nullptr, [this] { remove_source(); }};
         rm.danger = true;
         rm.confirm = "Remove this source?";
-        shell_set_actions({{"Select", 0, "Enter", nullptr}, {"Add a GitHub repo", 'n', nullptr, [this] { show_add(); }}, rm});
-        lv_obj_t* h = label(root_, "Apps come from these GitHub repos.", &zs_font_12, kMuted);
+        bool many = sources_.size() > 1;
+        shell_set_actions({{"Select", 0, "Enter", nullptr},
+                           {"Add a GitHub repo", 'n', nullptr, [this] { show_add(); }},
+                           {"Move up", 'k', nullptr, [this] { move_source(-1); }, many},
+                           {"Move down", 'j', nullptr, [this] { move_source(+1); }, many},
+                           rm});
+        lv_obj_t* h = label(root_, many ? "Apps come from these. Higher wins: Tab > K/J moves." : "Apps come from these.",
+                            &zs_font_12, kMuted);
         lv_obj_set_pos(h, 8, 3);
         list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 42);
-        for (size_t i = 0; i < sources_.size(); ++i)
-            list_.add(ZS_ICON_GLOBE, store::source_label(sources_[i]), "", nullptr);
+        int focus = -1;
+        for (size_t i = 0; i < sources_.size(); ++i) {
+            list_.add(ZS_ICON_GLOBE, store::source_label(sources_[i]), i == 0 && many ? "first" : "", nullptr);
+            if (sources_[i] == sel_source_) focus = int(i);
+        }
         list_.add(LV_SYMBOL_PLUS, "Add a GitHub repo", "", [this] { show_add(); });
         list_.finish();
+        // After a move: keep the moved source highlighted.
+        if (focus >= 0) list_.focus(focus);
         bottom_line();
+    }
+
+    // Swap the highlighted source with the one above (-1) or below (+1).
+    void move_source(int dir) {
+        int i = list_.focused(), j = i + dir;
+        if (i < 0 || i >= int(sources_.size())) {
+            shell_toast("Pick a source first");
+            return;
+        }
+        if (j < 0 || j >= int(sources_.size())) {
+            shell_toast(dir < 0 ? "Already first" : "Already last");
+            return;
+        }
+        std::string s = sources_[size_t(i)];
+        // The page is built again when the job ends (finished()), in the new order.
+        if (start([s, dir] { store::move_source(s, dir); })) sel_source_ = s;
     }
 
     void remove_source() {
@@ -466,6 +494,7 @@ private:
     std::vector<store::Entry> cat_;
     std::vector<std::string> sources_;
     std::string sel_id_;
+    std::string sel_source_;   // the source just moved, to keep it highlighted
     ListView list_;
     store::Status st_;
     bool watching_ = false;
