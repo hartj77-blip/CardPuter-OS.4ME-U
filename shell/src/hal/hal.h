@@ -262,6 +262,15 @@ struct ProcMem {
     int rss_kb = 0;
 };
 
+// A program running as the UI's user (Settings > Running programs).
+struct ProcInfo {
+    int pid = 0;
+    std::string name;        // "python3 weather.py" shows as "weather.py"
+    std::string command;     // the full command line, cut at 200 characters
+    int rss_kb = 0;          // resident memory
+    int cpu_percent = -1;    // of the whole CPU since the previous list; -1 on the first
+};
+
 struct SystemInfo {
     std::string hostname;
     std::string model;          // "CardputerZero" or "CardputerZero Lite"
@@ -490,6 +499,16 @@ public:
     virtual bool external_open(const std::string& command) = 0;
     virtual bool external_active() = 0;
     virtual void external_close() = 0;
+
+    // Programs running as the UI's user, biggest first: what Settings >
+    // Running programs lists. Leaves out ZeroShell itself and the session
+    // it can't do without (systemd --user, PipeWire, the user's D-Bus). The
+    // shell runs as that user, so it can't list or stop system services.
+    virtual std::vector<ProcInfo> processes() = 0;
+    // Stop one of them: SIGTERM, then SIGKILL if it's still there after
+    // 1.5 s. Blocks until it has gone (at most ~2 s). False if it isn't one
+    // processes() lists or it couldn't be stopped.
+    virtual bool process_stop(int pid) = 0;
 };
 
 // MockHal for the simulator and tests; LinuxHal for the device.

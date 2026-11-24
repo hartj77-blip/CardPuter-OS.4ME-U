@@ -178,6 +178,11 @@ sleep mode, so ZeroOS is set up for that:
 - Unused memory is compressed (zram), so bigger apps still fit. If memory does run out, the
   biggest app is closed instead of the whole device locking up. The home screen, SSH, networking
   and audio are never the ones closed.
+- Settings > Running programs (or type "kill" on home) lists what is running as you, biggest
+  first, with its memory and CPU: programs started from Terminal, M5Stack apps that keep going in
+  the background, a player. Enter stops one (it gets 1.5 seconds to save and quit, then it is
+  killed); Ctrl + K stops them all. The home screen and the services it needs aren't listed, and
+  system services can't be stopped from there.
 - Services a pocket computer doesn't need are off, and the HDMI desktop uses no memory until you
   open Dock or plug in a monitor.
 
@@ -195,7 +200,7 @@ update and install apps. Bluetooth is also built in, but lives inside Settings.
 | App | What it does |
 | --- | --- |
 | Apps | Browse, install, update and remove apps ([guide](docs/APPS.md)) |
-| Settings | Wi-Fi, Bluetooth, brightness, volume, power saving, restart, shut down |
+| Settings | Wi-Fi, Bluetooth, brightness, volume, power saving, running programs, restart, shut down |
 | Update | Install a newer ZeroOS over the network ([guide](docs/UPDATE.md)) |
 | Wi-Fi | Find and join networks |
 

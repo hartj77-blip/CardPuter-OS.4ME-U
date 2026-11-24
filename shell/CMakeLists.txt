@@ -130,6 +130,11 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(search_match_test PRIVATE src)
   target_compile_options(search_match_test PRIVATE -Wall -Wextra)
   add_test(NAME search_match_test COMMAND search_match_test)
+  # Settings > Running programs: listing and stopping the user's programs.
+  add_executable(proc_test tests/proc_test.cpp src/hal/proc_stats.cpp)
+  target_include_directories(proc_test PRIVATE src)
+  target_compile_options(proc_test PRIVATE -Wall -Wextra)
+  add_test(NAME proc_test COMMAND proc_test)
   # A test-pattern libretro core for the Games app (tests/games/testcore.c):
   # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
   add_library(zstest_libretro MODULE tests/games/testcore.c)

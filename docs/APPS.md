@@ -122,7 +122,9 @@ What's different from ZeroOS's own apps:
   screen and keyboard, which ZeroOS hands over.
 - **No real icons yet**: on the home screen each shows its first letter.
 - **Background apps keep running** after you leave them, as on M5's system (an app with a
-  service, such as a battery saver). Remove the app to stop it.
+  service, such as a battery saver). One that runs as you shows in Settings > Running programs,
+  where Enter stops it until it's started again; a system service doesn't, so remove the app to
+  stop that.
 
 How it fits together:
 
