@@ -19,7 +19,7 @@ import time
 W, H = 320, 170
 EV_SYN, EV_KEY = 0, 1
 KEY = dict(esc=1, enter=28, space=57, shift=42, ctrl=29, sym=0x17f, fn=0x185, right=106, left=105, up=103, down=108,
-           backspace=14)
+           backspace=14, tab=15, prsc=99, help=138)
 ROWS = {16: "qwertyuiop", 30: "asdfghjkl", 44: "zxcvbnm", 2: "1234567890"}
 CHAR = {c: base + i for base, row in ROWS.items() for i, c in enumerate(row)}
 CHAR[" "] = 57
@@ -222,6 +222,58 @@ def main():
         got = opened_since(mark)
         check("search opens Settings, 7 opens its 7th row, Esc goes back, then home",
               got == ["settings", "update", "settings", "home"], str(got))
+        # The stickers' own keys. PRSC (Fn + J; M5's driver sends SysRq):
+        # a PNG of the screen in ~/Pictures/Screenshots.
+        shots_dir = os.path.join(d.dir, "Pictures", "Screenshots")
+        before = d.frame()
+        d.key(KEY["fn"], 1)
+        d.tap(KEY["prsc"])
+        d.key(KEY["fn"], 0)
+        time.sleep(0.5)
+        pngs = sorted(os.listdir(shots_dir)) if os.path.isdir(shots_dir) else []
+        check("fn+j saves a screenshot", len(pngs) == 1, str(pngs))
+        if pngs:
+            from PIL import Image
+            img = Image.open(os.path.join(shots_dir, pngs[0]))
+            img.load()
+            check("screenshot is the LCD's size", img.size == (W, H), str(img.size))
+            # Rows below the status bar (the clock can tick), against the
+            # framebuffer as it was when the key went down.
+            px = img.convert("RGB").load()
+            same = True
+            for y in range(20, H, 7):
+                for x in range(0, W, 5):
+                    v = before[(y * W + x) * 2] | before[(y * W + x) * 2 + 1] << 8
+                    want = ((v >> 11) * 255 // 31, ((v >> 5) & 63) * 255 // 63, (v & 31) * 255 // 31)
+                    if px[x, y] != want:
+                        same = False
+            check("screenshot shows what was on the screen", same)
+            d.shot("10-after-screenshot")
+        # HELP (Fn + H): the key sheet, as 0. Any key closes it.
+        before = d.frame()[body]
+        d.key(KEY["fn"], 1)
+        d.tap(KEY["help"])
+        d.key(KEY["fn"], 0)
+        time.sleep(0.4)
+        d.shot("11-help")
+        check("fn+h shows the keys", d.frame()[body] != before)
+        d.nav("esc")
+        time.sleep(0.4)
+        # LOCK (Tab held): the screen goes off (the simulated hardware has no
+        # backlight, so ZeroShell draws it black); the next key only wakes it.
+        mark = len(d.read_log())
+        d.tap(KEY["tab"], hold=1.0)
+        time.sleep(0.6)
+        d.shot("12-locked")
+        check("holding tab turns the screen off", not any(d.frame()[W * 2 * 20:]))
+        d.tap(KEY["space"])
+        time.sleep(0.6)
+        d.shot("13-woken")
+        check("a key wakes it again", any(d.frame()[W * 2 * 20:]))
+        # Tab on Home opens All apps; held to lock, it wakes on Home again.
+        check("it wakes on the screen it was locked from", d.frame()[body] == home_body)
+        check("the waking key does nothing else", not opened_since(mark), str(opened_since(mark)))
+
         note = os.path.join(d.dir, "Notes", "notes.txt")
         saved = open(note).read() if os.path.exists(note) else ""
         want = text + "fastrollover"

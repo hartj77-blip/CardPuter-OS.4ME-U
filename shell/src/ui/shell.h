@@ -21,6 +21,12 @@ public:
     void go_home();
     // Esc held down (keypad hook): close the panel and go home now.
     void hold_home();
+    // Tab held down (LOCK on the key): the screen off now, as if idle.
+    void hold_lock();
+    // PRSC: save the screen to ~/Pictures/Screenshots and say so.
+    void screenshot();
+    // The Terminal, the camera or an M5Stack app has the screen.
+    bool handed_off() const { return handoff_; }
     void toast(const std::string& msg);
     void add_focus(lv_obj_t* obj);
 
@@ -92,6 +98,7 @@ private:
     uint32_t app_generation_ = 0;
     uint32_t last_key_ = 0;
     bool press_as_enter_ = false;
+    bool tab_by_app_ = false;   // the open app took the last Tab (Home: All apps)
     bool fn_layer_ = false;     // reset at each app switch
     lv_indev_t* keypad_ = nullptr;
     std::unique_ptr<App> app_;

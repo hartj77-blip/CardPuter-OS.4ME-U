@@ -46,6 +46,11 @@ public:
     // never turns on one that is off (face down, or the user's choice).
     void stay_awake(uint32_t now_ms);
 
+    // LOCK (Tab held): the screen off now. The next key only wakes it, as
+    // after the idle timeout. Picking it up doesn't wake it for a few seconds
+    // (it is in your hand as you lock it).
+    void lock_now(uint32_t now_ms);
+
     bool screen_off() const { return state_ == State::Off; }
     bool dimmed() const { return state_ == State::Dim; }
 

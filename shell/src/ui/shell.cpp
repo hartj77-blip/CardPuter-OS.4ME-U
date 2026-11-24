@@ -15,6 +15,7 @@
 #include "ui/power.h"
 #include "ui/quick_panel.h"
 #include "ui/remote.h"
+#include "ui/screenshot.h"
 #include "ui/sync.h"
 #include "ui/theme.h"
 #include "ui/tracker.h"
@@ -32,10 +33,12 @@ bool g_swallowed = false;     // the held key woke the screen; nothing else sees
 bool g_repeat = false;        // ...and it's a key worth repeating while held
 bool g_as_enter = false;      // a number key that picked an item: LVGL sees Enter
 bool g_esc_held = false;      // Esc is down: held long enough, it goes home
+bool g_tab_held = false;      // Tab is down: held long enough, it locks (LOCK on the key)
 uint32_t g_press_ms = 0, g_repeat_ms = 0, g_press_app = 0;
 lv_obj_t* g_enter_box = nullptr;   // text box that had focus when Enter went down
 constexpr uint32_t kRepeatDelay = 400, kRepeatEvery = 80;
 constexpr uint32_t kHoldHomeMs = 600;   // hold Esc this long: home (docs/UX.md)
+constexpr uint32_t kHoldLockMs = 600;   // hold Tab this long: screen off (docs/KEYS.md)
 constexpr uint32_t kExternalQuitMs = 3000;   // an M5Stack app: hold Esc this long to stop it (as M5's launcher)
 
 // Only movement and deleting repeat. Enter, Tab and letters are actions
@@ -57,6 +60,10 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
     if (pressed) g_last_key = data->key;
     g_last_state = data->state;
     if (Shell::get().in_external()) Shell::get().external_key(data->key, pressed);
+    // PRSC while the Terminal, the camera or an M5Stack app has the screen:
+    // its keys never reach handle_key, but the LCD can still be saved.
+    if (new_press && data->key == kKeyPrintScreen && Shell::get().handed_off() && !power().screen_off())
+        Shell::get().screenshot();
     if (new_press && power().on_key(lv_tick_get())) {
         g_swallowed = true;
     } else if (new_press) {
@@ -68,6 +75,12 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         // Esc (or ` standing in for it) did Back on the press; held on, it
         // goes all the way home.
         g_esc_held = Shell::get().last_key() == LV_KEY_ESC;
+        // Tab did its menu (or focus move) on the press; held on, it locks.
+        g_tab_held = Shell::get().last_key() == LV_KEY_NEXT;
+    } else if (pressed && g_tab_held && lv_tick_elaps(g_press_ms) > kHoldLockMs) {
+        g_tab_held = false;
+        Shell::get().hold_lock();
+        g_consumed = true;   // the rest of the press is the shell's
     } else if (pressed && g_esc_held && lv_tick_elaps(g_press_ms) > kHoldHomeMs) {
         g_esc_held = false;
         Shell::get().hold_home();
@@ -90,6 +103,7 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         g_swallowed = false;
         g_repeat = false;
         g_esc_held = false;
+        g_tab_held = false;
         g_as_enter = false;
     }
     // 3..9 picked an item and focused it: the rest of the press is an Enter
@@ -467,6 +481,30 @@ void Shell::fit_app_root() {
     if (app_root_) lv_obj_set_height(app_root_, actions_bar_shown() ? kBodyH : kContentH);
 }
 
+void Shell::hold_lock() {
+    if (handoff_) return;   // the terminal or camera has the screen (and Tab)
+    // Tab opened the menu on the press: put it away, so the screen comes back
+    // as it was.
+    actions_menu_close();
+    actions_sheet_close();
+    number_hints_hide();
+    // On Home, Tab opened All apps: back to Home. (Lists never take Tab, so
+    // there the press opened the menu, closed above.)
+    if (tab_by_app_ && app_id_ == "home" && app_) app_->on_back();
+    tab_by_app_ = false;
+    power().lock_now(lv_tick_get());
+}
+
+void Shell::screenshot() {
+    std::string path = screenshot_save();
+    if (handoff_) {
+        // Nothing of ours is on screen to show a message: a beep instead.
+        hal().beep(path.empty() ? 330 : 1760, 60);
+        return;
+    }
+    toast(path.empty() ? "Screenshot failed" : "Screenshot saved to Pictures/Screenshots");
+}
+
 void Shell::hold_home() {
     if (handoff_) return;   // the terminal or camera has the screen
     if (quick_panel_is_open()) quick_panel_close();
@@ -538,6 +576,7 @@ void Shell::add_focus(lv_obj_t* obj) {
 bool Shell::handle_key(uint32_t key) {
     bool used = false;
     press_as_enter_ = false;
+    tab_by_app_ = false;
     lv_obj_t* focused = group_ ? lv_group_get_focused(group_) : nullptr;
     bool in_text = focused && lv_obj_check_type(focused, &lv_textarea_class);
     bool panel = quick_panel_is_open();
@@ -545,6 +584,13 @@ bool Shell::handle_key(uint32_t key) {
     // Esc key. In a text box it types a `, unless the box is empty: then it's
     // Back too, so there's always a way out of a password or search box.
     if (key == '`' && (panel || !in_text || lv_textarea_get_text(focused)[0] == '\0')) key = LV_KEY_ESC;
+    // PRSC (Fn + J): first, before anything changes what is on the screen,
+    // whatever is open (menus, the panel, a confirm box, any app).
+    if (key == kKeyPrintScreen) {
+        last_key_ = key;
+        screenshot();
+        return true;
+    }
     // Screens that need no typing (the home screen, the taskbar panel) get
     // the Fn layer without Fn held: f/z/x/c are arrows, a/s/d volume, and so
     // on (keys.h). Shift + a letter is still the letter.
@@ -555,7 +601,7 @@ bool Shell::handle_key(uint32_t key) {
     last_key_ = key;
     // Whatever was asked for, the number badges have done their job (0
     // itself shows or hides them).
-    if (key != '0') number_hints_hide();
+    if (key != '0' && key != kKeyHelp) number_hints_hide();
     if (key == ctrl_key(' ')) {
         // Ctrl + Space: the taskbar panel, from anywhere, text box or not.
         actions_menu_close();
@@ -573,6 +619,7 @@ bool Shell::handle_key(uint32_t key) {
         used = true;
     } else if (!panel && app_ && app_->on_key(key)) {
         used = true;
+        tab_by_app_ = key == kKeyNext;
     } else if (!panel && key == kKeyNext && actions_have_menu()) {
         // Tab: the screen's menu (docs/UX.md). Screens without one keep Tab.
         actions_menu_open(focused, lv_label_get_text(sb_title_));
@@ -642,7 +689,13 @@ void Shell::system_key(uint32_t key) {
             if (n > 0) lv_group_focus_obj(lv_group_get_obj_by_index(group_, uint32_t(to)));
             break;
         }
-        default: break;   // F1..F12: nothing yet
+        case kKeyHelp:
+            // HELP (Fn + H): the keys for this screen, the same as 0.
+            if (!panel) number_key('0');
+            break;
+        // Insert (INS, Fn + B) reaches the open app first (App::on_key), and
+        // the Terminal gets it from the console. Nothing else uses it.
+        default: break;   // Insert, F1..F12: nothing yet
     }
     quick_panel_refresh();
     update_statusbar();

@@ -60,6 +60,27 @@ void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
 bool platform_ctrl_pending() { return false; }
 
+// The simulator: a snapshot of the active screen (the window has no
+// framebuffer to read back; toasts and the panel aren't in it).
+bool platform_capture(std::vector<uint8_t>& rgb, int& w, int& h) {
+    lv_draw_buf_t* b = lv_snapshot_take(lv_screen_active(), LV_COLOR_FORMAT_RGB888);
+    if (!b) return false;
+    w = int(b->header.w);
+    h = int(b->header.h);
+    rgb.resize(size_t(w) * size_t(h) * 3);
+    for (int y = 0; y < h; ++y) {
+        const uint8_t* row = b->data + size_t(y) * b->header.stride;
+        for (int x = 0; x < w; ++x) {   // LVGL's RGB888 is stored blue, green, red
+            uint8_t* o = &rgb[(size_t(y) * size_t(w) + size_t(x)) * 3];
+            o[0] = row[x * 3 + 2];
+            o[1] = row[x * 3 + 1];
+            o[2] = row[x * 3];
+        }
+    }
+    lv_draw_buf_destroy(b);
+    return true;
+}
+
 #elif ZS_BACKEND_DEVICE
 namespace {
 lv_indev_t* g_keypad = nullptr;
@@ -260,8 +281,11 @@ std::string open_lcd_or_exit() {
     return fb;
 }
 
+std::string g_fb_path;   // the LCD's framebuffer, for platform_capture()
+
 lv_indev_t* platform_init(int, int, int) {
     std::string fb = open_lcd_or_exit();
+    g_fb_path = fb;
     tty_graphics(true);
     std::atexit([] { tty_graphics(false); });
     install_quit_handlers();
@@ -275,6 +299,56 @@ lv_indev_t* platform_init(int, int, int) {
     // stock-image problem); the image masks getty@tty1 to prevent that.
     g_keypad = in;
     return in;
+}
+
+// Read the picture back from the LCD's framebuffer, whatever its pixel format.
+bool platform_capture(std::vector<uint8_t>& rgb, int& w, int& h) {
+    if (g_fb_path.empty()) return false;
+    int fd = open(g_fb_path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0) return false;
+    fb_var_screeninfo v{};
+    fb_fix_screeninfo f{};
+    bool ok = ioctl(fd, FBIOGET_VSCREENINFO, &v) == 0 && ioctl(fd, FBIOGET_FSCREENINFO, &f) == 0;
+    const unsigned bpp = v.bits_per_pixel;
+    ok = ok && (bpp == 16 || bpp == 24 || bpp == 32) && v.xres > 0 && v.yres > 0 && v.xres <= 4096 && v.yres <= 4096;
+    if (!ok) {
+        close(fd);
+        return false;
+    }
+    const size_t px = bpp / 8;
+    const size_t stride = f.line_length ? f.line_length : size_t(v.xres_virtual ? v.xres_virtual : v.xres) * px;
+    w = int(v.xres);
+    h = int(v.yres);
+    std::vector<uint8_t> raw(stride * size_t(h));
+    off_t at = off_t(v.yoffset) * off_t(stride) + off_t(v.xoffset) * off_t(px);
+    size_t got = 0;
+    while (got < raw.size()) {
+        ssize_t n = pread(fd, raw.data() + got, raw.size() - got, at + off_t(got));
+        if (n <= 0) break;
+        got += size_t(n);
+    }
+    close(fd);
+    if (got < raw.size()) return false;
+    // A colour from its bits in the pixel, scaled to 0..255.
+    auto part = [](uint32_t p, const fb_bitfield& b) -> uint8_t {
+        if (b.length == 0 || b.length > 16) return 0;
+        uint32_t max = (1u << b.length) - 1;
+        return uint8_t(((p >> b.offset) & max) * 255 / max);
+    };
+    rgb.resize(size_t(w) * size_t(h) * 3);
+    for (int y = 0; y < h; ++y) {
+        const uint8_t* row = raw.data() + size_t(y) * stride;
+        for (int x = 0; x < w; ++x) {
+            const uint8_t* q = row + size_t(x) * px;
+            uint32_t p = 0;
+            for (size_t i = 0; i < px; ++i) p |= uint32_t(q[i]) << (8 * i);   // little-endian
+            uint8_t* o = &rgb[(size_t(y) * size_t(w) + size_t(x)) * 3];
+            o[0] = part(p, v.red);
+            o[1] = part(p, v.green);
+            o[2] = part(p, v.blue);
+        }
+    }
+    return true;
 }
 
 bool platform_ctrl_pending() {
@@ -499,6 +573,19 @@ int platform_run() {
 }
 
 int platform_run_script(const std::string&) { return 2; }
+
+bool platform_capture(std::vector<uint8_t>& rgb, int& w, int& h) {
+    if (g_rgba.empty()) return false;
+    w = g_w;
+    h = g_h;
+    rgb.resize(size_t(w) * size_t(h) * 3);
+    for (size_t i = 0, n = size_t(w) * size_t(h); i < n; ++i) {
+        rgb[i * 3] = g_rgba[i * 4];
+        rgb[i * 3 + 1] = g_rgba[i * 4 + 1];
+        rgb[i * 3 + 2] = g_rgba[i * 4 + 2];
+    }
+    return true;
+}
 void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
 bool platform_ctrl_pending() { return false; }
@@ -570,9 +657,15 @@ void drain_keys() {
     run_for(100);
 }
 
-bool save_ppm(const std::string& path) {
+// Draw everything again so g_fb is current.
+void redraw_all() {
     lv_obj_invalidate(lv_screen_active());
+    lv_obj_invalidate(lv_layer_top());
     lv_refr_now(nullptr);
+}
+
+bool save_ppm(const std::string& path) {
+    redraw_all();
     FILE* f = std::fopen(path.c_str(), "wb");
     if (!f) return false;
     std::fprintf(f, "P6\n%d %d\n255\n", g_w, g_h);
@@ -605,6 +698,15 @@ int platform_run() {
     return 2;
 }
 
+bool platform_capture(std::vector<uint8_t>& rgb, int& w, int& h) {
+    if (g_fb.empty()) return false;
+    redraw_all();
+    rgb = g_fb;
+    w = g_w;
+    h = g_h;
+    return true;
+}
+
 int platform_run_script(const std::string& script) {
     run_for(300);
     std::stringstream ss(script);
@@ -627,6 +729,8 @@ int platform_run_script(const std::string& script) {
         else if (cmd == "esc") g_keys.push_back(LV_KEY_ESC);
         else if (cmd == "bksp") g_keys.push_back(LV_KEY_BACKSPACE);
         else if (cmd == "tab") g_keys.push_back(9);
+        else if (cmd == "prtsc") g_keys.push_back(kKeyPrintScreen);
+        else if (cmd == "help") g_keys.push_back(kKeyHelp);
         else if (cmd == "ctrl" && !arg.empty()) g_keys.push_back(ctrl_key(arg == "space" ? ' ' : arg[0]));
         else if (cmd == "hold") g_next_hold = uint32_t(std::atoi(arg.c_str()));
         else if (cmd == "type") for (char ch : arg) g_keys.push_back(uint32_t((unsigned char)ch));

@@ -11,7 +11,10 @@ installable apps follow.
 
 | Key | What it does |
 | --- | --- |
-| Esc | Back. Hold it for a moment to go to the home screen from anywhere, even from a text box |
+| Esc | Back. Hold it for a moment to go to the home screen from anywhere, even from a text box (HOME on the key) |
+| Tab, held | Lock: the screen goes off at once (LOCK on the key). The next key only wakes it |
+| Fn + J (PRSC) | Screenshot: saved as a PNG in ~/Pictures/Screenshots |
+| Fn + H (HELP) | Show every key for this screen, the same as 0 |
 | Ctrl + Space | Open or close the taskbar panel, from anywhere, even while typing |
 | 1 to 9 | Pick the 1st to 9th item on screen: the same as moving to it and pressing Enter |
 | 0 | Show every key for this screen. On screens not moved over yet, show which number is which |
@@ -85,5 +88,10 @@ layer for the Cardputer Zero.
 | W / E | Previous / next track |
 | K / N | Home / End: the first or last row of a list |
 | L / M | Page up / Page down: five items at a time in a list |
+| J | PRSC: screenshot, saved as a PNG in ~/Pictures/Screenshots. Works in the Terminal and M5Stack apps too (a beep says it's saved) |
+| H | HELP: every key for this screen, the same as 0 |
+| B | INS: Insert, for the Terminal and apps that use it |
 | Backspace | Delete |
 | 1 to 0, O, P | F1 to F12 (not used yet) |
+
+These are the red labels on the keys. A USB keyboard's PrintScreen key takes a screenshot too.
