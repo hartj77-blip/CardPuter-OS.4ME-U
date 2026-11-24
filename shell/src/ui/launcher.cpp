@@ -41,7 +41,7 @@ constexpr int kPinW = kScreenW / kPins;
 constexpr int kSearchH = 22, kPinsY = kSearchH + 5, kPinsH = 36, kRecentY = kPinsY + kPinsH + 2;
 constexpr int kRowH = 19, kRecents = 5;
 // Recent and All apps take the left of the screen; the clock, the bottom right.
-constexpr int kRowW = 204;
+constexpr int kRowW = 150;   // room for a 16-letter name
 // A fresh ZeroOS pins the first of these that are installed, then Settings.
 const char* const kDefaultPins[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
 
@@ -573,6 +573,8 @@ private:
         lv_obj_align(ic, LV_ALIGN_LEFT_MID, 4, 0);
         lv_obj_t* t = label(row, text.c_str(), &zs_font_14);
         lv_obj_remove_local_style_prop(t, LV_STYLE_TEXT_COLOR, 0);   // the row's, so focus turns it black
+        lv_obj_set_size(t, kRowW - 26 - (value.empty() ? 4 : 26), 17);   // a long name ends in "..."
+        lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 26, 0);
         if (!value.empty()) {
             lv_obj_t* v = label(row, value.c_str(), &zs_font_12, kMuted);
