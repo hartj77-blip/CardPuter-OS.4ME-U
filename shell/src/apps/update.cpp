@@ -118,7 +118,7 @@ private:
                 break;
             case UpdateStatus::Available:
                 head = "Version " + st_.latest + " is ready";
-                color = kAccent;
+                color = kWarn;
                 help = "Takes a minute or two. The screen restarts at the end; your files and settings stay.";
                 hint = "Enter: install";
                 break;

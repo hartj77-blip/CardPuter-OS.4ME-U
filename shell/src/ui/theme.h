@@ -1,6 +1,8 @@
-// Look and feel: Ubuntu's desktop (GNOME with the Yaru dark theme), cut down
-// to 320 x 170. Black top bar, aubergine wallpaper, orange accent, the Ubuntu
-// typeface.
+// Look and feel: "Monochrome" (docs/UX.md, UI 3). Black, white and greys;
+// the item in focus is lit white with black text; menus and dialogs are
+// lifted sheets with a soft grey gradient. Colour only marks state (green,
+// orange, blue, red) or belongs to content (app icons, album art). Square
+// corners on system chrome. The Ubuntu typeface, for now.
 #pragma once
 
 #include "lvgl.h"
@@ -44,22 +46,46 @@ constexpr int kContentH = kScreenH - kStatusH;
 constexpr int kSoftkeyH = 14;                    // soft-key bar (docs/UX.md)
 constexpr int kBodyH = kContentH - kSoftkeyH;    // an app area with the bar
 
-// Yaru dark.
-constexpr uint32_t kBg = 0x1e1e1e;        // window background
-constexpr uint32_t kSurface = 0x303030;   // cards, list rows
-constexpr uint32_t kSurface2 = 0x424242;  // raised: buttons, troughs
-constexpr uint32_t kText = 0xf7f7f7;
-constexpr uint32_t kMuted = 0xaea79f;     // Ubuntu warm grey
-constexpr uint32_t kAccent = 0xe95420;    // Ubuntu orange
-constexpr uint32_t kOnAccent = 0xffffff;  // text on the accent
-constexpr uint32_t kGood = 0x4bc16b;
-constexpr uint32_t kWarn = 0xf99b11;
-constexpr uint32_t kBad = 0xf0524f;
-constexpr uint32_t kInfo = 0x19b6ee;
-constexpr uint32_t kTopBar = 0x000000;
-constexpr uint32_t kAubergine = 0x2c001e;       // wallpaper, terminal
-constexpr uint32_t kAubergineLight = 0x77216f;
-constexpr uint32_t kTerminalBg = 0x300a24;
+// The grey ramp. Every grey in the interface is one of these.
+constexpr uint32_t kGrey0 = 0x000000;   // the screen
+constexpr uint32_t kGrey1 = 0x0d0d0d;   // sheets, the soft-key bar
+constexpr uint32_t kGrey2 = 0x171717;   // rows, cards
+constexpr uint32_t kGrey3 = 0x242424;   // dividers, raised controls
+constexpr uint32_t kGrey4 = 0x3a3a3a;   // borders
+constexpr uint32_t kGrey5 = 0x6b6b6b;   // disabled
+constexpr uint32_t kGrey6 = 0xa3a3a3;   // secondary text
+constexpr uint32_t kGrey7 = 0xd4d4d4;   // the bottom of the focus gradient
+constexpr uint32_t kGrey8 = 0xffffff;   // text, focus
+
+// Roles. Use these, not the ramp, in screens.
+constexpr uint32_t kBg = kGrey0;          // window background
+constexpr uint32_t kSurface = kGrey2;     // cards, list rows
+constexpr uint32_t kSurface2 = kGrey3;    // raised: buttons, troughs, badges
+constexpr uint32_t kBorder = kGrey4;
+constexpr uint32_t kHairline = kGrey3;
+constexpr uint32_t kText = kGrey8;
+constexpr uint32_t kMuted = kGrey6;
+constexpr uint32_t kDisabled = kGrey5;
+constexpr uint32_t kFocus = kGrey8;       // the lit row: top of its gradient
+constexpr uint32_t kFocusLow = kGrey7;    // ... and its bottom
+constexpr uint32_t kOnFocus = kGrey0;     // text on the lit row
+constexpr uint32_t kRaise = 0x232323;     // menus, dialogs: top of their gradient
+constexpr uint32_t kRaiseLow = 0x0a0a0a;  // ... and its bottom
+
+// State. Only for what something is (on, needs an update, failed), never decoration.
+constexpr uint32_t kGood = 0x3fb950;   // on, connected, installed
+constexpr uint32_t kWarn = 0xf0a020;   // update ready, low battery
+constexpr uint32_t kBad = 0xe5484d;    // destructive, error
+constexpr uint32_t kInfo = 0x3b9eff;   // in progress, searching
+
+// UI 2 names, kept so screens and installable apps keep building. The accent
+// is white now: it marks focus, cursors and highlights, and text on it is black.
+constexpr uint32_t kAccent = kFocus;
+constexpr uint32_t kOnAccent = kOnFocus;
+constexpr uint32_t kTopBar = kGrey0;
+constexpr uint32_t kAubergine = kGrey0;        // home wallpaper until photos land
+constexpr uint32_t kAubergineLight = kGrey3;
+constexpr uint32_t kTerminalBg = kGrey0;
 
 inline lv_color_t c(uint32_t hex) { return lv_color_hex(hex); }
 
@@ -68,6 +94,12 @@ void style_panel(lv_obj_t* o);            // rounded surface card
 void style_plain(lv_obj_t* o);            // transparent, no border/padding
 lv_obj_t* label(lv_obj_t* parent, const char* text, const lv_font_t* font = &zs_font_12,
                 uint32_t color = kText);
-void style_focus_list(lv_obj_t* list);    // list buttons with accent focus
+void style_focus_list(lv_obj_t* list);    // list buttons with the lit focus
+// The lit white gradient of the item in focus, on `selector` (a state such as
+// LV_STATE_FOCUSED). Text colour is the caller's: kOnFocus.
+void style_focus_fill(lv_obj_t* o, lv_style_selector_t selector);
+// A lifted sheet: menus, dialogs, pop-ups. Grey gradient, 1 px border with a
+// light top edge, a drop shadow. Square.
+void style_raised(lv_obj_t* o);
 
 }  // namespace zs::theme

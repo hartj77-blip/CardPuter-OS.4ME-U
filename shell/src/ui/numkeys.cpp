@@ -31,13 +31,13 @@ lv_obj_t* number_badge(int digit, int x, int y) {
     lv_obj_t* b = lv_obj_create(lv_layer_top());
     style_plain(b);
     lv_obj_set_size(b, 13, 13);
-    lv_obj_set_style_radius(b, 4, 0);
+    lv_obj_set_style_radius(b, 0, 0);
     lv_obj_set_style_bg_color(b, c(kAccent), 0);
     lv_obj_set_style_bg_opa(b, LV_OPA_COVER, 0);
     lv_obj_remove_flag(b, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(b, LV_OBJ_FLAG_CLICKABLE);
     char t[2] = {char('0' + digit), 0};
-    lv_obj_center(label(b, t, &zs_font_12, 0xffffff));
+    lv_obj_center(label(b, t, &zs_font_12, kOnAccent));
     // Keep it on the screen.
     if (x > kScreenW - 13) x = kScreenW - 13;
     if (y > kScreenH - 13) y = kScreenH - 13;
