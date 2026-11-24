@@ -55,7 +55,7 @@ battery.
 | `zeroos-browser` | Chromium for 512 MB: low-end device mode, at most 2 page processes, 32 MB cache in RAM, a 192 MB JavaScript heap limit. |
 | `zeroos-video` | mpv with hardware H.264 decoding (V4L2 M2M), a 32 MB stream cache; picks from ~/Videos with fuzzel. Plays videos the Jellyfin app sends to the monitor (M), with the sign-in header from `~/.config/zeroos/jellyfin-mpv.conf`. |
 | `zeroos-dock` | `start`, `stop`, `status`, `open terminal\|browser\|files\|video FILE`. Works over ssh too. |
-| ZeroShell | Watches the HDMI connector (`/sys/class/drm/*-HDMI-A-*/status`), offers or starts Dock mode, stops it 3 s after the monitor is unplugged, and stops reacting to keys while docked. |
+| ZeroShell | Watches the HDMI connector (`/sys/class/drm/*-HDMI-A-*/status`), offers or starts Dock mode, stops it 3 s after the monitor is unplugged, and stops reacting to keys while docked. It leaves a monitor that is plugged in alone while the open app drives HDMI itself (Games on a TV), which the app says by writing ZeroShell's process id to `$XDG_RUNTIME_DIR/zeroos-hdmi-app`. |
 
 While docked the CPU never drops below the Balanced profile, even with the
 built-in screen off. earlyoom closes Chromium first if memory runs out; the

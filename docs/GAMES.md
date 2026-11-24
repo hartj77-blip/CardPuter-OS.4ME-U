@@ -14,7 +14,7 @@ its own that runs the same libretro cores, scales each picture to fit the panel,
 keyboard. A core you download for Games is a normal libretro core, and the save files are the
 usual `.srm` battery saves.
 
-On an HDMI monitor ([Dock](DOCK.md)) you can also run RetroArch itself
+Games plays on a TV itself (below). In Dock mode ([Dock](DOCK.md)) you can also run RetroArch
 (`sudo apt install retroarch`), with the cores Games installed.
 
 ## Consoles
@@ -87,6 +87,17 @@ Accessories app on Windows, or an Xbox), then **X** (forget) and pair again. Zer
 for these controllers (`Privacy = device` and steady LE connection values in
 `/etc/bluetooth/main.conf`, set by `/usr/lib/zeroos/bluetooth-conf`): without them they drop
 after a couple of minutes and forget the pairing.
+
+**Two players (or more).** Each gamepad is a player of its own: the first to connect is player
+1, the next player 2, up to 4. The keyboard is always player 1; **Swap players 1 and 2** in the
+menu makes a lone gamepad player 2, so the keyboard and a gamepad can play together. Players 3
+and 4 need a core with a multitap. In the menu, a gamepad's d-pad moves, A chooses and B goes back.
+
+**On a TV.** With a TV or monitor on the HDMI port, the game plays on it at 720p, scaled up by a
+whole number where that fills most of the screen; the menu shows on both screens. Sound stays on
+the Cardputer. Plugging in or out mid-game moves the picture over. **Play on TV: Off** in the menu
+keeps it on the built-in screen. Leave Dock mode first: it has the HDMI port while it runs. Games
+1.2.0 and later; details in the app's own guide (CardPuter-Apps.4ME-U, `apps/games/README.md`).
 
 **Saves.** Games with a battery save (most RPGs) are saved as they are played and when you quit,
 in `~/Games/saves/<game>.srm`. **Save state** stores the exact moment in
