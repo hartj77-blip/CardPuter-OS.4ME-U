@@ -177,6 +177,8 @@ const SettingEntry kSettings[] = {
     {"Sync", "syncthing", "settings", "remote", LV_SYMBOL_LOOP},
     {"Software update", "upgrade version zeroos", "update", "", LV_SYMBOL_DOWNLOAD},
     {"About this device", "system memory storage cpu", "sysmon", "", LV_SYMBOL_LIST},
+    {"Running programs", "kill stop force quit close task manager process memory frozen", "settings", "running",
+     LV_SYMBOL_PLAY},
     {"Restart or shut down", "reboot power off", "settings", "power", LV_SYMBOL_POWER},
 };
 

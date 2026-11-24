@@ -859,11 +859,37 @@ public:
     bool external_active() override { return false; }
     void external_close() override {}
 
+    // Pretend programs, so Settings > Running programs has something to show
+    // (and to stop) in the simulator and the browser.
+    std::vector<ProcInfo> processes() override {
+        if (!procs_init_) {
+            procs_init_ = true;
+            procs_ = {{4211, "weather.py", "python3 /home/pi/weather.py", 31400, -1},
+                      {3876, "htop", "htop", 5200, -1},
+                      {4020, "bash", "-bash", 4100, -1},
+                      {3990, "ssh", "ssh desktop", 7800, -1},
+                      {4302, "m5-snake", "/usr/share/APPLaunch/bin/m5-snake", 12600, -1}};
+        }
+        std::vector<ProcInfo> v = procs_;
+        for (auto& p : v) p.cpu_percent = p.pid == 4211 ? 12 + int(ticks_ % 5) : p.pid == 3876 ? 2 : 0;
+        std::sort(v.begin(), v.end(), [](const ProcInfo& a, const ProcInfo& b) { return a.rss_kb > b.rss_kb; });
+        return v;
+    }
+    bool process_stop(int pid) override {
+        auto it = std::find_if(procs_.begin(), procs_.end(), [pid](const ProcInfo& p) { return p.pid == pid; });
+        if (it == procs_.end()) return false;
+        std::printf("[mock] stop %d (%s)\n", pid, it->name.c_str());
+        procs_.erase(it);
+        return true;
+    }
+
     void power_off() override { std::printf("[mock] power off\n"); }
     void reboot() override { std::printf("[mock] reboot\n"); }
     void beep(int, int) override {}
 
 private:
+    std::vector<ProcInfo> procs_;
+    bool procs_init_ = false;
     VideoState vid_;
     PlayClock vid_clock_;
     long vid_offset_ms_ = 0, vid_last_ = -1;

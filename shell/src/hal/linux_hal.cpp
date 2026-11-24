@@ -798,6 +798,7 @@ private:
 
     long long cpu_prev_[2] = {0, 0};
     std::vector<ProcMem> top_;
+    ProcCpuPrev proc_prev_;   // processes(): CPU time at the previous list
     int top_calls_ = 0;
     pid_t play_pid_ = -1, rec_pid_ = -1, cam_pid_ = -1, visible_pid_ = -1, pair_pid_ = -1, ext_pid_ = -1;
     std::vector<int> media_fds_;
@@ -1840,6 +1841,25 @@ private:
         if (ext_pid_ <= 0) return;
         kill_child(ext_pid_, SIGTERM);   // the whole group, SIGKILL after ~1 s
         ext_pid_ = -1;
+    }
+
+    // --- Running programs (Settings). Only our own user's: we run as that
+    // user, so the kernel wouldn't let us stop anything else anyway.
+    std::vector<ProcInfo> processes() override {
+#ifdef __EMSCRIPTEN__
+        return {};
+#else
+        return user_processes(getuid(), int(getpid()), proc_prev_);
+#endif
+    }
+
+    bool process_stop(int pid) override {
+#ifdef __EMSCRIPTEN__
+        (void)pid;
+        return false;
+#else
+        return stop_user_process(getuid(), int(getpid()), pid);
+#endif
     }
 
     static std::string json_str(const std::string& js, const std::string& key) {

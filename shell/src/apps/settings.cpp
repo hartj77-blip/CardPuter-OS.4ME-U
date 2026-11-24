@@ -16,7 +16,7 @@ namespace zs {
 namespace {
 using namespace theme;
 
-enum class Page { Root, Bluetooth, Display, Sound, Battery, Remote, Power };
+enum class Page { Root, Bluetooth, Display, Sound, Battery, Remote, Running, Power };
 
 // A value row's choices: what it shows and what it stores.
 struct Choice {
@@ -33,7 +33,8 @@ public:
         // Opened at a section (home search: "Brightness" opens Display).
         static const std::pair<const char*, Page> kSections[] = {
             {"bluetooth", Page::Bluetooth}, {"display", Page::Display}, {"sound", Page::Sound},
-            {"battery", Page::Battery},     {"remote", Page::Remote},   {"power", Page::Power}};
+            {"battery", Page::Battery},     {"remote", Page::Remote},   {"running", Page::Running},
+            {"power", Page::Power}};
         std::string arg = shell_app_arg();
         for (auto& [name, page] : kSections)
             if (arg == name) {
@@ -45,6 +46,10 @@ public:
     }
 
     bool on_key(uint32_t key) override { return list_.key(key); }
+
+    void tick() override {
+        if (page_ == Page::Running && ++ticks_ % 20 == 0) refresh_running();   // every ~2 s
+    }
 
     bool on_back() override {
         if (page_ == Page::Root || direct_) return false;   // opened at a section: Esc leaves
@@ -58,10 +63,11 @@ private:
     void show(Page p) {
         page_ = p;
         has_values_ = false;
+        free_ = nullptr;
         lv_obj_clean(root_);
         lv_group_remove_all_objs(group);
         static const char* const kNames[] = {"", "Bluetooth", "Display", "Sound", "Battery & power",
-                                             "Remote & sync", "Restart or shut down"};
+                                             "Remote & sync", "Running programs", "Restart or shut down"};
         if (p == Page::Root) {
             list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 4);
         } else {
@@ -77,10 +83,13 @@ private:
             case Page::Sound: sound_page(); break;
             case Page::Battery: battery_page(); break;
             case Page::Remote: remote_page(); break;
+            case Page::Running: running_page(); break;
             case Page::Power: power_page(); break;
         }
         list_.finish();
-        if (p == Page::Root) {
+        if (p == Page::Running) {
+            set_running_actions();
+        } else if (p == Page::Root) {
             shell_set_actions({{"Open", 0, "Enter", nullptr}, {"Find", 0, "a-z", nullptr}, {"Keys", 0, "0", nullptr}});
         } else if (has_values_) {
             shell_set_actions({{"Change", 0, LV_SYMBOL_LEFT LV_SYMBOL_RIGHT, nullptr},
@@ -96,12 +105,14 @@ private:
 
     // Back on the root page: focus the section we came from.
     void focus_section(Page from) {
-        static const Page order[] = {Page::Bluetooth, Page::Display, Page::Sound, Page::Battery, Page::Remote,
-                                     Page::Power};
+        // Rows on the root page, as root_page() adds them; 0 is Wi-Fi.
+        static const std::pair<Page, int> kRows[] = {{Page::Bluetooth, 1}, {Page::Display, 2}, {Page::Sound, 3},
+                                                     {Page::Battery, 4},   {Page::Remote, 5},  {Page::Power, 9},
+                                                     {Page::Running, 10}};
         int row = 0;
-        for (int i = 0; i < 6; ++i)
-            if (order[i] == from) row = i == 5 ? 8 : i + 1;   // Wi-Fi is row 0; Power is last
-        for (int i = 0; i < row; ++i) lv_group_focus_next(group);
+        for (auto& [page, r] : kRows)
+            if (page == from) row = r;
+        list_.focus(row);
     }
 
     // ---- Root -----------------------------------------------------------
@@ -127,6 +138,10 @@ private:
                   [] { shell_open_app("update"); });
         list_.add(LV_SYMBOL_LIST, "About this device", "", [] { shell_open_app("sysmon"); });
         list_.add(LV_SYMBOL_POWER, "Restart or shut down", "", [this] { open(Page::Power); });
+        // Last, so Restart or shut down stays on 9.
+        size_t running = h.processes().size();
+        list_.add(LV_SYMBOL_PLAY, "Running programs", running ? std::to_string(running) : "None",
+                  [this] { open(Page::Running); });
         list_.set_empty_text("No setting by that name");
     }
 
@@ -186,6 +201,78 @@ private:
                [](int v) { set_sync_mode(v == 1 ? "always" : v == 2 ? "manual" : "charging"); });
     }
 
+    // ---- Running programs -----------------------------------------------
+    // Everything running as the user (hal().processes()): programs started
+    // from Terminal, M5Stack apps that kept going in the background, a
+    // player. Enter stops one after asking. The values follow every ~2 s
+    // without rebuilding the list, so the focus doesn't jump.
+
+    static std::string usage(const ProcInfo& p) {
+        std::string s = p.rss_kb >= 10240 ? fmt("%d MB", p.rss_kb / 1024) : fmt("%.1f MB", p.rss_kb / 1024.0);
+        if (p.cpu_percent > 0) s += fmt("  %d%%", p.cpu_percent);
+        return s;
+    }
+
+    void running_page() {
+        procs_ = hal().processes();
+        SystemInfo si = hal().system();
+        lv_obj_t* free = label(root_, fmt("%d MB free", si.mem_avail_mb).c_str(), &zs_font_12, kMuted);
+        lv_obj_align(free, LV_ALIGN_TOP_RIGHT, -8, 2);
+        free_ = free;
+        for (const ProcInfo& p : procs_) {
+            int pid = p.pid;
+            std::string name = p.name;
+            list_.add(LV_SYMBOL_PLAY, p.name, usage(p), [this, pid, name] { ask_stop(pid, name); });
+        }
+        list_.set_empty_text("Nothing else is running");
+    }
+
+    void set_running_actions() {
+        bool any = !procs_.empty();
+        std::vector<Action> a;
+        a.push_back({"Stop", 0, "Enter", nullptr, any});
+        a.push_back({"Stop all", 'k', nullptr, [this] { stop_all(); }, any, true,
+                     fmt("Stop all %d programs?", int(procs_.size()))});
+        a.push_back({"Refresh", 'r', nullptr, [this] { show(Page::Running); }});
+        a.push_back({direct_ ? "Back" : "Settings", 0, "Esc", nullptr});
+        shell_set_actions(std::move(a));
+    }
+
+    void refresh_running() {
+        std::vector<ProcInfo> now = hal().processes();
+        for (size_t i = 0; i < procs_.size(); ++i) {
+            auto it = std::find_if(now.begin(), now.end(), [&](const ProcInfo& p) { return p.pid == procs_[i].pid; });
+            if (it == now.end()) {
+                list_.set_value(int(i), "Ended");
+                list_.set_value_color(int(i), kMuted);
+            } else {
+                list_.set_value(int(i), usage(*it));
+            }
+        }
+        if (free_) lv_label_set_text(free_, fmt("%d MB free", hal().system().mem_avail_mb).c_str());
+    }
+
+    void ask_stop(int pid, const std::string& name) {
+        std::string cmd;
+        for (auto& p : procs_)
+            if (p.pid == pid) cmd = p.command;
+        if (cmd.size() > 44) cmd = cmd.substr(0, 43) + "~";
+        shell_confirm("Stop " + name + "?", cmd + "\nAnything it hasn't saved is lost.", "Stop", [this, pid, name] {
+            bool ok = hal().process_stop(pid);
+            shell_toast(ok ? "Stopped " + name : "Couldn't stop " + name);
+            show(Page::Running);
+        });
+    }
+
+    // Stop all (Ctrl + K): the shell asks first, as for every danger action.
+    void stop_all() {
+        int stopped = 0;
+        for (auto& p : procs_)
+            if (hal().process_stop(p.pid)) ++stopped;
+        shell_toast(stopped == 1 ? "Stopped 1 program" : fmt("Stopped %d programs", stopped));
+        show(Page::Running);
+    }
+
     void power_page() {
         list_.add(LV_SYMBOL_REFRESH, "Restart", "", [] {
             shell_confirm("Restart the Cardputer?", "", "Restart", [] {
@@ -239,6 +326,9 @@ private:
     lv_obj_t* root_ = nullptr;
     Page page_ = Page::Root;
     bool has_values_ = false;
+    std::vector<ProcInfo> procs_;   // Running programs, in list order
+    lv_obj_t* free_ = nullptr;      // its "N MB free" label
+    int ticks_ = 0;
     bool direct_ = false;       // opened straight at a section (from search)   // the page has value rows (the bar says Left/Right change them)
     ListView list_;
 };
