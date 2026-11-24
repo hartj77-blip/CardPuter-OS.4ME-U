@@ -87,17 +87,7 @@ zs_link_lvgl(zeroshell)
 target_link_libraries(zeroshell PRIVATE quirc pthread m)
 zs_apps_build(zeroshell ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-if(ZS_BACKEND STREQUAL "web")
-  if(NOT EMSCRIPTEN)
-    message(FATAL_ERROR "ZS_BACKEND=web needs Emscripten: emcmake cmake ...")
-  endif()
-  set_target_properties(zeroshell PROPERTIES SUFFIX ".js")
-  target_link_options(zeroshell PRIVATE
-    -sMODULARIZE=1 -sEXPORT_NAME=createZeroShell -sENVIRONMENT=web
-    -sSINGLE_FILE=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0
-    -sEXPORTED_FUNCTIONS=_main,_zs_web_evdev,_zs_web_power,_zs_web_frame,_zs_web_take_dirty,_zs_web_hdmi,_zs_web_pose,_zs_web_app_count,_zs_web_app_id,_zs_web_app_name,_zs_web_current_app
-    -sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString)
-endif()
+zs_web_link(zeroshell)
 
 install(TARGETS zeroshell RUNTIME DESTINATION bin)
 if(ZS_APP_MODULES)
