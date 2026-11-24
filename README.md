@@ -150,7 +150,7 @@ On the home screen:
 | Tab | Open All apps (every app, A to Z). There, Tab on an app, P, then 1 to 7 pins it on that key |
 
 Ctrl, Shift, Fn and Sym are sticky: tap one and then press the next key. Apps show their own keys
-on screen. For example, in Media Space pauses and N skips, and in IR Remote L learns a button from
+on screen. For example, in Media Space pauses and M skips to the next track, and in IR Remote L learns a button from
 another remote. The full list is in [Keys](docs/KEYS.md), and the reasoning behind the layout is
 in [UX](docs/UX.md).
 
@@ -215,7 +215,7 @@ separate package with its own version, so updating one app never touches another
 | Compass | Compass and spirit level |
 | Battery | Time left, power draw and power profiles ([guide](docs/PERFORMANCE.md)) |
 | System | CPU, memory, storage and temperature |
-| Media | Music and video from the SD card, USB drives and server shares, in a classic MP3-player look |
+| Media | Music from the SD card, USB drives and server shares, in a classic MP3-player look, with other looks to switch to (T) |
 | Jellyfin | Music, movies and shows from your Jellyfin server ([guide](docs/JELLYFIN.md)) |
 | Recorder | Voice notes: record, play back, rename, delete |
 | Camera | Photos, a gallery, and a QR reader that can join Wi-Fi. Needs a model with a camera ([guide](docs/CAMERA.md)) |
@@ -261,12 +261,11 @@ Imager, and change the password after the first login.
 
 Apps are missing after updating from 0.4.x to 0.5.0. That update takes the old apps off and puts
 the new builds back; if Wi-Fi was down at that moment, they stay off. Run
-`sudo zeroos-apps upgrade` from the Terminal or SSH, which puts them back. From the release after
-0.5.1, **Update all** in Apps counts them too and does the same.
+`sudo zeroos-apps upgrade` from the Terminal or SSH, which puts them back. From 0.6.0, **Update all** in Apps counts them too and does the same.
 
 The Wi-Fi list says "No networks found" and nothing connects. Wi-Fi may be off: with **Wi-Fi off
 with screen** on (Settings), a restart while the screen was off used to leave it off. Press
-**Tab > W** in the Wi-Fi list (from the release after 0.5.1 the list says when Wi-Fi is off, and
+**Tab > W** in the Wi-Fi list (from 0.6.0 the list says when Wi-Fi is off, and
 it comes back on by itself after a restart). Over SSH, `nmcli radio wifi on` does the same.
 
 The screen stays black. ZeroShell logs why it couldn't start. Over SSH:
