@@ -36,7 +36,7 @@ jobs:
           cmake -S shell -B build/modules -DZS_BACKEND=headless -DZS_APPS_AS_MODULES=ON
           cmake --build build/modules -j"$(nproc)"
           shell/tools/modules-test.sh build/modules
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: screenshots
           path: build/screenshots
@@ -63,7 +63,7 @@ jobs:
       # machine with no Cardputer hardware and none of the apps' extras.
       - name: Open every app with the keyboard, with and without hardware
         run: python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so build/device-screens/apps
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: device-test-screens
@@ -112,7 +112,7 @@ jobs:
           version: 3.1.74
       - name: Build
         run: web/build.sh build/zeroos-simulator.html
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: zeroos-simulator-html
           path: build/zeroos-simulator.html
@@ -133,7 +133,7 @@ jobs:
           cmake --build build/device -j"$(nproc)"
           aarch64-linux-gnu-strip build/device/zeroshell
           aarch64-linux-gnu-strip --strip-unneeded build/device/apps/*.so
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: zeroshell-arm64
           path: build/device/zeroshell
@@ -151,13 +151,13 @@ jobs:
         run: image/package.sh build/device/zeroshell build/update
       - name: Package the apps
         run: image/apps/build.sh build/device/apps build/apps
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: zeroos-package
           path: build/update/
       # Every installable app and zeroos-apps.index (docs/APPS.md): try one on
       # a device with: sudo zeroos-apps install-file zeroos-app-<id>_*.deb
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
           name: zeroos-apps
           path: build/apps/
