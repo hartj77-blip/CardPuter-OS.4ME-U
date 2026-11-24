@@ -139,6 +139,8 @@ ZEROOS_FB_ROOT=$LR sh "$L"
 touch "$LR/dev/fb0"; ln -s fb0 "$LR/dev/fb_lcd"
 ZEROOS_FB_ROOT=$LR sh "$L"
 [ -f "$LR/dev/fb0" ] && [ ! -L "$LR/dev/fb0" ] && ok "m5-fb0-link: the LCD already fb0: nothing to do" || bad "m5-fb0-link: touched fb0 when the LCD is fb0"
+grep -qx 'DPKG::Lock::Timeout "900";' "$T/x/etc/apt/apt.conf.d/90zeroos-lock-wait" &&
+    ok "apt waits for another install's lock" || bad "apt lock wait not packaged"
 [ -x "$T/x/usr/lib/zeroos/m5-fb0-link" ] && grep -q 'RUN+="/usr/lib/zeroos/m5-fb0-link"' "$T/x/etc/udev/rules.d/90-zeroos.rules" &&
     ok "m5-fb0-link: in the package and run by udev" || bad "m5-fb0-link: not packaged or not run"
 grep -q '^ExecStartPre=-+/usr/lib/zeroos/console-on-lcd 3$' "$ROOT/image/stage-zeroos/files/remote/zeroos-terminal.service" &&
