@@ -10,6 +10,8 @@
 #include "hal/play_clock.h"
 #include "src/libs/qrcode/qrcodegen.h"   // LVGL's bundled QR encoder, for the pretend camera
 #include "hal/proc_stats.h"
+#include "hal/tailscale_up.h"
+#include "ui/prefs.h"
 
 namespace zs {
 namespace {
@@ -170,7 +172,10 @@ public:
         if (!ts_signed_in_ && ts_clock_.ms() > 8000) ts_signed_in_ = true;
         if (!ts_signed_in_) {
             t.state = "NeedsLogin";
-            t.auth_url = "https://login.tailscale.com/a/5f1c2e9a7b3d";
+            // A Headscale server's link is its own /register page.
+            std::string hs = tailscale_server_url(prefs::get_str("tailscale.server", ""));
+            t.auth_url = hs.empty() ? "https://login.tailscale.com/a/5f1c2e9a7b3d"
+                                    : hs + "/register/mkey:5f1c2e9a7b3d";
             return t;
         }
         t.state = "Running";
@@ -184,6 +189,14 @@ public:
         return t;
     }
     void tailscale_start() override {
+        // Like LinuxHal: a new server or an auth key signs in again (a key at once).
+        std::string server = tailscale_server_url(prefs::get_str("tailscale.server", ""));
+        if (server != prefs::get_str("tailscale.server_used", "")) ts_signed_in_ = false;
+        prefs::set_str("tailscale.server_used", server);
+        if (!prefs::get_str("tailscale.authkey", "").empty()) {
+            prefs::set_str("tailscale.authkey", "");
+            ts_signed_in_ = true;
+        }
         ts_on_ = true;
         ts_clock_.start();
     }
