@@ -168,6 +168,18 @@ def main():
         check("typing changes the screen", d.frame() != before)
         d.burst("fastrollover")
         d.shot("3-notes-typed")
+        # Word suggestions (docs/KEYS.md): the start of a word offers ways to
+        # finish it over the status bar. Tab types the first and a space; a
+        # full stop then closes up to the word.
+        bar = d.frame()[:W * 2 * 20]
+        d.type(" tom")
+        time.sleep(0.4)
+        check("a word being typed shows suggestions", d.frame()[:W * 2 * 20] != bar)
+        d.shot("3b-suggestions")
+        d.tap(KEY["tab"])
+        time.sleep(0.3)
+        d.type(".")
+        time.sleep(0.3)
         # Ctrl + Space opens the taskbar panel, even from a text box, and
         # types nothing into it (docs/UX.md).
         typed_frame = d.frame()
@@ -276,7 +288,7 @@ def main():
 
         note = os.path.join(d.dir, "Notes", "notes.txt")
         saved = open(note).read() if os.path.exists(note) else ""
-        want = text + "fastrollover"
+        want = text + "fastrollover tomorrow."
         check("typed text is in the note", want in saved, f"wanted {want!r} in {saved!r}")
 
     finally:

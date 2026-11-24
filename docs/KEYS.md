@@ -26,6 +26,27 @@ Media.
 Like Shift, Fn and Sym, Ctrl doesn't need holding: tap Ctrl and the status bar shows **Ctrl** until
 you press the next key. Tap it again to cancel. Holding it down works too.
 
+## Typing: word suggestions
+
+In any text box, typing two letters of a word shows up to three ways to finish it at the left of
+the top bar, after an orange **Tab** label. The bright one is the one Tab types.
+
+| Key | What it does while suggestions show |
+| --- | --- |
+| Tab | Type the bright suggestion and a space |
+| Tab again | Swap it for the next suggestion |
+| Backspace, straight after Tab | Take the suggestion back |
+| . , ! ? ; : straight after Tab | Remove the space Tab typed, then type the mark |
+
+With no suggestions showing, Tab is the menu as on every other screen, and holding Tab locks.
+Capitals are kept (`Th` gives `That`). Words of four letters or more that you type twice are
+learned and offered first. Password boxes, addresses, paths and numbers get no suggestions, and
+nothing typed in a password box is learned.
+
+Turn it off in Settings, Display, Word suggestions, or with "Turn word suggestions off" in the
+home search. "Forget learned words" in the home search wipes what it has learned
+(`~/.config/zeroos/words.learned`).
+
 ## Screens moved to the new design
 
 Home, Settings, Wi-Fi, Bluetooth, Apps and Update so far. A line along the bottom of the screen says what the keys do, and:

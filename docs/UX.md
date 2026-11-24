@@ -60,7 +60,8 @@ What changes from today:
   wants a run of arrow presses.
 - **Tab is the menu**, not "next tab". Tabs move to Left / Right.
 
-In a text box, 1 to 9 and 0 type digits and Tab still opens the menu. Esc in a text box goes back
+In a text box, 1 to 9 and 0 type digits and Tab still opens the menu, with one exception: while
+word suggestions show for the word being typed, Tab types the first one ([KEYS.md](KEYS.md)). Esc in a text box goes back
 (an empty box) or clears it (a box with text). Hold Esc always goes home.
 
 ## Kinds of screen

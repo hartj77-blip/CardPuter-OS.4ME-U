@@ -130,6 +130,11 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(search_match_test PRIVATE src)
   target_compile_options(search_match_test PRIVATE -Wall -Wextra)
   add_test(NAME search_match_test COMMAND search_match_test)
+  # Word suggestions: the word being typed, what is offered, what is learned.
+  add_executable(suggest_test tests/suggest_test.cpp src/ui/suggest.cpp src/ui/suggest_words.cpp src/ui/fileio.cpp)
+  target_include_directories(suggest_test PRIVATE src)
+  target_compile_options(suggest_test PRIVATE -Wall -Wextra)
+  add_test(NAME suggest_test COMMAND suggest_test)
   # A test-pattern libretro core for the Games app (tests/games/testcore.c):
   # ZS_GAMES_CORES=<build>/test-cores lets it play ~/Games/test/*.zstest.
   add_library(zstest_libretro MODULE tests/games/testcore.c)

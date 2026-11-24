@@ -231,6 +231,21 @@ apps repository's [newest release](https://github.com/hartj77-blip/CardPuter-App
 lists builds for it (its notes say which levels it was built for). If it doesn't yet, run its
 Release workflow by hand.
 
+### Text boxes and word suggestions
+
+Every LVGL text area (`lv_textarea`) in an app gets ZeroOS's word suggestions with no code in the
+app: ZeroShell watches whichever text box has the focus. Two things to do in an app:
+
+- A box for a secret must use password mode (`lv_textarea_set_password_mode(ta, true)`). Nothing
+  is suggested there and nothing typed there is learned.
+- A box for something that is no prose and shouldn't be remembered (a code, a serial number, a
+  device ID) can opt out with `lv_obj_add_flag(ta, LV_OBJ_FLAG_USER_4)`. In the OS sources that
+  flag is named `kNoSuggestFlag` (`shell/src/ui/suggest_bar.h`); it is a plain LVGL flag, so it
+  needs no newer app level.
+
+While suggestions show, Tab goes to them before the app's `on_key()`. An app that uses Tab in a
+text screen still gets it whenever no suggestion is showing.
+
 ## What's not done yet
 
 - Nothing here has run on a Cardputer yet: the installer is tested against stand-ins for apt and

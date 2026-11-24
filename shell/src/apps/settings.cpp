@@ -10,6 +10,7 @@
 #include "ui/list_view.h"
 #include "ui/power.h"
 #include "ui/remote.h"
+#include "ui/suggest_bar.h"
 #include "ui/sync.h"
 
 namespace zs {
@@ -156,6 +157,7 @@ private:
             toggle(LV_SYMBOL_DOWN, "Screen off face down", p.sleep_face_down(),
                    [](bool on) { power().set_sleep_face_down(on); });
         }
+        toggle(LV_SYMBOL_KEYBOARD, "Word suggestions", suggest_enabled(), [](bool on) { suggest_set_enabled(on); });
     }
 
     void sound_page() {

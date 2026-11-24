@@ -12,3 +12,5 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -I"$HERE/../src" "$HERE/tailscale_up_test.c
 "$OUT/tailscale_up_test"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -I"$HERE/../src" "$HERE/search_match_test.cpp" "$HERE/../src/ui/search_match.cpp" -o "$OUT/search_match_test"
 "$OUT/search_match_test"
+${CXX:-g++} -std=c++17 -Wall -Wextra -I"$HERE/../src" "$HERE/suggest_test.cpp" "$HERE/../src/ui/suggest.cpp" "$HERE/../src/ui/suggest_words.cpp" "$HERE/../src/ui/fileio.cpp" -o "$OUT/suggest_test"
+"$OUT/suggest_test"
