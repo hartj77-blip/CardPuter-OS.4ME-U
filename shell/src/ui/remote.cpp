@@ -47,8 +47,14 @@ bool use_mosh() { return prefs::get_int("remote.mosh", 0) != 0; }
 void set_use_mosh(bool on) { prefs::set_int("remote.mosh", on); }
 
 std::string ssh_command(const std::string& host) {
+    // The host is a peer's name from the tailnet, which its owner chose: one
+    // quoted word after "--", so it can't add shell commands or ssh options
+    // (such as -oProxyCommand=...).
     std::string target = ssh_user().empty() ? host : ssh_user() + "@" + host;
-    return std::string(use_mosh() ? "mosh " : "ssh ") + target;
+    std::string q = "'";
+    for (char ch : target) q += ch == '\'' ? std::string("'\\''") : std::string(1, ch);
+    q += "'";
+    return std::string(use_mosh() ? "mosh -- " : "ssh -- ") + q;
 }
 
 }  // namespace zs

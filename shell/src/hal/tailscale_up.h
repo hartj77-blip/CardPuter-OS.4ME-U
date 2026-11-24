@@ -30,15 +30,17 @@ inline std::string tailscale_quote(const std::string& s) {
     return q + "'";
 }
 
-// " --login-server='...' [--force-reauth] [--authkey='...']". The server is
-// always named: once a non-default one was used, a bare "tailscale up"
-// would refuse to quietly change it back.
+// " --login-server='...' [--force-reauth] [--authkey='file:...']". The server
+// is always named: once a non-default one was used, a bare "tailscale up"
+// would refuse to quietly change it back. The auth key itself never goes on
+// the command line (any process can read that): auth_key_file is a private
+// file holding it, which tailscale reads ("file:" prefix).
 inline std::string tailscale_up_flags(const std::string& server, const std::string& last,
-                                      const std::string& auth_key) {
+                                      const std::string& auth_key_file) {
     std::string url = tailscale_server_url(server);
     std::string f = " --login-server=" + tailscale_quote(url.empty() ? kTailscaleControl : url);
     if (url != tailscale_server_url(last)) f += " --force-reauth";
-    if (!auth_key.empty()) f += " --authkey=" + tailscale_quote(auth_key);
+    if (!auth_key_file.empty()) f += " --authkey=" + tailscale_quote("file:" + auth_key_file);
     return f;
 }
 

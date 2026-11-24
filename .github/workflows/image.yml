@@ -51,7 +51,7 @@ jobs:
     permissions:
       contents: write   # only used to upload to a release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 0   # git describe for the version string
       - name: Free disk space
@@ -115,7 +115,7 @@ jobs:
           sudo tail -40 build/image/pi-gen/deploy/build.log || true
           # Optional parts report themselves in the log; show how they went.
           sudo grep -h "zeroos: " build/image/pi-gen/deploy/build.log build/image/pi-gen/work/*/build.log 2>/dev/null | sort -u || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         if: always()
         with:
           name: zeroos-image

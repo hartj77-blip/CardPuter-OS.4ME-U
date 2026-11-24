@@ -493,6 +493,8 @@ bool parse_reply(Wire wire, int http_status, const std::string& body, std::strin
         std::string msg = parsed ? error_message(j) : "";
         std::string what = http_status == 401 || http_status == 403 ? "Key not accepted"
                            : http_status == 404                     ? "Not found (check the model or server)"
+                           : http_status >= 300 && http_status < 400
+                               ? "The server moved: check its address in Settings (https?)"
                            : http_status == 429                     ? "Too many requests or out of credit"
                            : http_status == 529 || http_status == 503 ? "Service busy, try again"
                            : http_status >= 500                     ? "Server error"
@@ -585,9 +587,12 @@ bool chat(const Settings& s, const std::vector<Message>& history, std::string& r
     }
 
     std::string at_h = "@" + hfile, at_b = "@" + bfile;
-    const char* argv[] = {"curl", "-sS", "-L", "--max-time", "120", "--connect-timeout", "10",
+    // No -L: curl would send the key header (and re-send the chat on a 307
+    // or 308) to whatever host a redirect names. A moved server is reported
+    // instead (parse_reply), with the new address to put in Settings.
+    const char* argv[] = {"curl", "-sS", "--proto", "=https,http", "--max-time", "120", "--connect-timeout", "10",
                           "-H", at_h.c_str(), "--data-binary", at_b.c_str(),
-                          "-w", "\n%{http_code}", r.url.c_str(), nullptr};
+                          "-w", "\n%{http_code}", "--", r.url.c_str(), nullptr};
 
     int out[2];
     if (pipe2(out, O_CLOEXEC) != 0) {

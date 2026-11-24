@@ -95,7 +95,8 @@ On GitHub, open **Actions**, choose
 press **Run workflow**, type the version (such as `0.4.0`) and press the green button. It
 releases the newest commit on `main` and tags it `v0.4.0`.
 
-Pushing a tag does the same:
+Pushing a tag does the same, for a commit that is on `main` (a tag on any other branch is
+refused, since only `main` has been through a reviewed pull request):
 
 ```sh
 git tag v0.4.0
@@ -182,8 +183,49 @@ their own package, and its install scripts run as root. So:
   Anyone on that network could still swap the package. Anything else over
   `http://` is refused unless `/etc/zeroos/update.conf` also says
   `ALLOW_HTTP=1`.
-- Not done yet: signing the manifest with a key kept off GitHub, which would
-  make the address and the network not matter.
+- Once ZeroOS has a release key (below), the manifest must also be signed with it, and the
+  manifest holds the package's SHA-256: then neither the address nor the network matters, only
+  the key.
+
+## Signatures
+
+ZeroOS can check an Ed25519 signature on the update manifest and on each app source's
+`zeroos-apps.index`. Every package's SHA-256 is in one of those two lists, so a valid signature
+covers the packages too.
+
+- **On the device**, `/usr/lib/zeroos/verify` checks them. `/usr/share/zeroos/keys/signers`
+  says which key signs what: `update` for ZeroOS updates, and each of this project's two app
+  sources. The keys are the `.pem` files next to it. Your own keys can go in `/etc/zeroos/keys`,
+  in the same layout (for example, to sign your own update server's manifest).
+- **While there is no key**, nothing changes: lists are taken unsigned, as before. A `signers`
+  line whose `.pem` file isn't there does nothing.
+- **Once there is one**, a manifest or index without a valid signature is refused. Update says
+  "The update isn't signed with ZeroOS's key". Apps leaves that source's apps out of its list
+  and keeps the others. A source with no key (M5Stack's store, or one you added) is taken as
+  before.
+- **Signing happens in the release workflows.** The private key is the secret
+  `ZEROOS_SIGNING_KEY` of the repository's `release` environment, and `tools/sign-release.sh`
+  writes `zeroos-update.manifest.sig` and `zeroos-apps.index.sig`. If ZeroOS ships a key and the
+  secret is missing or doesn't match, the release stops rather than publish lists that devices
+  would refuse.
+
+Turning it on, once:
+
+1. On your own computer, from this repository: `tools/signing-key.sh ~/zeroos-release-key.pem`.
+   It writes the private key there (keep it safe, out of any repository) and the public key to
+   `image/stage-zeroos/files/keys/zeroos-release.pem`.
+2. Add the private key as the `ZEROOS_SIGNING_KEY` secret of a `release` environment in **both**
+   repositories (Settings > Environments, or the `gh secret set` lines in the script). Add
+   yourself as a required reviewer there too: then nothing reaches devices until you approve it,
+   even if someone gets push access.
+3. Publish an Apps release (Actions > Release > Run workflow in the Apps repository), so its
+   index is signed before any device starts checking.
+4. Commit the public key to `main` and release ZeroOS. Devices check from that version on.
+
+The key is a GitHub secret, so this guards against a changed release file, a stolen token that
+can upload files, and a push that skips review (with a required reviewer). Anyone who can read
+the environment's secrets can still sign. For more, keep the key offline and sign
+`zeroos-update.manifest` by hand with `tools/sign-release.sh` before publishing.
 
 If an update stops part-way (power cut mid-install), the next update first
 finishes it with `dpkg --configure -a`. If the new package won't install,

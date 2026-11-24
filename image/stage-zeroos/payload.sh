@@ -54,6 +54,14 @@ install -m 0755 "$F/apps/m5-registry"         "$D/usr/lib/zeroos/m5-registry"
 install -m 0644 "$F/apps/zeroos-apps@.service" "$D/etc/systemd/system/"
 install -m 0644 "$F/apps/apps.sources"         "$D/etc/zeroos/apps.sources"
 install -d "$D/usr/lib/zeroos/apps"
+# Signatures on updates and app lists (docs/UPDATE.md, "Signatures"): the
+# checker, which key signs what, and the public keys (none until one is made
+# with tools/signing-key.sh; until then lists are taken unsigned, as before).
+install -m 0755 "$F/keys/zeroos-verify"        "$D/usr/lib/zeroos/verify"
+install -D -m 0644 "$F/keys/signers"           "$D/usr/share/zeroos/keys/signers"
+for k in "$F"/keys/*.pem; do
+    [ -f "$k" ] && install -m 0644 "$k" "$D/usr/share/zeroos/keys/"
+done
 # Updates over the network or from a PC (docs/UPDATE.md).
 install -m 0755 "$F/update/zeroos-update"      "$D/usr/bin/zeroos-update"
 install -m 0644 "$F/update/zeroos-update.service" "$F/update/zeroos-update-check.service" \
@@ -66,6 +74,8 @@ install -m 0755 "$F/password/first-password" "$F/password/password-check" "$D/us
 install -m 0644 "$F/password/zeroos-password-check.service" "$F/password/zeroos-password-check.path" \
                                                "$D/etc/systemd/system/"
 install -D -m 0644 "$F/password/profile.sh"    "$D/etc/profile.d/zeroos-password.sh"
+install -D -m 0644 "$F/password/sshd-default-password.conf" \
+                   "$D/usr/share/zeroos/sshd-default-password.conf"
 # First-boot volume: WirePlumber's default is close to silent on this speaker (M5 bug #262).
 install -D -m 0644 "$F/50-zeroos-default-volume.conf" \
                    "$D/etc/wireplumber/wireplumber.conf.d/50-zeroos-default-volume.conf"

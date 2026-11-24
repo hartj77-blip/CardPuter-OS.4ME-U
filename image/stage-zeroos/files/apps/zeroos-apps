@@ -39,6 +39,7 @@ ZEROSHELL=${ZEROOS_APPS_ZEROSHELL:-/usr/bin/zeroshell}
 CATALOG=$STATE_DIR/catalog
 STATUS=$RUN_DIR/apps.status
 INDEX=zeroos-apps.index
+VERIFY=${ZEROOS_VERIFY:-/usr/lib/zeroos/verify}
 ROOTDIR=${ZEROOS_APPS_ROOT:-}   # tests only: where apt source files go
 M5_REGISTRY=${ZEROOS_APPS_M5_REGISTRY:-/usr/lib/zeroos/m5-registry}
 M5_STORE=https://cardputerzero.github.io/generated/registry.json
@@ -154,7 +155,7 @@ filter_index() {
 }
 
 refresh() {
-    local abi arch tmp src url text n=0 reached=0 out
+    local abi arch tmp src url text n=0 reached=0 out idx rc
     abi=$(app_abi)
     arch=${ZEROOS_APPS_ARCH:-$(dpkg --print-architecture)}
     tmp=$(mktemp "$STATE_DIR/catalog.XXXXXX")
@@ -174,11 +175,30 @@ refresh() {
             printf '\n\n' >> "$tmp"
             continue
         fi
-        if ! text=$(curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 "$url/$INDEX"); then
+        idx=$(mktemp "$STATE_DIR/index.XXXXXX")
+        if ! curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 -o "$idx" "$url/$INDEX"; then
             log "no $INDEX from $src"
+            rm -f -- "$idx"
             continue
         fi
         reached=$((reached + 1))
+        # A source ZeroOS has a key for (zeroos-verify) must sign its index,
+        # which holds every package's SHA-256. Others are taken as they are.
+        rc=3
+        if [ -x "$VERIFY" ]; then
+            curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 -o "$idx.sig" "$url/$INDEX.sig" ||
+                rm -f -- "$idx.sig"
+            rc=0
+            "$VERIFY" "$src" "$idx" "$idx.sig" || rc=$?
+        fi
+        text=$(cat "$idx")
+        rm -f -- "$idx" "$idx.sig"
+        case $rc in
+            0) log "$src: index signature checked" ;;
+            3) ;;
+            *) log "$src: the app list isn't signed with its key; skipping it"
+               continue ;;
+        esac
         printf '%s\n\n' "$text" | filter_index "$src" "$abi" "$arch" >> "$tmp"
     done < <(list_sources)
     if [ "$n" -gt 0 ] && [ "$reached" = 0 ]; then
@@ -250,11 +270,24 @@ install_m5() {
     [ -n "$pkg" ] && { [ -z "$want" ] || [ "$pkg" = "$want" ]; } || fail "Not the package for $id"
     # ZeroOS's own packages are never replaced from here.
     case $pkg in zeroos|zeroos-*) fail "Not an M5Stack app" ;; esac
+    # Nor is any other package already on the device that didn't come from
+    # M5Stack's store (sudo, openssh-server...): the catalog isn't ours, and a
+    # package of the same name, or one that replaces, conflicts with or breaks
+    # it, would take its place as root.
+    local rel name
+    rel=$(dpkg-deb -f "$deb" Replaces Conflicts Breaks 2>/dev/null |
+          sed -e 's/^[A-Za-z-]*: *//' | tr ',|' '\n\n' | sed -e 's/[[:space:]]*(.*//' -e 's/:.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    for name in "$pkg" $rel; do
+        [[ $name =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
+        is_installed_pkg "$name" || continue
+        m5_managed | grep -qxF -- "$name" ||
+            fail "$id would replace $name, which is already on this device and didn't come from M5Stack's store"
+    done
     [ "$arch" = all ] || [ "$arch" = "$(dpkg --print-architecture)" ] ||
         fail "This app is for another kind of computer ($arch)"
     status installing 100
     case $deb in */*) ;; *) deb=./$deb ;; esac
-    apt_put_on "$deb" || fail "Could not install $id. Nothing else changed"
+    APT_GUARD=m5 apt_put_on "$deb" || fail "Could not install $id. Nothing else changed"
     apt-mark manual "$pkg" >&2 || true
     m5_note "$id" "$pkg"
     status done 100 "$id $ver installed"
@@ -286,6 +319,34 @@ remove_m5() {
     rm -f -- "$M5_DIR/$id"
     apt-get autoremove --purge -y >&2 || log "autoremove failed; extras may be left"
     status done 100 "$id removed"
+}
+
+is_installed_pkg() {
+    dpkg-query -W -f '${db:Status-Abbrev}\n' "$1" 2>/dev/null | grep -q '^ii'
+}
+
+# The Debian packages installed from M5Stack's store, one per line.
+m5_managed() {
+    local f
+    [ -d "$M5_DIR" ] || return 0
+    for f in "$M5_DIR"/m5-*; do
+        [ -f "$f" ] && sed -n 's/^package=//p' "$f" | head -n1
+    done
+}
+
+# apt_guard_ok <apt-get install args>: with APT_GUARD=m5, apt's own dry run
+# must not take anything off but other M5Stack apps. A package from a
+# catalog we don't control could otherwise pull out system packages through
+# its dependencies. If the dry run itself fails, so will the install.
+apt_guard_ok() {
+    [ "${APT_GUARD:-}" = m5 ] || return 0
+    local out pkg allowed
+    out=$(apt-get -s install -y --no-install-recommends "$@" 2>/dev/null) || return 0
+    allowed=$(m5_managed)
+    for pkg in $(printf '%s\n' "$out" | awk '$1 == "Remv" {print $2}'); do
+        printf '%s\n' "$allowed" | grep -qxF -- "$pkg" && continue
+        fail "Not installed: it would remove $pkg from this device. Nothing changed"
+    done
 }
 
 # Installed M5Stack apps: "<id> <version>" each.
@@ -342,9 +403,45 @@ apt_sources_from() {
     files=$(cd "$dir" && find etc/apt/sources.list.d usr/share/keyrings -type f \
         \( -name "zeroos-app-$id.list" -o -name "zeroos-app-$id.sources" \
            -o -name "zeroos-app-$id.gpg" -o -name "zeroos-app-$id.asc" \) 2>/dev/null)
+    for f in $files; do
+        case $f in
+            *.list|*.sources)
+                apt_source_ok "$dir/$f" "$id" || {
+                    rm -rf -- "${dir:?}"
+                    fail "$id adds a package source apt can't check (it must name its own key, and not be marked trusted)"
+                } ;;
+        esac
+    done
     for f in $files; do install -D -m 0644 "$dir/$f" "$ROOTDIR/$f"; done
     rm -rf -- "${dir:?}"
     [ -n "$files" ]
+}
+
+# apt_source_ok <file> <id>: an app's apt source must be checked by apt
+# against the app's own key (usr/share/keyrings/zeroos-app-<id>.gpg|.asc),
+# and nothing may switch that check off. Otherwise one app could let anyone
+# who can reach that address replace any package on the device.
+apt_source_ok() {
+    local f=$1 id=$2 key
+    key="/usr/share/keyrings/zeroos-app-$id\\.(gpg|asc)"
+    # Anything that turns checking off, in either format.
+    grep -qiE '(trusted|allow-insecure|allow-weak|allow-downgrade-to-insecure)[[:space:]]*[=:]' "$f" && return 1
+    case $f in
+        *.list)
+            KEY=$key awk '
+                BEGIN { key = ENVIRON["KEY"] }
+                /^[[:space:]]*(#|$)/ { next }
+                !/^[[:space:]]*deb(-src)?[[:space:]]/ { bad = 1; next }
+                { if ($0 !~ "\\[[^]]*signed-by=" key "[] ]") bad = 1 }
+                END { exit bad }' "$f" ;;
+        *.sources)
+            # deb822: one or more stanzas, each with Signed-By: our key.
+            KEY=$key awk '
+                BEGIN { RS = ""; key = ENVIRON["KEY"] }
+                { n++; if ($0 !~ "(^|\n)[Ss]igned-[Bb]y:[[:space:]]*" key "[[:space:]]*(\n|$)") bad = 1 }
+                END { exit (bad || !n) }' "$f" ;;
+        *) return 1 ;;
+    esac
 }
 
 # Apps built for an older app ABI (a ZeroOS update changed it). ZeroShell
@@ -379,10 +476,12 @@ apt_put_on() {
         dpkg --configure -a >&2 || fail "The package system needs repair first: sudo dpkg --configure -a"
     fi
     drop_stale_apps
+    apt_guard_ok "$@" || return 1
     apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2 &&
         return 0
     # Old or missing package lists (a fresh card has none): fetch them, try again.
     apt-get update -o Acquire::Retries=3 >&2 || true
+    apt_guard_ok "$@" || return 1
     apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3 "$@" >&2
 }
 
@@ -397,6 +496,7 @@ keep_extras() {
         xfile=$(field "$id" extra-file)
         [ -n "$xfile" ] || continue
         xpkg=$(echo "${xfile%%_*}" | tr 'A-Z' 'a-z')
+        [[ $xpkg =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
         dpkg-query -W -f '${db:Status-Abbrev}' "$xpkg" 2>/dev/null | grep -q '^ii' || continue
         mkdir -p "$STATE_DIR/extras"
         echo "$xpkg" > "$STATE_DIR/extras/$id"
@@ -457,6 +557,17 @@ fetch_and_install() {
     local id=$1 ver file sha size xfile xurl xsha base
     ver=$(field "$id" version)
     [ -n "$ver" ] || fail "No source offers $id"
+    # Never back to an older version: a stale or replayed list could
+    # otherwise put back one with a known hole. (zeroos-apps install-file, by
+    # hand, still can.)
+    local cur
+    cur=""
+    # (An M5Stack id counts only once the store installed it: a package of the
+    # same name from elsewhere isn't this app. install_m5 refuses that.)
+    if ! is_m5 "$id" || [ -r "$M5_DIR/$id" ]; then cur=$(installed_version "$id"); fi
+    if [ -n "$cur" ] && dpkg --compare-versions "$ver" lt "$cur"; then
+        fail "$id $cur is newer than the $ver on offer; keeping it"
+    fi
     if [ "$(field "$id" kind)" = m5 ]; then
         fetch_m5 "$id"
         return

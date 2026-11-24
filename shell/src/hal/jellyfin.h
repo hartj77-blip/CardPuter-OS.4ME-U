@@ -71,6 +71,17 @@ namespace jf {
 // "nas", "nas:8096" or "https://music.example.com/" as typed by a person,
 // made into a base URL. Bare hosts get http:// and Jellyfin's port, 8096.
 std::string normalize_server(const std::string& typed);
+// The addresses login() tries, in order, for what was typed. A bare host is
+// tried over https first (as given, then port 8920 if no port was given),
+// and over plain http (normalize_server) only when no https one answers. An
+// address typed with http:// or https:// is used as it is.
+std::vector<std::string> server_candidates(const std::string& typed);
+// True for an https server; false means the password, token and media
+// travel unencrypted (fine on a home network or over Tailscale).
+bool is_encrypted(const std::string& server);
+// A token or id made only of letters, digits, '-', '_' and '.', as Jellyfin
+// sends them: anything else is refused, so it can't break a header line.
+bool safe_token(const std::string& t);
 
 // The Authorization header value Jellyfin expects from a client.
 std::string auth_header(const JfSession& s);

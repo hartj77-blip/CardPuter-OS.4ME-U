@@ -20,7 +20,12 @@ Only the newest release gets fixes. Use the **Update** app to stay current.
 ## Things that are by design
 
 - Every image starts with the password `raspberry` for the `pi` user. The
-  first login asks for a new one, and SSH commands without a terminal are
-  refused until it is changed.
+  first login asks for a new one, and until it is changed SSH takes keys
+  only (no password logins).
 - Updates are only fetched from the addresses set in
-  `/etc/zeroos/update.conf`; see [docs/UPDATE.md](docs/UPDATE.md).
+  `/etc/zeroos/update.conf`; see [docs/UPDATE.md](docs/UPDATE.md). Until the
+  project's release key is added, updates and app lists aren't signed (see
+  "Signatures" there), so you trust this repository's releases and HTTPS.
+- An app source you add can run anything as root when you install from it,
+  which is why adding one asks for your password. M5Stack's store, on by
+  default, is reviewed by M5Stack's community repository, not this project.

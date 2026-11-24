@@ -3,7 +3,7 @@ name: Release
 # Two ways to start it, same result:
 #   - Actions tab > Release > Run workflow, and type the version (0.4.0).
 #     It tags the newest commit on main v0.4.0 once CI has passed.
-#   - Push a tag like v0.4.0.
+#   - Push a tag like v0.4.0 (to a commit on main; others are refused).
 # It publishes that version as an update: the zeroos
 # package and its manifest become a GitHub release, which is where
 # zeroos-update on the device looks (docs/UPDATE.md). The installable apps
@@ -34,10 +34,14 @@ jobs:
   release:
     needs: ci
     runs-on: ubuntu-24.04
+    # The signing key is a secret of this environment (tools/signing-key.sh).
+    # In Settings > Environments > release, add yourself as a required
+    # reviewer, and a release then waits for your OK before it is signed.
+    environment: release
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 0   # image/version.sh reads the tag
       - name: Tag
@@ -55,6 +59,13 @@ jobs:
             git push origin "$TAG"
           else
             TAG="$GITHUB_REF_NAME"
+            echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$' \
+              || { echo "'$TAG' is not a version tag like v0.4.0"; exit 1; }
+            # A pushed tag is only released if it's on main: everything there
+            # went through a reviewed pull request; a tag on another branch didn't.
+            git fetch --quiet origin main
+            git merge-base --is-ancestor "$GITHUB_SHA" origin/main \
+              || { echo "$TAG is not on main; only commits on main are released."; exit 1; }
           fi
           echo "TAG=$TAG" >> "$GITHUB_ENV"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -72,6 +83,7 @@ jobs:
           image/tests/update-test.sh
           image/tests/apps-test.sh
           image/tests/bluetooth-conf-test.sh
+          image/tests/polkit-test.sh
       - name: Package
         run: |
           image/package.sh build/device/zeroshell build/update
@@ -82,6 +94,14 @@ jobs:
           # on a device reads zeroos-apps.index from the newest release.
           image/apps/build.sh build/device/apps build/apps
           cat build/apps/zeroos-apps.index
+      - name: Sign
+        env:
+          ZEROOS_SIGNING_KEY: ${{ secrets.ZEROOS_SIGNING_KEY }}
+        run: |
+          # The manifest and index hold every package's SHA-256, so signing
+          # them covers the packages (docs/UPDATE.md, "Signatures").
+          tools/sign-release.sh image/stage-zeroos/files/keys/zeroos-release.pem \
+            build/update/zeroos-update.manifest build/apps/zeroos-apps.index
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -90,6 +110,9 @@ jobs:
           case "$TAG" in *-*) pre=(--prerelease --latest=false) ;; esac
           files=(build/update/zeroos_*.deb build/update/zeroos-update.manifest
                  build/apps/zeroos-app-*.deb build/apps/zeroos-apps.index)
+          for f in build/update/zeroos-update.manifest.sig build/apps/zeroos-apps.index.sig; do
+            [ -f "$f" ] && files+=("$f")
+          done
           # A release made by hand on GitHub (Releases > Draft a new release,
           # which also makes the tag) gets the files added to it.
           if gh release view "$TAG" >/dev/null 2>&1; then

@@ -1,0 +1,35 @@
+#!/bin/bash
+# zeroos-verify <what> <file> <signature-file>
+# Checks a downloaded list against the Ed25519 keys trusted for it
+# (docs/UPDATE.md, "Signatures"). <what> is "update" (ZeroOS updates) or an
+# apps source as apps.sources names it (owner/repo or an https:// address).
+#
+# Keys live in /usr/share/zeroos/keys (shipped with ZeroOS) and
+# /etc/zeroos/keys (your own), each with a "signers" file:
+#     <what> <key name>        # <key name>.pem is the public key, next to it
+# Exit status:
+#   0  signed by one of the keys for <what>
+#   1  there are keys for <what>, and the signature is missing or wrong
+#   3  no key for <what>: nothing to check against (an unsigned source)
+set -u
+what=${1:?} file=${2:?} sig=${3:?}
+DIRS=${ZEROOS_KEYS_DIRS:-/etc/zeroos/keys /usr/share/zeroos/keys}
+lower() { printf '%s' "$1" | tr 'A-Z' 'a-z'; }
+want=$(lower "$what")
+keys=()
+for d in $DIRS; do
+    [ -r "$d/signers" ] || continue
+    while read -r w k _; do
+        case $w in ''|'#'*) continue ;; esac
+        [ "$(lower "$w")" = "$want" ] || continue
+        [[ $k =~ ^[A-Za-z0-9._-]+$ ]] || continue
+        [ -r "$d/$k.pem" ] && keys+=("$d/$k.pem")
+    done < "$d/signers"
+done
+[ "${#keys[@]}" -gt 0 ] || exit 3
+[ -s "$sig" ] && [ -r "$file" ] || exit 1
+command -v openssl >/dev/null || { echo "zeroos-verify: openssl is missing; can't check $what" >&2; exit 1; }
+for k in "${keys[@]}"; do
+    openssl pkeyutl -verify -pubin -inkey "$k" -rawin -in "$file" -sigfile "$sig" >/dev/null 2>&1 && exit 0
+done
+exit 1

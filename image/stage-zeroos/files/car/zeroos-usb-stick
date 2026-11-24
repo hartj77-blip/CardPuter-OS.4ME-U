@@ -23,8 +23,15 @@ STATE=${ZEROOS_CAR_STATE:-/run/zeroos/usb-stick.state}
 GADGET=/sys/kernel/config/usb_gadget/zeroos-stick
 START=2048                      # first sector of the FAT partition (1 MiB)
 EXTS='mp3|m4a|aac|wma|wav|flac|ogg|opus'
+SELF=${ZEROOS_USB_STICK:-$(readlink -f "$0")}   # this script, run again as ~/Music's owner
 
-say() { mkdir -p "$(dirname "$STATE")"; echo "$*" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"; }
+# The image is built as the Music folder's owner, not root (start, below):
+# ~/Music is theirs, and root reading it would follow any link they put there
+# to files they can't read. That build reports progress on stdout instead.
+say() {
+    if [ "${ZEROOS_CAR_PROGRESS:-}" = stdout ]; then echo "$*"; return; fi
+    mkdir -p "$(dirname "$STATE")"; echo "$*" > "$STATE.tmp" && mv "$STATE.tmp" "$STATE"
+}
 fail() { say "error: $*"; echo "zeroos-usb-stick: $*" >&2; exit 1; }
 
 # Music files under $1, sorted, as NUL-separated paths relative to it.
@@ -82,6 +89,38 @@ build() {
     mv "$tmp" "$img"
 }
 
+# Build the image as whoever owns ~/Music, in a folder of its own, then take
+# it over: only a plain file of theirs, never a link they left in its place.
+build_as_owner() {
+    local owner work line rc
+    owner=$(stat -c %U "$MUSIC" 2>/dev/null) || fail "no Music folder"
+    if [ "$(id -u)" != 0 ] || [ "$owner" = root ]; then
+        build "$IMG" "$MUSIC"
+        return
+    fi
+    rm -f "$IMG" "$IMG.new"
+    work=$(mktemp -d "$DIR/build.XXXXXX") || fail "can't make a build folder"
+    chown "$owner" "$work"
+    rc=0
+    while IFS= read -r line; do
+        say "$line"
+        case $line in "error: "*) rc=1 ;; esac
+    done < <(runuser -u "$owner" -- env ZEROOS_CAR_PROGRESS=stdout "$SELF" build "$work/music.img" "$MUSIC" 2>/dev/null ||
+             echo "error: building the music image failed")
+    # Theirs no more: nothing in it can change from here on.
+    chown -R root:root "$work"
+    chmod 0755 "$work"
+    if [ "$rc" != 0 ] || [ -L "$work/music.img" ] || [ ! -f "$work/music.img" ] ||
+        [ "$(stat -c %h "$work/music.img")" != 1 ]; then
+        rm -rf -- "$work"
+        [ "$rc" != 0 ] && exit 1
+        fail "building the music image failed"
+    fi
+    chmod 0644 "$work/music.img"
+    mv -f "$work/music.img" "$IMG"
+    rm -rf -- "$work"
+}
+
 udc() { ls /sys/class/udc 2>/dev/null | head -1; }
 
 stop() {
@@ -102,7 +141,7 @@ start() {
     now=$(fingerprint "$MUSIC")
     if [ ! -f "$IMG" ] || [ "$(cat "$STAMP" 2>/dev/null)" != "$now" ]; then
         say "building 0"
-        build "$IMG" "$MUSIC"
+        build_as_owner
         echo "$now" > "$STAMP"
     fi
     stop

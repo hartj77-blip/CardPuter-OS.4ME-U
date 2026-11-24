@@ -32,8 +32,8 @@ int main() {
           " --login-server='https://hs.example.com' --force-reauth", "Tailscale -> Headscale");
     check(tailscale_up_flags("", "https://hs.example.com", ""),
           " --login-server='https://controlplane.tailscale.com' --force-reauth", "Headscale -> Tailscale");
-    check(tailscale_up_flags("hs.example.com", "https://hs.example.com", "k'1"),
-          " --login-server='https://hs.example.com' --authkey='k'\\''1'", "auth key, quoted");
+    check(tailscale_up_flags("hs.example.com", "https://hs.example.com", "/tmp/k'1"),
+          " --login-server='https://hs.example.com' --authkey='file:/tmp/k'\\''1'", "auth key file, quoted");
 
     if (g_failed) return 1;
     std::printf("tailscale_up_test: all passed\n");

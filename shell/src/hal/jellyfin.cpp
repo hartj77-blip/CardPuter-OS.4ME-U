@@ -218,55 +218,143 @@ bool safe_id(const std::string& id) {
 
 struct Reply {
     int status = 0;        // HTTP status, 0 = no answer
+    int curl_exit = -1;    // curl's exit code, -1 = it didn't run
     std::string body;
+    std::string final_url; // where the answer came from (after redirects, if followed)
 };
 
-// The curl command for a request (without the address), and the
-// temporary file holding the body, if any. False if the file can't be made.
-bool curl_command(const std::string& auth, const std::string* body, std::string& cmd, std::string& tmp_path) {
-    // --post30x: a 301/302/303 redirect (http -> https) keeps the POST,
-    // instead of curl turning the sign-in into a GET.
-    cmd = "curl -sS -L --post301 --post302 --post303 --max-time " + std::to_string(kTimeoutS) +
-          " --connect-timeout 4" + " -H 'Accept: application/json' -H " + shell_quote("Authorization: " + auth);
-    tmp_path.clear();
-    if (!body) return true;
+// A private (0600) temporary file holding data, for curl to read. "" on failure.
+std::string private_file(const std::string& data) {
     char tmp[] = "/tmp/zeroos-jf-XXXXXX";
     int fd = mkstemp(tmp);   // created 0600
-    if (fd < 0) return false;
-    bool ok = write(fd, body->data(), body->size()) == ssize_t(body->size());
+    if (fd < 0) return "";
+    bool ok = write(fd, data.data(), data.size()) == ssize_t(data.size());
     close(fd);
     if (!ok) {
         unlink(tmp);
+        return "";
+    }
+    return tmp;
+}
+
+// The curl command for a request (without the address), and the temporary
+// files it reads: the headers (the token never goes on a command line, where
+// any process could read it) and the body, if any. False if a file can't be
+// made. Redirects are not followed: curl would send the token (a custom
+// header) and the password (a re-POSTed body) to wherever the server points.
+bool curl_command(const std::string& auth, const std::string* body, std::string& cmd,
+                  std::vector<std::string>& tmps) {
+    tmps.clear();
+    std::string headers = "Accept: application/json\n";
+    if (!auth.empty()) headers += "Authorization: " + auth + "\n";
+    if (body) headers += "Content-Type: application/json\n";
+    std::string hfile = private_file(headers);
+    if (hfile.empty()) return false;
+    tmps.push_back(hfile);
+    cmd = "curl -sS --proto =http,https --max-time " + std::to_string(kTimeoutS) + " --connect-timeout 4 -H @" +
+          hfile;
+    if (!body) return true;
+    std::string bfile = private_file(*body);
+    if (bfile.empty()) {
+        unlink(hfile.c_str());
+        tmps.clear();
         return false;
     }
-    tmp_path = tmp;
-    cmd += " -H 'Content-Type: application/json' --data-binary @" + tmp_path;
+    tmps.push_back(bfile);
+    cmd += " --data-binary @" + bfile;
     return true;
 }
 
-// GET, or POST when body is set. The body travels in a private temporary
-// file so a password never shows in the process list.
-Reply http(const std::string& url, const std::string& auth, const std::string* body) {
+void remove_all(const std::vector<std::string>& files) {
+    for (auto& f : files) unlink(f.c_str());
+}
+
+// Runs a curl command line and reads the body, final address and status.
+Reply run_curl(const std::string& cmd_line) {
     Reply r;
-    std::string cmd, tmp;
-    if (!curl_command(auth, body, cmd, tmp)) return r;
     // Up to kTimeoutS on the UI thread, and a screen may make a few calls in
     // a row: a wait, not a hang (platform/watchdog.h).
     WatchdogGrace grace;
-    cmd += " -w '\\n%{http_code}' " + shell_quote(url) + " 2>/dev/null";
+    std::string cmd = cmd_line + " 2>/dev/null";
     if (FILE* p = popen(cmd.c_str(), "r")) {
         char buf[4096];
         size_t n;
         while ((n = fread(buf, 1, sizeof buf, p)) > 0) r.body.append(buf, n);
-        pclose(p);
+        int st = pclose(p);
+        if (st != -1 && WIFEXITED(st)) r.curl_exit = WEXITSTATUS(st);
     }
-    if (!tmp.empty()) unlink(tmp.c_str());
     auto nl = r.body.rfind('\n');
     if (nl != std::string::npos) {
         r.status = std::atoi(r.body.c_str() + nl + 1);
         r.body.erase(nl);
+        auto nl2 = r.body.rfind('\n');
+        if (nl2 != std::string::npos) {
+            r.final_url = r.body.substr(nl2 + 1);
+            r.body.erase(nl2);
+        }
     }
     return r;
+}
+
+// GET, or POST when body is set. The body travels in a private temporary
+// file so a password never shows in the process list; so does the token.
+Reply http(const std::string& url, const std::string& auth, const std::string* body) {
+    std::string cmd;
+    std::vector<std::string> tmps;
+    if (!curl_command(auth, body, cmd, tmps)) return Reply{};
+    cmd += " -w '\\n%{url_effective}\\n%{http_code}' -- " + shell_quote(url);
+    Reply r = run_curl(cmd);
+    remove_all(tmps);
+    return r;
+}
+
+std::string lower(std::string s) {
+    for (char& ch : s) ch = char(std::tolower((unsigned char)ch));
+    return s;
+}
+
+// "https://Host:8920/jf/x" -> "host:8920" (scheme, path and user info gone).
+std::string host_port(const std::string& url) {
+    auto p = url.find("://");
+    std::string rest = p == std::string::npos ? url : url.substr(p + 3);
+    rest = rest.substr(0, rest.find_first_of("/?#"));
+    auto at = rest.rfind('@');
+    if (at != std::string::npos) rest = rest.substr(at + 1);
+    return lower(rest);
+}
+
+std::string host_only(const std::string& url) {
+    std::string hp = host_port(url);
+    if (!hp.empty() && hp[0] == '[') return hp.substr(0, hp.find(']') + 1);
+    return hp.substr(0, hp.find(':'));
+}
+
+const char kPublicInfo[] = "/System/Info/Public";
+
+// Is a Jellyfin server at this base address? Asks for its public info (no
+// sign-in, no secrets sent), following redirects only on the same host and
+// never from https down to http. Returns the base address that answered
+// ("" if none): a server that sends http to https gives the https one.
+std::string probe(const std::string& base) {
+    bool tls = base.rfind("https://", 0) == 0;
+    std::vector<std::string> tmps;
+    std::string cmd;
+    if (!curl_command("", nullptr, cmd, tmps)) return "";
+    // Shorter waits than a normal request: several addresses may be tried.
+    cmd += std::string(" -L --max-redirs 3 --proto-redir ") + (tls ? "=https" : "=http,https") +
+           " --connect-timeout 3 -w '\\n%{url_effective}\\n%{http_code}' -- " + shell_quote(base + kPublicInfo);
+    Reply r = run_curl(cmd);
+    remove_all(tmps);
+    if (r.curl_exit != 0 || r.status != 200) return "";
+    Json j;
+    if (!Parser(r.body).parse(j) || j["Id"].text().empty()) return "";
+    const std::string& got = r.final_url;
+    size_t n = sizeof kPublicInfo - 1;
+    if (got.size() <= n || got.compare(got.size() - n, n, kPublicInfo) != 0) return base;
+    std::string moved = got.substr(0, got.size() - n);
+    bool moved_tls = moved.rfind("https://", 0) == 0;
+    if (host_only(moved) != host_only(base) || (tls && !moved_tls)) return base;
+    return moved;
 }
 
 std::string status_error(const Reply& r) {
@@ -310,10 +398,46 @@ std::string normalize_server(const std::string& typed) {
     return s;
 }
 
+std::vector<std::string> server_candidates(const std::string& typed) {
+    std::string n = normalize_server(typed);
+    if (n.empty()) return {};
+    std::string s;
+    for (char ch : typed)
+        if (!std::isspace((unsigned char)ch)) s += ch;
+    while (!s.empty() && s.back() == '/') s.pop_back();
+    if (s.find("://") != std::string::npos) return {n};   // the scheme was chosen: keep it
+    // A bare host: https first (443, then Jellyfin's own https port 8920,
+    // or the port given), plain http on 8096 only when none answers.
+    auto slash = s.find('/');
+    std::string host = s.substr(0, slash), path = slash == std::string::npos ? "" : s.substr(slash);
+    bool has_port = host.rfind(':') != std::string::npos && host.back() != ']';
+    std::vector<std::string> v;
+    if (has_port) {
+        v.push_back("https://" + host + path);
+    } else {
+        v.push_back("https://" + host + path);
+        v.push_back("https://" + host + ":8920" + path);
+    }
+    v.push_back(n);
+    return v;
+}
+
+bool is_encrypted(const std::string& server) { return server.rfind("https://", 0) == 0; }
+
+bool safe_token(const std::string& t) {
+    if (t.empty() || t.size() > 256) return false;
+    for (unsigned char ch : t)
+        if (!std::isalnum(ch) && ch != '-' && ch != '_' && ch != '.') return false;
+    return true;
+}
+
 std::string auth_header(const JfSession& s) {
     std::string h = "MediaBrowser Client=\"ZeroOS\", Device=\"Cardputer Zero\", DeviceId=\"" + s.device_id +
                     "\", Version=\"0.1.0\"";
-    if (!s.token.empty()) h += ", Token=\"" + s.token + "\"";
+    // Only a token of plain characters: anything else could end the header
+    // or the line it is written on (mpv's config). The server then asks to
+    // sign in again.
+    if (safe_token(s.token)) h += ", Token=\"" + s.token + "\"";
     return h;
 }
 
@@ -416,10 +540,14 @@ std::string list_path(const JfSession& s, JfView view, const std::string& full_a
 bool parse_login(const std::string& json, JfSession& s) {
     Json j;
     if (!Parser(json).parse(j)) return false;
-    s.token = j["AccessToken"].text();
-    s.user_id = j["User"]["Id"].text();
+    const std::string& token = j["AccessToken"].text();
+    const std::string& user_id = j["User"]["Id"].text();
+    // Both go into headers and addresses: plain characters only.
+    if (!safe_token(token) || !safe_token(user_id)) return false;
+    s.token = token;
+    s.user_id = user_id;
     if (!j["User"]["Name"].text().empty()) s.user = j["User"]["Name"].text();
-    return !s.token.empty() && !s.user_id.empty();
+    return true;
 }
 
 bool parse_items(const std::string& json, std::vector<JfItem>& out) {
@@ -482,14 +610,32 @@ bool login(const std::string& server, const std::string& user, const std::string
         error = "Server and user name are needed";
         return false;
     }
+    // Find the server before the password goes anywhere: https first for a
+    // bare name, and an http address that the server itself moves to https
+    // (same host) is signed in to over https.
+    for (const std::string& base : server_candidates(server)) {
+        std::string found = probe(base);
+        if (!found.empty()) {
+            s.server = found;
+            break;
+        }
+    }
     std::string body = "{\"Username\":\"" + json_escape(user) + "\",\"Pw\":\"" + json_escape(password) + "\"}";
     Reply r = http(s.server + "/Users/AuthenticateByName", auth_header(s), &body);
     if (r.status == 401 || r.status == 403) {
         error = "Wrong user name or password";
         return false;
     }
+    if (r.status >= 300 && r.status < 400) {
+        // Not followed: the password would go along. Type where it points.
+        error = "The server moved; type its full address (https://...)";
+        return false;
+    }
     if (r.status != 200) {
-        error = r.status == 0 ? "Can't reach " + s.server : status_error(r);
+        if (r.curl_exit == 60)
+            error = "The server's certificate isn't trusted";
+        else
+            error = r.status == 0 ? "Can't reach " + s.server : status_error(r);
         return false;
     }
     if (!parse_login(r.body, s)) {
@@ -557,16 +703,19 @@ void report(const JfSession& s, JfReport what, const std::string& item_id, const
     const char* path = what == JfReport::Start ? "/Sessions/Playing"
                        : what == JfReport::Progress ? "/Sessions/Playing/Progress"
                                                     : "/Sessions/Playing/Stopped";
-    std::string body = report_body(item_id, play_session, pos_s, paused), cmd, tmp;
-    if (!curl_command(auth_header(s), &body, cmd, tmp)) return;
+    std::string body = report_body(item_id, play_session, pos_s, paused), cmd;
+    std::vector<std::string> tmps;
+    if (!curl_command(auth_header(s), &body, cmd, tmps)) return;
     // The shell backgrounds curl and exits at once, so nothing waits on the
-    // network and no child is left to reap. The body file goes after.
-    std::string script = "(" + cmd + " -o /dev/null " + shell_quote(s.server + path) + "; rm -f " + tmp +
+    // network and no child is left to reap. The header and body files go after.
+    std::string rm = "rm -f";
+    for (auto& t : tmps) rm += " " + t;
+    std::string script = "(" + cmd + " -o /dev/null -- " + shell_quote(s.server + path) + "; " + rm +
                          ") </dev/null >/dev/null 2>&1 &";
     const char* argv[] = {"sh", "-c", script.c_str(), nullptr};
     pid_t pid;
     if (posix_spawnp(&pid, "sh", nullptr, nullptr, const_cast<char* const*>(argv), environ) != 0) {
-        unlink(tmp.c_str());
+        remove_all(tmps);
         return;
     }
     int st;
@@ -582,6 +731,8 @@ bool write_dock_options(const JfSession& s, int start_s) {
     mkdir(dir.c_str(), 0700);
     std::string path = dir + "/jellyfin-mpv.conf";
     std::string header = "Authorization: " + auth_header(s);
+    // One line per option: a line break in a value would start a new one.
+    if (header.find_first_of("\r\n") != std::string::npos) return false;
     // %N% quotes a value of N bytes as is: the header is full of commas and
     // quotes that mpv would otherwise read as list separators.
     std::string text = "http-header-fields-append=%" + std::to_string(header.size()) + "%" + header + "\n";

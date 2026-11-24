@@ -128,6 +128,16 @@ if [ ! -e "$ROOT/var/lib/zeroos/apps/.m5-store-added" ]; then
     mkdir -p "$ROOT/var/lib/zeroos/apps"
     touch "$ROOT/var/lib/zeroos/apps/.m5-store-added"
 fi
+# A device that still has the default password gets the current sshd setting
+# for it (keys only until it's changed; older versions took the password).
+# Never turned on here: only the image build writes it, and password-check
+# removes it.
+SSHD_DEF=$ROOT/etc/ssh/sshd_config.d/10-zeroos-default-password.conf
+if [ -f "$SSHD_DEF" ] && [ -f "$ROOT/var/lib/zeroos/default-password" ] &&
+        ! cmp -s "$ROOT/usr/share/zeroos/sshd-default-password.conf" "$SSHD_DEF"; then
+    install -m 0644 "$ROOT/usr/share/zeroos/sshd-default-password.conf" "$SSHD_DEF"
+    changed="$changed /etc/ssh/sshd_config.d/10-zeroos-default-password.conf"
+fi
 # BlueZ options for Bluetooth LE gamepads (Xbox): edited in place, since
 # main.conf belongs to the bluez package.
 bt_changed=""
@@ -151,6 +161,8 @@ if [ -d /run/systemd/system ]; then
     # Once, when the options were first set: connected Bluetooth devices
     # reconnect a moment later.
     case $changed in *etc/bluetooth/main.conf*) systemctl try-restart bluetooth.service || true ;; esac
+    # Open SSH sessions stay; new ones get the setting.
+    case $changed in *sshd_config.d*) systemctl try-reload-or-restart ssh.service || true ;; esac
 fi
 POSTINST
 chmod 0755 "$STAGE/DEBIAN/postinst"

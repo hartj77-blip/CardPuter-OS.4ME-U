@@ -10,6 +10,8 @@
 #include "ui/power.h"
 #include "ui/tracker.h"
 
+#include <cstdlib>
+
 namespace zs {
 namespace {
 using namespace theme;
@@ -62,6 +64,30 @@ private:
     // finished connecting to it: typing never waits on the radio.
     bool can_chat() const { return st_.running && !st_.failing; }
 
+    // Allow phones: meshtasticd's web client and API have no login, so
+    // they answer only this device and your tailnet until it's on
+    // (zeroos-mesh-lan.service, files/expansion/zeroos-mesh-firewall).
+    static bool simulated() {
+        static int s = -1;
+        if (s < 0) s = hal().system().simulated ? 1 : 0;
+        return s == 1;
+    }
+    bool lan_on() const {
+        if (simulated()) return sim_lan_;
+        return std::system("systemctl is-active --quiet zeroos-mesh-lan.service") == 0;
+    }
+    void set_lan(bool on) {
+        if (simulated()) {
+            sim_lan_ = on;
+        } else if (std::system(on ? "systemctl start zeroos-mesh-lan.service >/dev/null 2>&1"
+                                  : "systemctl stop zeroos-mesh-lan.service >/dev/null 2>&1") != 0) {
+            shell_toast("Couldn't change it. Update ZeroOS and try again");
+            return;
+        }
+        shell_toast(on ? "Phones on this network can connect" : "Only this device and Tailscale can connect");
+        dirty_ = true;
+    }
+
     void rebuild() {
         st_ = hal().mesh();
         sig_ = sig(st_);
@@ -84,7 +110,8 @@ private:
         lv_obj_set_flex_align(panel, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
         lv_obj_set_style_pad_row(panel, 3, 0);
 
-        if (st_.running && !st_.web_url.empty() && !st_.no_radio && !st_.failing) {
+        lan_ = st_.running && lan_on();
+        if (st_.running && lan_ && !st_.web_url.empty() && !st_.no_radio && !st_.failing) {
             lv_obj_t* qr = lv_qrcode_create(panel);
             lv_qrcode_set_size(qr, 84);
             lv_qrcode_set_dark_color(qr, c(0x000000));
@@ -111,6 +138,7 @@ private:
             const char* hint = !st_.installed ? "meshtasticd is missing: reinstall Mesh in Apps."
                                : st_.no_radio ? "Plug in the Cap LoRa-1262 with the power off, then turn the mesh on."
                                : st_.failing ? err.c_str()
+                               : st_.running && !lan_ ? "To chat from a phone on this network, choose Allow phones. Tailscale always can."
                                : st_.running ? "Connect to Wi-Fi to chat from your phone."
                                              : "Text over LoRa radio, miles away, with no signal or internet.";
             lv_obj_t* h = label(panel, hint, &zs_font_12, kMuted);
@@ -139,6 +167,11 @@ private:
                 }, this);
             }
             if (st_.running) {
+                list_button(list, lan_ ? LV_SYMBOL_CLOSE : LV_SYMBOL_WIFI,
+                            lan_ ? "Block phones" : "Allow phones", [](lv_event_t* e) {
+                    auto* self = static_cast<MeshApp*>(lv_event_get_user_data(e));
+                    self->set_lan(!self->lan_);
+                }, this);
                 list_button(list, LV_SYMBOL_IMAGE, "Open on monitor", [](lv_event_t* e) {
                     auto* self = static_cast<MeshApp*>(lv_event_get_user_data(e));
                     if (!power().docked()) {
@@ -252,6 +285,8 @@ private:
     MeshStatus st_;
     std::string sig_, draft_;
     bool starting_ = false, dirty_ = false, info_ = false;
+    bool lan_ = false;       // Allow phones is on
+    bool sim_lan_ = false;   // the same, in the simulator
     int n_ = 0, seq_ = -1;
 };
 }  // namespace

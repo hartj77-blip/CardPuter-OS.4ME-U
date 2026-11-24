@@ -22,6 +22,7 @@ chromium
 mpv
 mc
 curl
+openssl
 tmux
 python3
 libspa-0.2-bluetooth

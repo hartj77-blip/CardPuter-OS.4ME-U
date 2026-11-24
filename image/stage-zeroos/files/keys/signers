@@ -1,0 +1,10 @@
+# Which key signs what (docs/UPDATE.md, "Signatures"). One line each:
+#     <what> <key name>
+# <what> is "update" (ZeroOS updates) or an apps source exactly as
+# apps.sources names it. <key name>.pem, the Ed25519 public key, sits next to
+# this file. A line whose .pem isn't here yet does nothing: until the key is
+# added (tools/signing-key.sh), these lists are taken unsigned, as before.
+# Once it is, they must be signed, or the device refuses them.
+update zeroos-release
+hartj77-blip/CardPuter-Apps.4ME-U zeroos-release
+hartj77-blip/CardPuter-OS.4ME-U zeroos-release

@@ -7,7 +7,11 @@
 #   Privacy = device         BlueZ then hands over an identity key when pairing;
 #                            without it the Xbox controller never finishes
 #                            bonding, drops after ~2.5 min and forgets us.
-#   JustWorksRepairing       a gamepad that lost its key can pair again
+#   JustWorksRepairing       a gamepad that lost its key can pair again, but
+#     = confirm              only with an OK on the device (pairing it again
+#                            from the Bluetooth app): with "always", anything
+#                            nearby that copies a paired keyboard's address
+#                            could re-pair as it, silently, and type.
 #   ControllerMode = dual    LE and classic (the default, said out loud)
 #   [LE] connection values   BlueZ doesn't apply the controller's preferred
 #                            ones; these keep the link steady.
@@ -20,7 +24,7 @@ trap 'rm -f "$tmp"' EXIT
 awk '
 BEGIN {
     # section|key|value
-    n = split("General|Privacy|device,General|JustWorksRepairing|always,General|ControllerMode|dual," \
+    n = split("General|Privacy|device,General|JustWorksRepairing|confirm,General|ControllerMode|dual," \
               "LE|MinConnectionInterval|7,LE|MaxConnectionInterval|9,LE|ConnectionLatency|0," \
               "LE|ConnectionSupervisionTimeout|200", want, ",")
     for (i = 1; i <= n; i++) { split(want[i], f, "|"); sec[i] = f[1]; key[i] = f[2]; val[i] = f[3]; done[i] = 0 }

@@ -114,9 +114,13 @@ the device afterwards.
 
 ### Logging in
 
-The user is `pi` and the password is `raspberry`. SSH is on. The first time you log in, from the
-Terminal app or over SSH (`ssh pi@cardputer.local`), you have to pick a new password before you
-can do anything else. If you added an SSH key in Raspberry Pi Imager you can skip that and run
+The user is `pi` and the password is `raspberry`. The first time you open the **Terminal** app
+(or log in on a console), you have to pick a new password before you can do anything else.
+
+SSH is on, but while the password is still `raspberry` it only takes SSH keys: everyone knows
+that password, so anyone on the same Wi-Fi could otherwise log in before you do. Change the
+password in the Terminal first, then `ssh pi@cardputer.local` works with it. If you added an SSH
+key (or your own password) in Raspberry Pi Imager, SSH works straight away; with a key, run
 `passwd` later. How this works is explained under
 [Security](#security-and-what-you-are-trusting).
 
@@ -932,11 +936,15 @@ strong as they could be.
 
 The default password. Every image starts with user `pi` and password `raspberry`, and SSH is
 on. To stop that being left in place, the image build records the default password's hash in
-`/var/lib/zeroos/default-password` and adds an sshd `ForceCommand`. While the hash still matches,
-every SSH login and every interactive login on the device goes to a password-change prompt
-first, and SSH commands without a terminal are refused. A root service watches `/etc/shadow`; as
-soon as the password changes, it removes the marker and the sshd setting. Logging in with an SSH
-key is let through without the prompt. The scripts are in
+`/var/lib/zeroos/default-password` and adds an sshd setting
+(`files/password/sshd-default-password.conf`). While the hash still matches, SSH refuses
+passwords and takes keys only: a known password would let anyone on the network in first, and
+sshd's `ForceCommand` alone doesn't stop port forwarding (`ssh -N`), which could reach the
+system's D-Bus as `pi`. Every interactive login on the device goes to a password-change prompt
+first, and Ctrl+C there ends the login. A root service watches `/etc/shadow`; as soon as the
+password changes, it removes the marker and the sshd setting, and password logins work. Logging in
+with an SSH key is let through, with a reminder. An update brings a device that still has the
+default password up to the current sshd setting. The scripts are in
 `image/stage-zeroos/files/password/`. The password isn't forced through account expiry
 (`chage -d 0`) because the Terminal, Dock and the user session start through PAM, which would
 refuse an expired account.
@@ -949,12 +957,15 @@ things without a password:
 - NetworkManager actions (join and forget networks).
 - Power off and reboot.
 - Start and stop these units: `zeroos-dock`, `zeroos-terminal`, `tailscaled`, the user's
-  `syncthing@` instance, `meshtasticd`, `zeroos-usb-stick`, `zeroos-update`,
-  `zeroos-update-check`, and `zeroos-apps@<job>`.
+  `syncthing@` instance, `meshtasticd`, `zeroos-mesh-lan` (Mesh's **Allow phones**),
+  `zeroos-usb-stick`, `zeroos-update`, `zeroos-update-check`, and these `zeroos-apps@<job>`
+  jobs: refresh, upgrade, install, remove, and removing or reordering a source. Adding a source
+  is not on the list: it decides what may run as root, so Apps asks for your password and starts
+  it through `sudo`. `image/tests/polkit-test.sh` checks the rule.
 
 The root side of each of those is a script you can read: `zeroos-update` for updates,
 `zeroos-apps` for apps (which checks the job it's given itself), and `power-perms`, which only
-changes permissions on the CPU frequency and panel power files.
+changes permissions on the CPU frequency and panel power files. `pi` has no password-free `sudo`.
 
 Updates. Updates come from the address in `/etc/zeroos/update.conf`, by default this
 repository's GitHub releases over HTTPS. The download must match the SHA-256 in the manifest,
@@ -963,20 +974,39 @@ download is complete. It says nothing about who made it. In practice you are tru
 publish releases on this repository, and GitHub's HTTPS. The package is installed by dpkg as
 root. Plain `http://` is only accepted for addresses on your own network (localhost, private
 ranges, Tailscale's 100.64.0.0/10 and `*.ts.net`, and `.local`, `.lan` and `.home.arpa` names),
-and anywhere else only if you add `ALLOW_HTTP=1` yourself. Signing the manifest with a key kept
-off GitHub is not done yet; it's the next step for update security.
+and anywhere else only if you add `ALLOW_HTTP=1` yourself. ZeroOS can check an Ed25519
+signature on the manifest and on the app lists, which takes the server and the network out of
+the picture. It switches on once the project's release key is added
+([docs/UPDATE.md, "Signatures"](docs/UPDATE.md#signatures)); until then, lists are taken
+unsigned as before. Releases only come from commits on `main`, and the release workflows use
+actions pinned to exact commits.
 
 Apps. An installed app runs inside ZeroShell with the same access as the home screen, and
 installing one runs its package's scripts as root. Like updates, the index's SHA-256 only proves
-a complete download. Only add sources you trust. Apps from M5Stack's store are reviewed by
-M5Stack's community repository, not by this project; ZeroOS only checks that each download is
-the file M5's list names.
+a complete download (until the signing key is added). Only add sources you trust; adding one
+asks for your password. Apps never installs an older version over a newer one, and an app's own
+apt repository must be checked against the app's key. Apps from M5Stack's store are reviewed by
+M5Stack's community repository, not by this project; ZeroOS checks that each download is the
+file M5's list names, that it's marked reviewed, and that it can't replace or remove a package
+that didn't come from M5's store ([docs/APPS.md](docs/APPS.md#m5stacks-app-store)).
+
+Network. The Mesh app's web client and API (Meshtastic has no login for them) answer only the
+device and your tailnet until you choose **Allow phones**. Bluetooth re-pairing a device it
+already knows needs an OK on the device (BlueZ `JustWorksRepairing = confirm`), so something
+copying a paired keyboard's address can't silently take its place.
 
 Your data. Wi-Fi passwords are stored by NetworkManager as usual. A Wi-Fi password that fails to
-connect is deleted rather than kept and retried. The AI app's API keys are in
-`~/.config/zeroos/ai.conf` with mode 600, and are handed to curl through a private temporary file
-so they never show up in the process list. Jellyfin's password is used once to get a sign-in
-token and isn't stored. Nothing in ZeroOS sends usage data anywhere.
+connect is deleted rather than kept and retried. Secrets never go on a command line, where every
+process can read them: Wi-Fi passwords, the AI app's API keys, Jellyfin's token and password, and
+a Tailscale auth key are handed over in private (mode 600) temporary files. The AI app's keys are
+in `~/.config/zeroos/ai.conf` with mode 600. Requests that carry a key or password don't follow
+redirects, so they can't be passed on to another server. Jellyfin tries `https://` first for a
+server typed without one, and says so when a connection isn't encrypted. Its password is used
+once to get a sign-in token and isn't stored. Nothing in ZeroOS sends usage data anywhere.
+
+Bluetooth pairing. The window in which the device accepts pairing is only open while you pair
+the device you picked (or, in Car's **Be found**, until the first device pairs), and anything
+else that pairs in it is removed.
 
 Other things switched off for security: `adbd` (a root shell over USB with no pairing) and
 Raspberry Pi Connect.
@@ -998,7 +1028,7 @@ anything merges.
 | Device build with a fake screen and keyboard | Builds the real device version for the CI machine, runs it with a file standing in for the LCD and a pipe standing in for the keyboard, sends the exact key codes M5's driver sends, and checks the screen and what was typed into Notes, including a word finished with Tab | Broken key translation, typing that drops letters, word suggestions that don't appear or type the wrong thing, a device build that won't start |
 | Open every app with the keyboard | The same, opening every app from the home screen, once with simulated hardware and once with the real hardware layer on a machine with no Cardputer hardware | An app that hangs or crashes when its hardware or tools are missing |
 | Install every app for real | In a Debian trixie arm64 container with Raspberry Pi's repository added, installs every app with the real apt, side by side, then removes each and checks nothing is left | A dependency that doesn't exist, two apps that clash, files left behind |
-| Device build (arm64) | Cross-compiles for the Cardputer, runs the update, app-installer and Bluetooth config tests, and builds the update package and every app package | A broken update or installer, a package that won't build |
+| Device build (arm64) | Cross-compiles for the Cardputer, runs the update, app-installer (signatures included), Bluetooth config and polkit rule tests, and builds the update package and every app package | A broken update or installer, a polkit rule that lets too much through, a package that won't build |
 | Browser simulator | Builds the WebAssembly version | Code that only builds on Linux |
 
 The unit tests (`shell/tests/`) cover key translation, IR code encoding and Flipper file parsing,
@@ -1042,9 +1072,11 @@ image/
   version.sh              version from git
   stage-zeroos/           the image stage: 01-run.sh, payload.sh (every file ZeroOS owns), files/
   apps/                   app package descriptions (.pkg) and make-app-deb.sh
-  tests/                  update, installer and Bluetooth config tests
+  tests/                  update, installer, Bluetooth config and polkit rule tests
 cmake/                    the arm64 cross-compile toolchain file
 tools/push-update.sh      send a build to a Cardputer over SSH
+tools/signing-key.sh      make the release key that signs updates and app lists (docs/UPDATE.md)
+tools/sign-release.sh     sign them, in the release workflow
 tools/irdb/               builds the IR code database from Flipper-IRDB
 web/                      the browser simulator
 docs/                     guides and design notes

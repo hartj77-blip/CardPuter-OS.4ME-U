@@ -5,6 +5,10 @@
 if [ -e /var/lib/zeroos/default-password ] && [ -z "${ZEROOS_PASSWORD_SET:-}" ] &&
    [ "$(id -u)" = 1000 ] && [ -t 0 ]; then
     case $- in
-        *i*) /usr/lib/zeroos/first-password login || exit 1 ;;
+        # Ctrl+C or Ctrl+Z at the prompt ends the login rather than skipping
+        # the rest of this file and leaving a shell open.
+        *i*) trap 'exit 1' INT QUIT TSTP
+             /usr/lib/zeroos/first-password login || exit 1
+             trap - INT QUIT TSTP ;;
     esac
 fi
