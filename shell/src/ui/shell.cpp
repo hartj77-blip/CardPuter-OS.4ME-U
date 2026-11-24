@@ -16,6 +16,7 @@
 #include "ui/quick_panel.h"
 #include "ui/remote.h"
 #include "ui/screenshot.h"
+#include "ui/suggest_bar.h"
 #include "ui/sync.h"
 #include "ui/theme.h"
 #include "ui/tracker.h"
@@ -182,6 +183,7 @@ void Shell::start(lv_indev_t* keypad) {
 
     quick_panel_build(screen_);
     actions_build(screen_);
+    suggest_build(screen_);
 
     // Simulator stand-in for the backlight: a black layer over everything.
     blank_ = lv_obj_create(lv_layer_top());
@@ -380,6 +382,7 @@ void Shell::tick_cb(lv_timer_t* t) {
     if (!power().screen_off() && !s->handoff_ && ++n % 10 == 0) s->update_statusbar();
     if (s->app_) s->app_->tick();
     number_hints_tick();
+    suggest_tick();
     if (n % 10 == 0) quick_panel_refresh();
     s->apply_pending();
     if (s->toast_shown_ && lv_tick_elaps(s->toast_since_) > 2000) {   // wrap-safe
@@ -567,6 +570,7 @@ void Shell::prepare_power_off() {
         switch_to(make_launcher(), "");
     }
     track_stop();
+    suggest_flush();   // the words learned in the last half minute
 }
 
 void Shell::add_focus(lv_obj_t* obj) {
@@ -602,7 +606,13 @@ bool Shell::handle_key(uint32_t key) {
     // Whatever was asked for, the number badges have done their job (0
     // itself shows or hides them).
     if (key != '0' && key != kKeyHelp) number_hints_hide();
-    if (key == ctrl_key(' ')) {
+    // Word suggestions (ui/suggest_bar.h): while some show for the text box
+    // in focus, Tab types the first. Not under a menu, the panel or a
+    // confirm box, which take the keys themselves.
+    bool covered = panel || actions_confirm_is_open() || actions_sheet_is_open() || actions_menu_is_open();
+    if (suggest_key(key, in_text && !covered ? focused : nullptr)) {
+        used = true;
+    } else if (key == ctrl_key(' ')) {
         // Ctrl + Space: the taskbar panel, from anywhere, text box or not.
         actions_menu_close();
         if (panel) quick_panel_close();

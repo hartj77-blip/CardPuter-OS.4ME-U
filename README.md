@@ -32,6 +32,7 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
    - [What happens at boot](#what-happens-at-boot)
    - [ZeroShell, the home screen](#zeroshell-the-home-screen)
    - [How a key press travels](#how-a-key-press-travels)
+   - [How word suggestions work](#how-word-suggestions-work)
    - [How long lists stay fast](#how-long-lists-stay-fast)
    - [The watchdog: a frozen screen restarts itself](#the-watchdog-a-frozen-screen-restarts-itself)
    - [The hardware layer](#the-hardware-layer)
@@ -66,6 +67,7 @@ stand.
 | SD card image builds | Yes, for every release, on GitHub's arm64 runner |
 | Boots and runs on a real Cardputer Zero | Partly. Owners have run it; most apps have not been checked on the device yet |
 | Watchdog restart and new apps on home after a terminal install | In CI on a PC (`shell/tests/watch_test.py`). Not yet seen on the device |
+| Word suggestions while typing | In CI: unit tests, and a word finished with Tab in Notes on the fake keyboard. Not yet tried on the device's own keyboard |
 | Battery life, boot time, memory use on the device | Not measured yet. Numbers in this README marked "estimate" are estimates |
 
 In short: the software is checked heavily by machines, but a lot of it has not been touched by a
@@ -139,6 +141,7 @@ keyboard the arrows are Fn + F, Z, X and C.
 | Fn + H (HELP) | Same as 0: the keys for the current screen |
 | Hold the top-right button | Screen off (LOCK); the next key only wakes it |
 | Letters | In a list, find a row: only the rows that match stay |
+| Tab, while typing | Finish the word: types the first suggestion shown in the top bar. See [Typing](#typing-word-suggestions) |
 
 On the home screen:
 
@@ -164,6 +167,56 @@ Update all at the top of the list (or Ctrl + U) updates everything.
 
 Updating ZeroOS: open Update. No re-flashing needed, see [Updates](docs/UPDATE.md) and
 [How ZeroOS updates itself](#how-zeroos-updates-itself).
+
+### Typing: word suggestions
+
+The keyboard is small, so ZeroOS finishes words for you. It works in every text box: Notes, the AI
+and Mesh chats, Git commit messages, names and searches, in ZeroOS's own screens and in installed
+apps.
+
+1. Start typing a word. After two letters, up to three ways to finish it appear at the left of the
+   top bar, next to an orange **Tab** label. The first one is brighter.
+2. Press Tab. The rest of that word is typed, with a space after it, so you can go straight on to
+   the next word.
+3. If it was the wrong one, press Tab again: the word is swapped for the next suggestion, and
+   again for the third. Or just keep typing letters and the list narrows.
+
+| Key | What it does while suggestions show |
+| --- | --- |
+| Tab | Type the bright suggestion and a space |
+| Tab again | Swap it for the next suggestion |
+| Backspace, straight after Tab | Take the whole suggestion back, leaving what you typed |
+| . , ! ? ; : straight after Tab | The space Tab typed is removed, so you get `word.` and not `word .` |
+| Any other key | Carry on typing as normal |
+
+A worked example, in Notes: type `I wan`, press Tab (`I want `), type `to mee`, press Tab
+(`I want to meet `), type `tom`, press Tab, then `.`, and the note reads `I want to meet tomorrow.`
+That is 18 key presses for 24 characters.
+
+Things to know:
+
+- **Capitals are kept.** `Th` offers `That`, and `TH` offers `THAT`.
+- **It learns your words.** A word of four letters or more that you type twice is offered from then
+  on, ahead of the built-in words, and the words you use most come first. Names, places and
+  technical words are picked up this way. It keeps the 200 words you use most.
+- **Tab is still the menu.** Tab only finishes a word while suggestions are showing. With none on
+  screen (after a space, or in an empty box) Tab opens the screen's menu as before, and Ctrl + a
+  letter always works. Holding Tab still locks the screen.
+- **Passwords are never suggested or learned.** Password boxes are skipped completely. So is
+  anything that isn't a plain word: web addresses, email addresses, file paths, numbers and command
+  options are left alone.
+- **The Terminal is separate.** It is a real Linux shell, which has its own Tab completion for
+  commands and file names.
+- **Home search and list filters** already find things as you type, so they have no suggestions.
+
+To turn it off: Settings, Display, Word suggestions. Or type `suggest` on the home screen and press
+Enter on "Turn word suggestions off". To wipe the words it has learned, type `forget` on the home
+screen and choose "Forget learned words". The learned words are in
+`~/.config/zeroos/words.learned`, one word and its count per line, readable only by you; you can
+edit or delete the file.
+
+It costs almost nothing: no background work, about 6 KB for the built-in words and at most 6 KB
+for yours. [How word suggestions work](#how-word-suggestions-work) has the details.
 
 ### Battery and memory
 
@@ -447,6 +500,53 @@ gives up the keyboard), starts the program, and takes the screen back when the p
    shell's own keys get a turn (Esc for back, the volume and brightness keys, number keys to
    pick a row, Tab for the menu). Only then does it reach the LVGL widget in focus. That order is
    what lets an app use plain letters as shortcuts while text boxes still type normally.
+6. One thing comes before the app: if a text box has the focus and word suggestions are showing,
+   Tab finishes the word (next section). With no suggestions showing, Tab goes down the list
+   above as usual.
+
+### How word suggestions work
+
+The feature is part of ZeroShell, not of any app, so every text box gets it, including those in
+installed apps, and no app had to change (the app level, `ZS_APP_ABI`, stays at 4).
+
+| Piece | File | What it does |
+| --- | --- | --- |
+| The engine | `shell/src/ui/suggest.cpp` | Finds the word being typed, looks it up, learns words. No LVGL, so it is unit tested on any machine |
+| The built-in words | `shell/src/ui/suggest_words.cpp` | About 900 everyday English words plus the words this device uses (battery, bluetooth, wireless...), most common first |
+| The bar | `shell/src/ui/suggest_bar.cpp` | Shows the suggestions over the status bar, handles Tab and Backspace, saves learned words |
+
+What happens on a key press in a text box:
+
+1. `Shell::handle_key()` passes the key to `suggest_key()` together with the text box in focus.
+   The first time a text box is typed in, the bar attaches one event listener to it; LVGL frees
+   it with the box.
+2. LVGL types the character and the listener hears that the text changed. It reads the word just
+   before the cursor. A word is letters and apostrophes; it must come after the start of the
+   text, a space, a new line or an opening bracket or quote. That rule is what keeps
+   `192.168.we`, `me@exam`, `/home/pi/Doc` and `--verb` from being treated as words.
+3. With two or more letters, the engine collects up to three words that start with them: first
+   your learned words (those typed at least twice, most used first), then the built-in list in
+   its own order. The built-in list is one string in the program's read-only data, scanned from
+   the start; at about 6 KB that takes a few microseconds, so there is no index to build or keep.
+4. The bar shows them at the left of the status bar, as wide as the words need, so the battery
+   and Wi-Fi icons on the right stay visible.
+5. Tab types the rest of the word and a space. The listener ignores changes the bar makes itself,
+   but the app's own listeners still hear them, so Notes autosaves as usual.
+
+Learning: when the next character ends a word (a space, a new line, punctuation, or Enter in a
+one-line box), that word's count goes up by one. A word accepted with Tab is counted once the next
+key shows it was kept. Words shorter than four letters aren't stored (finishing them saves no
+key presses), and neither is anything with a digit or symbol in it. The list holds 200 words at
+28 bytes each; when it is full, the least used word makes room, the oldest first.
+
+Saving: learned words are written to `~/.config/zeroos/words.learned` no sooner than 30 seconds
+after a change, and before a shutdown, so typing never causes a stream of card writes. The write
+is atomic (a temporary file, then a rename), so a power cut leaves the old file intact. At most
+the last 30 seconds of learning can be lost.
+
+Left alone on purpose: password boxes (LVGL's password mode), a text box an app has marked with
+`kNoSuggestFlag` (`shell/src/ui/suggest_bar.h`), the home search and list filters (not text
+boxes; they match as you type already), and the Terminal (a real console, outside ZeroShell).
 
 ### How long lists stay fast
 
@@ -798,6 +898,7 @@ with each setting's file:
 | Logs on the card, capped at 24 MB (`files/journald.conf`) | Few card writes, but a failed boot can still be read |
 | Dock, Chromium and the HDMI desktop start only when asked | They cost nothing until used |
 | Lists make widgets only for the lines on screen (`shell/src/ui/list_view.cpp`) | The 200-row Apps list costs about 36 UI objects instead of about 1,200, and opens as fast as a short one |
+| Word suggestions scan a 6 KB word list in read-only data on each key (`shell/src/ui/suggest.cpp`) | No index, no background work, nothing allocated for the built-in words. Learned words: 200 at most, about 6 KB, written to the card at most every 30 seconds |
 | New apps found with inotify in the main loop's `poll()` (`shell/src/ui/app_watch.cpp`) | No polling timer: nothing runs until a file in an app folder changes |
 | Watchdog ping at most every 2.5 s (`shell/src/platform/watchdog.cpp`) | One small `sendto()`, from the loop that runs anyway |
 | CPU profiles Saver, Balanced, Performance (`shell/src/ui/power.cpp`) | Saver is on-demand capped near 70% speed; the screen-off state drops to the lowest speed |
@@ -894,15 +995,16 @@ anything merges.
 | Simulator build and screenshots | Builds the SDL and headless versions, runs the unit tests, then drives the headless build through every screen of every app and saves a screenshot of each | Code that doesn't compile, failing tests, an app that crashes when opened |
 | Watchdog and new apps (`shell/tests/watch_test.py`, in the same job) | Starts the headless build with a socket standing in for systemd's and checks the first `WATCHDOG=1` arrives; writes an M5 launcher entry into a folder that didn't exist at start, once with home open and once with Settings open, and checks the app list is read again at the right moment | A watchdog that never pings, a folder watch that misses new apps or reloads under an open app |
 | Apps as modules | Builds every app as a module, starts ZeroShell with none installed, then loads and opens each one | A module that won't load (missing symbol, wrong app level) or crashes |
-| Device build with a fake screen and keyboard | Builds the real device version for the CI machine, runs it with a file standing in for the LCD and a pipe standing in for the keyboard, sends the exact key codes M5's driver sends, and checks the screen and what was typed into Notes | Broken key translation, typing that drops letters, a device build that won't start |
+| Device build with a fake screen and keyboard | Builds the real device version for the CI machine, runs it with a file standing in for the LCD and a pipe standing in for the keyboard, sends the exact key codes M5's driver sends, and checks the screen and what was typed into Notes, including a word finished with Tab | Broken key translation, typing that drops letters, word suggestions that don't appear or type the wrong thing, a device build that won't start |
 | Open every app with the keyboard | The same, opening every app from the home screen, once with simulated hardware and once with the real hardware layer on a machine with no Cardputer hardware | An app that hangs or crashes when its hardware or tools are missing |
 | Install every app for real | In a Debian trixie arm64 container with Raspberry Pi's repository added, installs every app with the real apt, side by side, then removes each and checks nothing is left | A dependency that doesn't exist, two apps that clash, files left behind |
 | Device build (arm64) | Cross-compiles for the Cardputer, runs the update, app-installer and Bluetooth config tests, and builds the update package and every app package | A broken update or installer, a package that won't build |
 | Browser simulator | Builds the WebAssembly version | Code that only builds on Linux |
 
 The unit tests (`shell/tests/`) cover key translation, IR code encoding and Flipper file parsing,
-the Jellyfin client, the AI app's requests and replies (no network), and the parser for M5Stack
-launcher entries. `image/tests/update-test.sh` builds a real update package and drives
+the Jellyfin client, the AI app's requests and replies (no network), the parser for M5Stack
+launcher entries, and word suggestions (which word is being typed, what is offered, what is
+learned, saved and forgotten: `shell/tests/suggest_test.cpp`). `image/tests/update-test.sh` builds a real update package and drives
 `zeroos-update` against a folder standing in for the server, with stand-ins for `dpkg -i` and
 `systemctl`: finding an update, refusing a bad checksum or a malformed manifest, installing,
 rolling back by hand and rolling back a version that keeps crashing. `image/tests/apps-test.sh`
@@ -922,7 +1024,8 @@ through it and reporting what you find is the most useful thing you can do for t
 ```
 shell/                    ZeroShell
   src/main.cpp            entry point and command-line options
-  src/ui/                 the shell: launcher, status bar, panel, power, store, theme, settings
+  src/ui/                 the shell: launcher, status bar, panel, power, store, theme, settings,
+                          word suggestions (suggest*.cpp)
   src/platform/           screen and keyboard for each backend; key translation
   src/hal/                hardware layer: hal.h, linux_hal.cpp, mock_hal.cpp, Jellyfin, Meshtastic
   src/ir/                 IR protocols, Flipper .ir files, the code database

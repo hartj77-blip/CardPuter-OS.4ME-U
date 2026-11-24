@@ -24,6 +24,7 @@
 #include "ui/quick_panel.h"
 #include "ui/search_match.h"
 #include "ui/shell.h"
+#include "ui/suggest_bar.h"
 #include "ui/theme.h"
 
 namespace zs {
@@ -169,6 +170,7 @@ const SettingEntry kSettings[] = {
     {"Brightness", "screen display", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Dim screen after", "display sleep timeout", "settings", "display", LV_SYMBOL_EYE_CLOSE},
     {"Screen off after", "display sleep timeout", "settings", "display", LV_SYMBOL_POWER},
+    {"Word suggestions", "typing keyboard autocomplete autofill predict text", "settings", "display", LV_SYMBOL_KEYBOARD},
     {"Sound", "audio volume mute output speaker", "settings", "sound", LV_SYMBOL_VOLUME_MAX},
     {"Volume", "sound audio", "settings", "sound", LV_SYMBOL_VOLUME_MAX},
     {"Power profile", "battery saver performance", "settings", "battery", LV_SYMBOL_CHARGE},
@@ -224,6 +226,18 @@ std::vector<Result> search(const std::string& q) {
         bool m = hal().muted();
         hal().set_muted(!m);
         shell_toast(m ? "Sound on" : "Sound off");
+    });
+    toggle(LV_SYMBOL_KEYBOARD, suggest_enabled() ? "Turn word suggestions off" : "Turn word suggestions on",
+           "typing keyboard autocomplete autofill predict", [] {
+        bool on = suggest_enabled();
+        suggest_set_enabled(!on);
+        shell_toast(on ? "Word suggestions off" : "Word suggestions on");
+    });
+    toggle(LV_SYMBOL_TRASH, "Forget learned words", "typing suggestions autocomplete clear reset", [] {
+        shell_confirm("Forget learned words?", "Suggestions go back to the built-in words.", "Forget", [] {
+            suggest_forget();
+            shell_toast("Learned words forgotten");
+        });
     });
     if (int sc = search_score("Volume", "sound audio louder quieter", q)) {
         Result r{LV_SYMBOL_VOLUME_MAX, "Volume", "Action", nullptr, percents(), (h.volume() + 2) / 5};
