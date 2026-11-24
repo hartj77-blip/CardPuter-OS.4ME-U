@@ -72,8 +72,8 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
         Shell::get().screenshot();
     if (new_press && power().on_key(lv_tick_get())) {
         g_swallowed = true;
-    } else if (new_press && lock_face_shown()) {   // locked: this key unlocks, nothing else
-        lock_face_hide();
+    } else if (new_press && lock_face_shown()) {   // locked: Tab unlocks; no key does anything else
+        if (data->key == LV_KEY_NEXT) lock_face_hide();
         g_swallowed = true;
     } else if (new_press) {
         g_press_ms = g_repeat_ms = lv_tick_get();

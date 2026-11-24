@@ -12,7 +12,7 @@ installable apps follow.
 | Key | What it does |
 | --- | --- |
 | Esc | Back. Hold it for a moment to go to the home screen from anywhere, even from a text box (HOME on the key) |
-| Tab, held | Lock: the screen goes off at once (LOCK on the key). The next key wakes it to the lock screen (the time over a photograph), and the key after that unlocks. Neither does anything else |
+| Tab, held | Lock: the screen goes off at once (LOCK on the key). The next key wakes it to the lock screen (the time, the date and what is playing, over a photograph), and Tab unlocks. Other keys on the lock screen do nothing, and neither the waking key nor Tab does anything else |
 | Fn + J (PRSC) | Screenshot: saved as a PNG in ~/Pictures/Screenshots |
 | Fn + H (HELP) | Show every key for this screen, the same as 0 |
 | Ctrl + Space | Open or close the taskbar panel, from anywhere, even while typing |

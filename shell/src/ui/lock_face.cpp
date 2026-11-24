@@ -38,7 +38,7 @@ void lock_face_build() {
     lv_obj_set_size(g_playing, kScreenW - 30, 18);
     lv_label_set_long_mode(g_playing, LV_LABEL_LONG_DOT);
     lv_obj_set_pos(g_playing, 15, 84);
-    lv_obj_t* hint = label(g_face, "Any key unlocks", &zs_font_12, kMuted);
+    lv_obj_t* hint = label(g_face, "Tab unlocks", &zs_font_12, kMuted);
     lv_obj_align(hint, LV_ALIGN_BOTTOM_LEFT, 15, -8);
     lv_obj_add_flag(g_face, LV_OBJ_FLAG_HIDDEN);
 }
