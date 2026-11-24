@@ -57,7 +57,11 @@ void refresh();
 void install(const std::string& id);   // also upgrades
 void remove(const std::string& id);
 void upgrade_all();
-void add_source(const std::string& source);
+// Adding a source decides what may run as root, so it takes the user's
+// password: the job is started through sudo, which reads the password from a
+// pipe (never the command line). Started, or the password was refused.
+enum class AddResult { Started, Refused };
+AddResult add_source(const std::string& source, const std::string& password);
 void remove_source(const std::string& source);
 // Move a source one place up (-1) or down (+1). Higher sources win when two
 // offer the same app.

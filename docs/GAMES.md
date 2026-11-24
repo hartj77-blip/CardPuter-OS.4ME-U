@@ -55,6 +55,16 @@ cores come from Debian with it. For the other consoles, press **C** for the core
 1 to 3 MB each). Downloaded cores go in `~/Games/cores`; **Del** removes one. Removing the Games
 app keeps your games, saves and downloaded cores.
 
+**How safe is a downloaded core?** A core is a program that Games runs with your user's rights,
+so the download is kept narrow: https only, from the fixed address `buildbot.libretro.com`,
+following no redirects; unpacked aside and moved into place only when it is a whole Linux
+library; into `~/Games/cores`, which only you can write to. What it can't do is check the core
+against a known fingerprint: libretro's nightly builds change every day and come with no
+published checksums or signatures. So you trust libretro's build server (and its https
+certificate) for each core you download, as RetroArch users do. Cores from Debian (the ones
+Games installs, or `sudo apt install libretro-...`) are checked by apt's signatures and are
+the safer choice where one exists.
+
 You can also copy any `<name>_libretro.so` built for arm64 into `~/Games/cores` yourself. Games
 uses a core it knows for a console (see the table above). A copy in `~/Games/cores` is used
 before the system one.

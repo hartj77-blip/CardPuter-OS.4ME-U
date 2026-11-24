@@ -112,6 +112,8 @@ STUB
 cat > "$T/bin/apt-get" <<STUB
 #!/bin/sh
 echo "apt-get \$*" >> "$T/apt.log"
+# -s (a dry run): would take off the package named in $T/apt-remv, if any.
+case " \$* " in *" -s "*) [ -e "$T/apt-remv" ] && echo "Remv \$(cat "$T/apt-remv") [1.0]"; exit 0 ;; esac
 case " \$* " in *" -f install "*) rm -f "$T/bad-configure"; exit 0 ;; esac
 case " \$* " in *" install "*) [ -e "$T/apt-fail" ] && exit 100 ;; esac
 exit 0
@@ -157,6 +159,12 @@ for x in evil future pc sneaky; do
     cat_has "app=$x" && bad "refresh: kept bad entry $x" || ok "refresh: dropped bad entry $x"
 done
 apps list | grep -q '^gps  *1.0.0' && bad "list: gps shown installed" || ok "list: nothing installed yet"
+echo "zeroos-app-notes 2.0.0" > "$T/installed"
+: > "$T/apt.log"
+apps run install:notes || true
+expect "install, older than what's installed: failed" state failed
+grep -q "apt-get install " "$T/apt.log" && bad "install, older: apt ran" || ok "install, older: nothing installed"
+: > "$T/installed"
 
 printf 'file://%s/nowhere\n' "$T" > "$T/sources.off"
 PATH="$T/bin:$PATH" ZEROOS_APPS_SOURCES=$T/sources.off ZEROOS_APPS_STATE=$T/state ZEROOS_APPS_CACHE=$T/cache \
@@ -320,6 +328,26 @@ apps run remove-source:someone/cardputer-apps || true
 grep -qx 'someone/cardputer-apps' "$T/sources" && bad "remove-source" || ok "remove-source: removed"
 apps sources | grep -qx 'other/apps' && ok "sources: lists them" || bad "sources"
 printf '# mine\nfile://%s/a\n\nfile://%s/b\nother/apps\n' "$T" "$T" > "$T/sources"
+# Signatures (zeroos-verify): a source ZeroOS has a key for must sign its index.
+K=$T/keys-sig
+mkdir -p "$K"
+openssl genpkey -algorithm ed25519 -out "$T/apps-key.pem" 2>/dev/null
+openssl pkey -in "$T/apps-key.pem" -pubout -out "$K/apps.pem" 2>/dev/null
+echo "file://$T/a apps" > "$K/signers"
+signed_apps() { ZEROOS_VERIFY=$ROOT/image/stage-zeroos/files/keys/zeroos-verify ZEROOS_KEYS_DIRS=$K apps "$@"; }
+signed_apps run refresh
+cat_has "source=file://$T/a" && bad "signed source: unsigned index used" || ok "signed source: unsigned index skipped"
+cat_has "source=file://$T/b" && ok "unsigned source with no key: still used" || bad "unsigned source b dropped"
+openssl pkeyutl -sign -inkey "$T/apps-key.pem" -rawin -in "$T/a/zeroos-apps.index" -out "$T/a/zeroos-apps.index.sig"
+signed_apps run refresh
+cat_has "source=file://$T/a" && ok "signed source: signed index used" || bad "signed source: signed index not used"
+echo "# changed" >> "$T/a/zeroos-apps.index"
+signed_apps run refresh
+cat_has "source=file://$T/a" && bad "signed source: changed index used" || ok "signed source: changed index skipped"
+sed -i '$d' "$T/a/zeroos-apps.index"
+rm -f "$T/a/zeroos-apps.index.sig"
+apps run refresh
+
 apps run source-up:other/apps || true
 [ "$(apps sources | tr '\n' ' ')" = "file://$T/a other/apps file://$T/b " ] && ok "source-up: moved above the one before" ||
     bad "source-up: $(apps sources | tr '\n' ' ')"
@@ -333,11 +361,12 @@ apps run source-up:nobody/here || true
 expect "source-up, not a source: failed" state failed
 
 # --- M5Stack's app store (registry.json) --------------------------------------
-m5deb() {   # m5deb <package> <version> <arch>: an app made for M5's launcher, in $T/m5
+m5deb() {   # m5deb <package> <version> <arch> [control line]: an app made for M5's launcher, in $T/m5
     local d=$T/m5build/$1
     rm -rf "$d"
     mkdir -p "$d/DEBIAN" "$d/usr/share/APPLaunch/applications" "$d/usr/share/APPLaunch/bin"
     printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: t <t@t>\nDescription: t\n' "$1" "$2" "$3" > "$d/DEBIAN/control"
+    [ -n "${4:-}" ] && echo "$4" >> "$d/DEBIAN/control"
     printf '[Desktop Entry]\nName=Hello\nExec=/usr/share/APPLaunch/bin/hello\nType=Application\n' \
         > "$d/usr/share/APPLaunch/applications/$1.desktop"
     dpkg-deb -b --root-owner-group "$d" "$T/m5/$1_$2_$3.deb" >/dev/null
@@ -399,5 +428,36 @@ grep -qx 'package=hello-zero' "$T/state/m5/m5-hello-zero" && ok "m5 install-file
     bad "m5 install-file: note"
 grep -qx m5stack "$ROOT/image/stage-zeroos/files/apps/apps.sources" && ok "m5 store: a source out of the box" ||
     bad "m5 store: not in apps.sources"
+
+# M5Stack's catalog isn't ours: it can't replace what's already on the device.
+echo "openssh-server 1:10.0" >> "$T/installed"
+m5deb openssh-server 99.0 arm64
+m5deb sneaky-cam 1.0.0 arm64 "Conflicts: zero-cam, openssh-server (<< 99)"
+m5deb grabby 1.0.0 arm64
+m5deb unreviewed 1.0.0 arm64
+printf '{"apps":[%s,%s,%s,%s]}' "$(m5entry openssh-server 99.0 arm64)" "$(m5entry sneaky-cam 1.0.0 arm64)" \
+    "$(m5entry grabby 1.0.0 arm64)" "$(m5entry unreviewed 1.0.0 arm64 | sed 's/"review":{"status":"approved"},//')" \
+    > "$T/m5/registry.json"
+apps run refresh
+cat_has app=m5-unreviewed && bad "m5 store: kept an app with no review status" ||
+    ok "m5 store: an app with no review status is left out"
+: > "$T/apt.log"
+apps run install:m5-openssh-server || true
+expect "m5 install, same name as a system package: failed" state failed
+grep -q "would replace openssh-server" "$T/run/apps.status" && ok "  ...because it would replace openssh-server" || bad "  wrong reason: $(cat "$T/run/apps.status")"
+apps run install:m5-sneaky-cam || true
+expect "m5 install, conflicts with a system package: failed" state failed
+grep -q "would replace openssh-server" "$T/run/apps.status" && ok "  ...because it would replace openssh-server" || bad "  wrong reason: $(cat "$T/run/apps.status")"
+echo openssh-server > "$T/apt-remv"
+apps run install:m5-grabby || true
+expect "m5 install, apt would remove a system package: failed" state failed
+grep -q "would remove openssh-server" "$T/run/apps.status" && ok "  ...because it would remove openssh-server" || bad "  wrong reason: $(cat "$T/run/apps.status")"
+rm -f "$T/apt-remv"
+grep -q "apt-get install " "$T/apt.log" && bad "m5 guard: apt ran: $(cat "$T/apt.log")" ||
+    ok "m5 guard: nothing was installed"
+echo hello-zero > "$T/apt-remv"   # another M5 app (noted by install-file above) may go
+apps run install:m5-grabby
+expect "m5 install that replaces another M5 app: done" state done
+rm -f "$T/apt-remv"
 
 [ "$fails" = 0 ] && echo "all passed" || { echo "$fails failed"; sed 's/^/log: /' "$T/log" | tail -30; exit 1; }

@@ -42,7 +42,13 @@ In **Car**, under **Bluetooth**:
   then scan (8 seconds). Press Enter on it in the list to pair and connect.
 - **Let the car find me**: for cars that search for a phone from their own
   screen. The Cardputer is visible as `cardputer` for 2 minutes; pick it on
-  the car's screen.
+  the car's screen. Only the first device that pairs is kept (and trusted to
+  reconnect by itself); the Cardputer then hides again at once.
+
+Pairing is only possible while you pair: when you pick a device to pair, the
+Cardputer accepts pairing for that device alone until it has connected, and
+unpairs anything else that pairs in that time. It is never visible to others
+except during **Let the car find me**.
 - Enter on a paired device connects or disconnects it. **X** forgets it.
 
 Once connected, sound from the Media app goes to that device, and its play,

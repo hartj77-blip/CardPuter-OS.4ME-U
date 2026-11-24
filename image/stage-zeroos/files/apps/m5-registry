@@ -74,7 +74,9 @@ def blocks(registry, source, arch):
         url = str(dl.get("url") or "")
         sha = str(dl.get("sha256") or "")
         size = dl.get("size")
-        if (app.get("review") or {}).get("status", "approved") != "approved":
+        # Only apps M5's community repository says it reviewed: an entry
+        # without a review status is left out, not let in.
+        if (app.get("review") or {}).get("status") != "approved":
             continue
         if dl.get("type", "deb") != "deb" or not PKG.match(package) or not VERSION.match(version):
             continue

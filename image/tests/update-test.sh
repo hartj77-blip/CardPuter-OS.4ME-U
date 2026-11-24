@@ -204,8 +204,56 @@ echo "UPDATE_URL=http://updates.example.com" > "$T/update.conf"; update check ||
 expect "http to the internet: refused" state failed
 echo "UPDATE_URL=http://192.168.1.20:8000" > "$T/update.conf"; update check || true
 expect "http on the LAN: allowed" state offline
+for u in http://10.example.com http://192.168.1.1.example.net http://172.32.0.1 http://100.128.0.1 http://10.0.0.256; do
+    echo "UPDATE_URL=$u" > "$T/update.conf"; update check || true
+    expect "http to $u (not your network): refused" state failed
+done
+for u in http://10.0.0.5 http://172.20.1.1/x http://100.100.100.100 http://user@127.0.0.1:8080 http://box.local; do
+    echo "UPDATE_URL=$u" > "$T/update.conf"; update check || true
+    expect "http to $u: allowed" state offline
+done
 printf 'UPDATE_URL=http://updates.example.com\nALLOW_HTTP=1\n' > "$T/update.conf"; update check || true
 expect "http with ALLOW_HTTP=1: allowed" state offline
+
+# Signatures (zeroos-verify): once a key for updates is shipped, the manifest
+# must be signed with it.
+K=$T/keys
+mkdir -p "$K"
+openssl genpkey -algorithm ed25519 -out "$T/release-key.pem" 2>/dev/null
+openssl pkey -in "$T/release-key.pem" -pubout -out "$K/zeroos-release.pem" 2>/dev/null
+openssl genpkey -algorithm ed25519 -out "$T/other-key.pem" 2>/dev/null
+echo "update zeroos-release" > "$K/signers"
+signed() { ZEROOS_VERIFY=$ROOT/image/stage-zeroos/files/keys/zeroos-verify ZEROOS_KEYS_DIRS=$K update "$@"; }
+sign() {   # sign <key> <dir>
+    openssl pkeyutl -sign -inkey "$1" -rawin -in "$2/zeroos-update.manifest" -out "$2/zeroos-update.manifest.sig"
+}
+serve 1.1.0
+rm -f "$T/server-1.1.0/zeroos-update.manifest.sig"
+signed check || true
+expect "key shipped, manifest unsigned: refused" state failed
+grep -q "isn't signed" "$T/run/update.status" && ok "unsigned: says why" || bad "unsigned: $(cat "$T/run/update.status")"
+sign "$T/other-key.pem" "$T/server-1.1.0"
+signed check || true
+expect "signed with another key: refused" state failed
+sign "$T/release-key.pem" "$T/server-1.1.0"
+signed check
+expect "signed with the update key: available" state available
+cp "$T/server-1.1.0/zeroos-update.manifest" "$T/manifest.signed"
+sed -i 's/^size=.*/size=1/' "$T/server-1.1.0/zeroos-update.manifest"
+signed check || true
+expect "manifest changed after signing: refused" state failed
+cp "$T/manifest.signed" "$T/server-1.1.0/zeroos-update.manifest"
+mv "$K/zeroos-release.pem" "$K/zeroos-release.pem.off"
+rm -f "$T/server-1.1.0/zeroos-update.manifest.sig"
+signed check
+expect "no key shipped yet: taken unsigned, as before" state available
+mv "$K/zeroos-release.pem.off" "$K/zeroos-release.pem"
+sign "$T/release-key.pem" "$T/server-1.1.0"
+signed install
+expect "signed update installs" state done
+echo "ZeroOS 1.0.0 (test)" > "$T/release"
+cp "$T/server-1.0.0/zeroos_1.0.0_$ARCH.deb" "$T/state/current.deb"
+rm -f "$T/server-1.1.0/zeroos-update.manifest.sig"
 
 serve 1.1.0
 cp "$T/server-1.1.0/zeroos-update.manifest" "$T/manifest.good"

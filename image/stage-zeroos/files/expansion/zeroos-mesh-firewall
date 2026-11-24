@@ -1,0 +1,34 @@
+#!/bin/sh
+# zeroos-mesh-firewall close|open|clear (root; meshtasticd's drop-in and
+# zeroos-mesh-lan.service run it). meshtasticd's web client (9443) and API
+# (4403) have no login: anyone who can reach them can read the mesh, send as
+# you and change the node. So they answer only this device (lo) and your
+# tailnet (tailscale0), until you choose Allow phones in Mesh, which
+# opens them to the network you're on until the mesh is turned off.
+#   close  only lo and tailscale0 reach them (before meshtasticd starts)
+#   open   anyone on the network can (Allow phones)
+#   clear  remove ZeroOS's rules (meshtasticd stopped)
+set -u
+T="inet zeroos_mesh"
+command -v nft >/dev/null 2>&1 || { echo "zeroos-mesh-firewall: nft is missing (apt install nftables)" >&2; exit 1; }
+case ${1:-} in
+    close)
+        nft -f - <<NFT
+table $T {}
+flush table $T
+table $T {
+    chain input {
+        type filter hook input priority -10; policy accept;
+        iifname != { "lo", "tailscale0" } tcp dport { 4403, 9443 } drop
+    }
+}
+NFT
+        ;;
+    open)
+        nft list table $T >/dev/null 2>&1 && nft flush table $T
+        exit 0 ;;
+    clear)
+        nft delete table $T 2>/dev/null
+        exit 0 ;;
+    *) echo "usage: zeroos-mesh-firewall close|open|clear" >&2; exit 2 ;;
+esac

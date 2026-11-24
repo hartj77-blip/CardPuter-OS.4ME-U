@@ -120,6 +120,22 @@ std::string shell_quote(const std::string& s) {
     return r + "'";
 }
 
+// A private (0600) temporary file holding data, for a tool to read a secret
+// from instead of its command line, where every process can see it. "" on
+// failure. The caller removes it.
+std::string private_tmp(const std::string& data) {
+    char tmp[] = "/tmp/zeroos-secret-XXXXXX";
+    int fd = mkstemp(tmp);   // created 0600
+    if (fd < 0) return "";
+    bool ok = write(fd, data.data(), data.size()) == ssize_t(data.size());
+    close(fd);
+    if (!ok) {
+        unlink(tmp);
+        return "";
+    }
+    return tmp;
+}
+
 std::vector<std::string> list_dir(const std::string& path) {
     std::vector<std::string> v;
     if (DIR* d = opendir(path.c_str())) {
@@ -429,29 +445,62 @@ public:
         return v;
     }
 
+    // The SECURITY column of the last scan for this network ("WPA2", "WPA3",
+    // "WEP", "WPA2 802.1X"...); "" if it wasn't seen (a hidden network).
+    std::string wifi_security(const std::string& ssid) {
+        std::istringstream in(run("nmcli -t -f SSID,SECURITY dev wifi list --rescan no"));
+        for (std::string line; std::getline(in, line);) {
+            std::vector<std::string> f = nmcli_fields(line);
+            if (f.size() >= 2 && f[0] == ssid && !f[1].empty() && f[1] != "--") return f[1];
+        }
+        return "";
+    }
     bool wifi_connect(const std::string& ssid, const std::string& psk) override {
+        // nmcli has no "--": a name starting with '-' could be read as one of
+        // its options (-a is --ask). Such names are refused.
+        if (ssid.empty() || ssid[0] == '-') return false;
+        if (psk.find_first_of("\r\n") != std::string::npos) return false;
         std::string id = shell_quote(ssid);
-        // A saved profile for this network, and its password, from before
-        // this attempt: a mistyped retry must not lose a working one.
-        bool existed = !trim_nl(run("nmcli -g connection.id connection show id " + id)).empty();
-        std::string old_psk;
-        if (existed && !psk.empty())
-            old_psk = trim_nl(run("nmcli -s -g 802-11-wireless-security.psk connection show id " + id));
-        // --wait bounds the attempt (default 90 s): this runs on the UI thread.
-        std::string cmd = "nmcli --wait 20 dev wifi connect " + id;
-        if (!psk.empty()) cmd += " password " + shell_quote(psk);
-        if (run(cmd + " && echo OK").find("OK") != std::string::npos) {
+        if (psk.empty()) {
+            // A saved network (its own password), or an open one.
+            // --wait bounds the attempt (default 90 s): this runs on the UI thread.
+            if (run("nmcli --wait 20 dev wifi connect " + id + " && echo OK").find("OK") == std::string::npos)
+                return false;
             net_refresh_soon();
             return true;
         }
-        if (psk.empty()) return false;
-        // A failed attempt with a typed password must not leave that password
-        // saved: NetworkManager would keep retrying it and the next connect
-        // would reuse it instead of asking (M5 launcher fix #62). A profile
-        // that was there before gets its old password back instead.
-        if (!existed) run("nmcli connection delete id " + id);
-        else if (!old_psk.empty()) run("nmcli connection modify id " + id + " wifi-sec.psk " + shell_quote(old_psk));
-        return false;
+        // With a password: never on nmcli's command line, where every process
+        // can read it. It goes in a private file (passwd-file) for "connection
+        // up", into a new profile under a temporary name, so a mistyped
+        // password never touches a profile that works: on failure only the
+        // new one is deleted and nothing of it stays saved (NetworkManager
+        // would keep retrying it, M5 launcher fix #62). On success it takes
+        // the network's name and replaces the older profile.
+        std::string sec = wifi_security(ssid);
+        if (sec.find("802.1X") != std::string::npos) return false;   // enterprise: needs more than a password
+        bool wep = sec.find("WEP") != std::string::npos;
+        bool sae_only = sec.find("WPA3") != std::string::npos && sec.find("WPA2") == std::string::npos &&
+                        sec.find("WPA1") == std::string::npos;
+        std::string tmp_name = shell_quote("zeroos-joining-" + std::to_string(getpid()));
+        std::string add = "nmcli connection add type wifi con-name " + tmp_name + " ssid " + id +
+                          " wifi-sec.key-mgmt " + (wep ? "none wifi-sec.wep-key-type key" : sae_only ? "sae" : "wpa-psk");
+        if (sec.empty()) add += " 802-11-wireless.hidden yes";   // not in the scan: maybe hidden
+        run("nmcli connection delete id " + tmp_name);   // a leftover from an attempt cut short
+        if (run(add + " >/dev/null && echo OK").find("OK") == std::string::npos) return false;
+        std::string pf = private_tmp(std::string(wep ? "802-11-wireless-security.wep-key0:"
+                                                     : "802-11-wireless-security.psk:") + psk + "\n");
+        bool ok = !pf.empty() && run("nmcli --wait 20 connection up id " + tmp_name + " passwd-file " +
+                                     shell_quote(pf) + " && echo OK").find("OK") != std::string::npos;
+        if (!pf.empty()) unlink(pf.c_str());
+        if (!ok) {
+            run("nmcli connection delete id " + tmp_name);
+            return false;
+        }
+        for (int i = 0; i < 8 && !trim_nl(run("nmcli -g connection.id connection show id " + id)).empty(); ++i)
+            run("nmcli connection delete id " + id);
+        run("nmcli connection modify id " + tmp_name + " connection.id " + id);
+        net_refresh_soon();
+        return true;
     }
     static std::string trim_nl(std::string s) {
         while (!s.empty() && (s.back() == '\n' || s.back() == '\r')) s.pop_back();
@@ -566,8 +615,13 @@ public:
                                          "--cache=yes", "--demuxer-max-bytes=16MiB"};
         // -append takes one header as is. --http-header-fields is a list split
         // at commas, and Jellyfin's header is full of them: the token never
-        // arrived and every stream got 401.
-        if (!auth.empty()) argv.push_back("--http-header-fields-append=Authorization: " + auth);
+        // arrived and every stream got 401. It goes in a file only we can
+        // read (--include works with --no-config), not on the command line.
+        if (!auth.empty()) {
+            std::string conf = stream_header_file(auth);
+            if (conf.empty()) return false;
+            argv.push_back("--include=" + conf);
+        }
         argv.push_back("--");
         argv.push_back(url);
         play_pid_ = spawn(argv);
@@ -781,6 +835,30 @@ private:
         return h ? h : "/home/pi";
     }
 
+    // ~/.config/zeroos/stream-header.conf (0600, in a 0700 folder): the
+    // Authorization header for mpv, as an option it reads with --include.
+    // "" if it can't be written or the header has a line break.
+    static std::string stream_header_file(const std::string& auth) {
+        std::string header = "Authorization: " + auth;
+        if (header.find_first_of("\r\n") != std::string::npos) return "";
+        std::string dir = home() + "/.config/zeroos";
+        mkdir((home() + "/.config").c_str(), 0755);
+        mkdir(dir.c_str(), 0700);
+        std::string path = dir + "/stream-header.conf", tmp = path + ".tmp";
+        // %N% takes N bytes as they are, commas and quotes included.
+        std::string text = "http-header-fields-append=%" + std::to_string(header.size()) + "%" + header + "\n";
+        int fd = open(tmp.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+        if (fd < 0) return "";
+        fchmod(fd, 0600);
+        bool ok = write(fd, text.data(), text.size()) == ssize_t(text.size());
+        close(fd);
+        if (!ok || rename(tmp.c_str(), path.c_str()) != 0) {
+            unlink(tmp.c_str());
+            return "";
+        }
+        return path;
+    }
+
     int duration_of(const std::string& path) {
         int d = cached_duration(path);
         if (d >= 0) return d;
@@ -889,12 +967,16 @@ private:
         // sets tailscale.server); an auth key, if given, is used once.
         std::string server = tailscale_server_url(prefs::get_str("tailscale.server", ""));
         std::string key = prefs::get_str("tailscale.authkey", "");
-        std::string flags = tailscale_up_flags(server, prefs::get_str("tailscale.server_used", ""), key);
+        // The key goes to tailscale in a private file (0600), removed once
+        // "up" has finished with it, never on its command line.
+        std::string key_file = key.empty() ? "" : private_tmp(key + "\n");
+        std::string flags = tailscale_up_flags(server, prefs::get_str("tailscale.server_used", ""), key_file);
         prefs::set_str("tailscale.server_used", server);
         if (!key.empty()) prefs::set_str("tailscale.authkey", "");
         run("systemctl start tailscaled.service");
-        run("mkdir -p \"$HOME/.cache/zeroos\"; setsid tailscale up --timeout=10m" + flags +
-            " >\"$HOME/.cache/zeroos/tailscale-up.log\" 2>&1 </dev/null &");
+        std::string cleanup = key_file.empty() ? "" : "; rm -f " + shell_quote(key_file);
+        run("mkdir -p \"$HOME/.cache/zeroos\"; (setsid tailscale up --timeout=10m" + flags + cleanup +
+            ") >\"$HOME/.cache/zeroos/tailscale-up.log\" 2>&1 </dev/null &");
         ts_at_ = 0;
     }
     void tailscale_stop() override {
@@ -968,6 +1050,7 @@ private:
         sync_at_ = sync_run_at_ = 0;
     }
     bool sync_answer(const SyncRequest& r, bool accept) override {
+        if (!sync_id_ok(r.device_id)) return false;
         std::ostringstream cmd;
         if (r.is_folder)
             cmd << "zeroos-sync " << (accept ? "accept-folder " : "ignore-folder ") << shell_quote(r.folder_id) << ' '
@@ -977,12 +1060,22 @@ private:
                 << shell_quote(r.device_name);
         return sync_run(cmd.str());
     }
+    // A Syncthing device ID: letters, digits and dashes (AAAAAAA-BBBBBBB-...),
+    // never starting with '-'. IDs also come from QR codes and typing.
+    static bool sync_id_ok(const std::string& id) {
+        if (id.empty() || id.size() > 80 || id[0] == '-') return false;
+        for (unsigned char ch : id)
+            if (!std::isalnum(ch) && ch != '-') return false;
+        return true;
+    }
     bool sync_add_device(const std::string& id, const std::string& name) override {
+        if (!sync_id_ok(id)) return false;
         std::ostringstream cmd;
         cmd << "zeroos-sync add-device " << shell_quote(id) << ' ' << shell_quote(name);
         return sync_run(cmd.str());
     }
     bool sync_remove_device(const std::string& id) override {
+        if (!sync_id_ok(id)) return false;
         std::ostringstream cmd;
         cmd << "zeroos-sync remove-device " << shell_quote(id);
         return sync_run(cmd.str());
@@ -1569,31 +1662,70 @@ private:
         });
         return v;
     }
-    // A bluetoothctl that is BlueZ's default agent and accepts every pairing
-    // request (its built-in "agent auto"), with the adapter pairable, for
+    // Addresses of the paired devices.
+    std::vector<std::string> bt_paired() {
+        std::vector<std::string> v;
+        std::istringstream in(run("bluetoothctl devices Paired"));
+        for (std::string l; std::getline(in, l);)
+            if (l.rfind("Device ", 0) == 0 && l.size() >= 24 && is_address(l.substr(7, 17))) v.push_back(l.substr(7, 17));
+        return v;
+    }
+    // Unpairs whatever paired since `before`, except `keep`.
+    void bt_drop_strangers(const std::vector<std::string>& before, const std::string& keep) {
+        for (auto& a : bt_paired())
+            if (a != keep && std::find(before.begin(), before.end(), a) == before.end())
+                run("bluetoothctl remove " + a);
+    }
+    // A bluetoothctl that is BlueZ's default agent and accepts pairing
+    // requests (its built-in "agent auto"), with the adapter pairable, for
     // `seconds`. Gamepads (Xbox) ask "Accept pairing?" the moment they
     // connect; with no default agent BlueZ refuses ("No agent available") and
-    // they connect unpaired, then drop. Only for a short window while someone
-    // is pairing: an always-on yes would let anyone nearby pair a keyboard.
-    // bluetoothctl registers its own agent first; dropping it is async, hence
-    // the pauses. `extra` runs inside the window (Car's "Be found").
-    static std::string pairing_window_cmd(int seconds, const std::string& extra_on = "",
-                                          const std::string& extra_off = "") {
-        return "{ sleep 1; echo 'agent off'; sleep 0.5; echo 'agent auto'; sleep 0.5; echo default-agent; "
-               "echo 'pairable on'; " + extra_on + "sleep " + std::to_string(seconds) + "; " + extra_off +
-               "echo 'pairable off'; echo quit; } | bluetoothctl >/dev/null 2>&1";
+    // they connect unpaired, then drop. The agent can't tell who is asking,
+    // so the window is only open while someone is pairing, and once a second
+    // it unpairs any device that paired in it other than the one allowed:
+    //   allow = an address: only that device (the one picked to pair).
+    //   allow = "", visible: the first device that pairs (Car's "Be found",
+    //     where the car starts the pairing); the window then closes at once,
+    //     with that one trusted so it can reconnect by itself.
+    // `before` is the paired list when it opened. bluetoothctl registers its
+    // own agent first; dropping it is async, hence the pauses.
+    static std::string pairing_window_cmd(int seconds, const std::vector<std::string>& before,
+                                          const std::string& allow, bool visible) {
+        std::string known;
+        for (auto& a : before) known += a + " ";
+        std::string cmd =
+            "known='" + known + "'; allow='" + allow + "'; "
+            "guard() { for a in $(bluetoothctl devices Paired | while read -r _ x _; do echo \"$x\"; done); do "
+            "case \" $known $allow \" in *\" $a \"*) ;; *) ";
+        if (visible)
+            cmd += "if [ -z \"$allow\" ]; then allow=$a; bluetoothctl trust \"$a\" >/dev/null 2>&1; "
+                   "else bluetoothctl remove \"$a\" >/dev/null 2>&1; fi;; ";
+        else
+            cmd += "bluetoothctl remove \"$a\" >/dev/null 2>&1;; ";
+        cmd += "esac; done; }; "
+               "{ sleep 1; echo 'agent off'; sleep 0.5; echo 'agent auto'; sleep 0.5; echo default-agent; "
+               "echo 'pairable on'; ";
+        if (visible) cmd += "echo 'discoverable on'; ";
+        cmd += "t=0; while [ $t -lt " + std::to_string(seconds) + " ]; do sleep 1; t=$((t+1)); guard; ";
+        if (visible) cmd += "[ -n \"$allow\" ] && break; ";
+        cmd += "done; ";
+        if (visible) cmd += "echo 'discoverable off'; ";
+        cmd += "echo 'pairable off'; sleep 0.5; guard; echo quit; } | bluetoothctl >/dev/null 2>&1";
+        return cmd;
     }
-    void bt_pairing_window(int seconds) {
+    void bt_close_pairing_window() {
 #ifndef __EMSCRIPTEN__
-        if (pair_pid_ > 0) kill_child(pair_pid_, SIGTERM);
-        pair_pid_ = spawn({"sh", "-c", pairing_window_cmd(seconds)});
-        usleep(2500 * 1000);   // registered and pairable before anything asks
+        if (pair_pid_ <= 0) return;
+        kill_child(pair_pid_, SIGTERM);
+        pair_pid_ = -1;
+        run("bluetoothctl pairable off");
 #endif
     }
     void bt_scan() override {
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
-        bt_pairing_window(120);   // scanning: about to pair something
+        // No pairing window here: nothing pairs until a device is picked
+        // (bt_connect), and then only that one.
         run("bluetoothctl --timeout 8 scan on");
     }
     bool bt_connect(const std::string& address, std::string& error) override {
@@ -1604,21 +1736,38 @@ private:
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
         std::string info = run("bluetoothctl info " + address);
+        std::vector<std::string> before;
+        bool windowed = false;
         if (info.find("Paired: yes") == std::string::npos) {
             // "Just works" pairing: nothing to type here. The window's agent
-            // answers whatever the device asks, before or after our pair.
-            bt_pairing_window(60);
+            // answers what this device asks, before or after our pair, until
+            // it has connected; anything else that pairs is dropped.
+            before = bt_paired();
+            windowed = true;
+#ifndef __EMSCRIPTEN__
+            if (pair_pid_ > 0) kill_child(pair_pid_, SIGTERM);
+            pair_pid_ = spawn({"sh", "-c", pairing_window_cmd(60, before, address, false)});
+            usleep(2500 * 1000);   // registered and pairable before anything asks
+#endif
             std::string out = run("bluetoothctl --timeout 25 pair " + address);
             if (out.find("Pairing successful") == std::string::npos &&
                 run("bluetoothctl info " + address).find("Paired: yes") == std::string::npos) {
+                bt_close_pairing_window();
+                bt_drop_strangers(before, address);
                 error = "Pairing failed. Put it in pairing mode (lights flash fast), then try again";
                 return false;
             }
         }
         run("bluetoothctl trust " + address);   // lets it reconnect by itself later
         std::string out = run("bluetoothctl --timeout 15 connect " + address);
-        if (out.find("Connection successful") == std::string::npos &&
-            run("bluetoothctl info " + address).find("Connected: yes") == std::string::npos) {
+        bool ok = out.find("Connection successful") != std::string::npos ||
+                  run("bluetoothctl info " + address).find("Connected: yes") != std::string::npos;
+        if (windowed) {
+            // Paired and connected (or given up): close the window now.
+            bt_close_pairing_window();
+            bt_drop_strangers(before, address);
+        }
+        if (!ok) {
             error = "Paired, but it didn't connect";
             return false;
         }
@@ -1633,22 +1782,20 @@ private:
     void bt_set_visible(int seconds) override {
 #ifndef __EMSCRIPTEN__
         if (visible_pid_ > 0) {
-            // Ends the agent and the timer (the whole group), then does
-            // what the timer would have: hide, and trust what paired.
+            // Ends the agent and the timer (the whole group), then does what
+            // the window would have: hide, and stop taking pairings. What
+            // paired in it was trusted (or dropped) as it happened.
             kill_child(visible_pid_, SIGTERM);
             visible_pid_ = -1;
             run("bluetoothctl discoverable off");
-            run("bluetoothctl devices Paired | while read -r _ a _; do bluetoothctl trust \"$a\"; done");
+            run("bluetoothctl pairable off");
         }
         if (seconds <= 0) return;
         run("rfkill unblock bluetooth");
         run("bluetoothctl power on");
-        // bluetoothctl stays open as the (default, accept-all) pairing agent
-        // for the whole time, then trusts whatever paired so it can
-        // reconnect by itself.
-        visible_pid_ = spawn({"sh", "-c",
-            pairing_window_cmd(seconds, "echo 'discoverable on'; ", "echo 'discoverable off'; ") + "; "
-            "bluetoothctl devices Paired | while read -r _ a _; do bluetoothctl trust \"$a\"; done"});
+        // Visible and taking pairings for `seconds`, or until the first
+        // device (the car) has paired: one device per "Be found".
+        visible_pid_ = spawn({"sh", "-c", pairing_window_cmd(seconds, bt_paired(), "", true)});
 #endif
     }
 

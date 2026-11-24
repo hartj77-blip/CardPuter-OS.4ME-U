@@ -3,7 +3,9 @@
 #include "ui/store.h"
 
 #include <dirent.h>
+#include <signal.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 
 #include <algorithm>
 #include <cctype>
@@ -424,13 +426,31 @@ void install(const std::string& id) { g_mock ? mock_start("install", id) : start
 void remove(const std::string& id) { g_mock ? mock_start("remove", id) : start_job("remove:" + id); }
 void upgrade_all() { g_mock ? mock_start("upgrade", "") : start_job("upgrade"); }
 
-void add_source(const std::string& source) {
+AddResult add_source(const std::string& source, const std::string& password) {
     if (g_mock) {
+        if (password.empty()) return AddResult::Refused;
         g_mock_sources.push_back(source);
         mock_start("add-source", "");
-    } else {
-        start_job("add-source:" + source);
+        return AddResult::Started;
     }
+    // polkit lets the UI user run the other jobs without asking, but not this
+    // one (files/90-zeroos.rules): sudo it with the user's own password.
+    // -S reads the password from stdin, -k never uses a remembered one, and
+    // -p '' keeps the prompt out of the output.
+    WatchdogGrace grace;   // a wrong password takes sudo a couple of seconds
+    std::string unit = "zeroos-apps@" + unit_escape("add-source:" + source) + ".service";
+    std::string cmd = "sudo -S -k -p '' -- systemctl start --no-block " + quote(unit) + " >/dev/null 2>&1";
+    struct sigaction ign {}, old {};
+    ign.sa_handler = SIG_IGN;
+    sigaction(SIGPIPE, &ign, &old);   // sudo may be gone before it reads
+    int st = -1;
+    if (FILE* p = popen(cmd.c_str(), "w")) {
+        fputs(password.c_str(), p);
+        fputc('\n', p);
+        st = pclose(p);
+    }
+    sigaction(SIGPIPE, &old, nullptr);
+    return st != -1 && WIFEXITED(st) && WEXITSTATUS(st) == 0 ? AddResult::Started : AddResult::Refused;
 }
 
 void remove_source(const std::string& source) {

@@ -1,0 +1,13 @@
+# Mesh's "Allow phones": the web client and API answer the network
+# you're on, not only this device and your tailnet (zeroos-mesh-firewall).
+# Ends with the mesh: stopping meshtasticd stops this too.
+[Unit]
+Description=ZeroOS: Meshtastic reachable from this network
+BindsTo=meshtasticd.service
+After=meshtasticd.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/lib/zeroos/mesh-firewall open
+ExecStop=/usr/lib/zeroos/mesh-firewall close

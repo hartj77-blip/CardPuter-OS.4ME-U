@@ -20,7 +20,7 @@ check() {
     [ "$got" = "$1 = $2" ] && ok "$1 = $2 in [$3]" || bad "$1 in [$3]: '$got'"
 }
 check Privacy device General
-check JustWorksRepairing always General
+check JustWorksRepairing confirm General
 check ControllerMode dual General
 check MinConnectionInterval 7 LE
 check MaxConnectionInterval 9 LE

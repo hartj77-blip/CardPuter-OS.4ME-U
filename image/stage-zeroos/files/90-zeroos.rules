@@ -26,17 +26,26 @@ polkit.addRule(function(action, subject) {
     // Dock mode: ZeroShell starts and stops the desktop on the HDMI monitor.
     // Terminal app, Tailscale ("when needed"), Sync and updates are started the same way.
     var units = ["zeroos-dock.service", "zeroos-terminal.service", "tailscaled.service",
-                 "syncthing@" + user + ".service", "meshtasticd.service", "zeroos-usb-stick.service",
+                 "syncthing@" + user + ".service", "meshtasticd.service", "zeroos-mesh-lan.service", "zeroos-usb-stick.service",
                  "zeroos-update.service", "zeroos-update-check.service"];
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         units.indexOf(action.lookup("unit")) >= 0) {
         return polkit.Result.YES;
     }
     // The Apps app: zeroos-apps@<job>.service installs and removes apps
-    // (docs/APPS.md). zeroos-apps checks the job itself.
+    // (docs/APPS.md). zeroos-apps checks the job itself. Only jobs that work
+    // with the sources already listed: adding a source decides what may run
+    // as root, so it needs the user's password (the Apps app asks for it and
+    // starts that job through sudo). The instance is systemd-escaped, so "-"
+    // is "\x2d" in it.
     var unit = action.lookup("unit") || "";
     if (action.id == "org.freedesktop.systemd1.manage-units" &&
         unit.indexOf("zeroos-apps@") == 0 && unit.slice(-8) == ".service") {
-        return polkit.Result.YES;
+        var job = unit.slice(12, -8);
+        if (job == "refresh" || job == "upgrade") return polkit.Result.YES;
+        var prefixes = ["install:", "remove:", "remove\\x2dsource:", "source\\x2dup:", "source\\x2ddown:"];
+        for (var i = 0; i < prefixes.length; i++) {
+            if (job.indexOf(prefixes[i]) == 0 && job.length > prefixes[i].length) return polkit.Result.YES;
+        }
     }
 });

@@ -150,11 +150,9 @@ rm -f /etc/systemd/system/multi-user.target.wants/adbd.service
 install -d -m 0755 /var/lib/zeroos
 ( umask 077; printf '%s %s\n' pi "$(awk -F: '$1 == "pi" {print $2}' /etc/shadow)" > /var/lib/zeroos/default-password )
 grep -q '^pi [^ ]' /var/lib/zeroos/default-password || { echo "zeroos: ERROR: no password hash for pi" >&2; exit 1; }
-cat > /etc/ssh/sshd_config.d/10-zeroos-default-password.conf <<'SSHD'
-# ZeroOS: removed once pi's password is changed from the default.
-ForceCommand /usr/lib/zeroos/first-password ssh
-ExposeAuthInfo yes
-SSHD
+# While the default is set, SSH takes keys only (see the file for why).
+install -m 0644 /usr/share/zeroos/sshd-default-password.conf \
+    /etc/ssh/sshd_config.d/10-zeroos-default-password.conf
 grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' /etc/ssh/sshd_config ||
     echo "zeroos: WARNING: sshd_config has no sshd_config.d include; SSH won't ask for a new password"
 systemctl enable zeroos-password-check.service zeroos-password-check.path

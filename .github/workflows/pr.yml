@@ -8,6 +8,9 @@ name: Pull request
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml

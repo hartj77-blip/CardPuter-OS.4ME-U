@@ -105,6 +105,8 @@ int main() {
         CHECK(has(t, "Four.") && has(t, "cut off"));
         CHECK(!parse_reply(Wire::OpenAI, 400, R"([{"error":{"code":400,"message":"API key not valid"}}])", t, e));
         CHECK(has(e, "API key not valid"));
+        CHECK(!parse_reply(Wire::OpenAI, 308, "", t, e));
+        CHECK(has(e, "moved"));
         CHECK(!parse_reply(Wire::OpenAI, 0, "", t, e));
         CHECK(has(e, "internet"));
         CHECK(!parse_reply(Wire::OpenAI, 200, "<html>", t, e));
@@ -159,6 +161,7 @@ int main() {
         CHECK(reply == "Four.");
         CHECK(pid.load() == 0);
         CHECK(!has(slurp(d + "/args"), "sk-ant-secret"));
+        CHECK(!has(slurp(d + "/args"), "-L"));   // the key header never follows a redirect
         CHECK(has(slurp(d + "/files"), "x-api-key: sk-ant-secret"));
         CHECK(has(slurp(d + "/files"), "\"What's 2+2?\""));
 

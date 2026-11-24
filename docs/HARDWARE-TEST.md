@@ -15,13 +15,15 @@ override afterwards with `sudo systemctl revert zeroshell`.
 - [ ] **Keys** ([KEYS.md](KEYS.md)): Fn+S/D change the volume and Fn+U/I the brightness (a message says the new level); in any app Fn+S/D and Fn+U/I do the same, and Fn+Q plays or pauses music. Ctrl + Space opens the taskbar panel, and 1 there turns Wi-Fi off and on. In Settings, 0 shows numbers and 2 switches Bluetooth. Holding Esc goes home from anywhere. In Notes, numbers still type.
 - [ ] **New keys** ([UX.md](UX.md)): in Notes, type something, then Ctrl + Space opens the taskbar panel and nothing extra is typed; Ctrl + Space again closes it. Try it both ways: Ctrl held down, and Ctrl tapped (the status bar shows Ctrl) then Space. In Wi-Fi, open a network's password box and hold Esc for a second: you land on the home screen. A quick Esc there only goes back to the list.
 - [ ] **Sticker keys** ([KEYS.md](KEYS.md)): Fn+J (PRSC) says "Screenshot saved"; the PNG in ~/Pictures/Screenshots (open it in Files, or copy it off) shows the screen as it was. Fn+J in the Terminal beeps and saves the console. Fn+H (HELP) shows the keys for the screen. Hold Tab (LOCK) for a second: the screen goes off; the next key only turns it back on, on the same screen. Also note: does Fn+J in the Terminal do anything else there (it shouldn't quit the program running)?
-- [ ] **Wi-Fi**: the list of networks shows; the password shows as you type it; Enter joins.
+- [ ] **Wi-Fi**: the list of networks shows; the password shows as you type it; Enter joins. The password now reaches NetworkManager through a private file, not nmcli's command line: after joining, restart, and check it reconnects by itself (the password was saved). A wrong password says so and leaves an already-saved network working. Try a WPA3-only network if you have one.
 - [ ] **Settings**: brightness and volume change, Bluetooth toggles.
 - [ ] **Files**: browse ~, open a .txt (opens in Notes once Notes is installed), Esc goes up a folder.
 - [ ] **Terminal**: Enter opens a console; type `ls`; Ctrl+Q or `exit` comes back to the home screen.
 - [ ] **Update**: says you're on the newest version.
 - [ ] **Dock**: with an HDMI monitor plugged in, Start Dock mode shows the desktop; without one it says No monitor.
 - [ ] **Apps**: Tab > R refreshes the list; you see the installable apps listed.
+- [ ] **First login and SSH**: on a fresh card, `ssh pi@cardputer.local` with `raspberry` is refused (keys only). The Terminal app asks for a new password; after it, `ssh` with the new password works. Ctrl+C at the password prompt on a console ends the login.
+- [ ] **Adding a source**: Apps > Tab > P > Add a GitHub repo asks for your password; a wrong one says "Wrong password" and adds nothing; the right one adds it. Installing and removing apps still needs no password.
 
 ## Installed from Apps
 
@@ -34,11 +36,15 @@ override afterwards with `sudo systemctl revert zeroshell`.
 - [ ] **Camera** (full model): viewfinder opens, a photo saves; Q scans a Wi-Fi QR code. Lite: should say "No camera found".
 - [ ] **IR Remote**: Universal > pick a TV brand, point at a TV, it turns off; learn one button from a real remote and send it back.
 - [ ] **GPS** (needs the Cap LoRa-1262 or a Grove GPS): outdoors, a fix within a few minutes. With no module: "No GPS found" after a few seconds.
-- [ ] **Mesh** (needs the Cap LoRa-1262): turn it on, your node name shows, a message reaches a phone running Meshtastic. Without the cap: should say no radio, not hang.
+- [ ] **Mesh** (needs the Cap LoRa-1262): turn it on, your node name shows, a message reaches a phone running Meshtastic. Without the cap: should say no radio, not hang. A phone on the same Wi-Fi can't open `https://<cardputer>:9443` until **Allow phones**, and can after; **Block phones** or turning the mesh off closes it again.
 - [ ] **Tether**: share your phone's internet over USB or Bluetooth; Wi-Fi off, a page still loads in Terminal (`curl -I example.com`).
 - [ ] **Remote**: sign in to Tailscale with the link or QR, your other devices are listed, SSH to one opens.
 - [ ] **Sync**: shows a device ID; pair with Syncthing on your PC, a note syncs across.
-- [ ] **Car**: USB stick mode builds, then a car stereo (or PC) sees a USB drive with your music; Bluetooth pairs with a speaker.
+- [ ] **Car**: USB stick mode builds, then a car stereo (or PC) sees a USB drive with your music; Bluetooth pairs with a speaker. (The image is now built as `pi`, not root: check it still builds, and that `/var/lib/zeroos/car/music.img` is owned by root.)
+- [ ] **Bluetooth pairing**: pairing a keyboard, headphones and an Xbox pad from Settings still works (the pairing window is now only open for the device you picked, and scanning no longer opens one).
+- [ ] **Remote with an auth key**: signing in to Tailscale with an auth key still works (the key goes to `tailscale up` as a file now).
+- [ ] **Jellyfin**: signing in with a bare server name uses https when the server has it; an `http://` address warns that it's unencrypted and still works; videos and music still play (the token goes to mpv in a file now).
+- [ ] **Bluetooth re-pairing**: a gamepad that lost its pairing pairs again from the Bluetooth app (re-pairing now needs that OK on the device).
 
 ## Remove
 

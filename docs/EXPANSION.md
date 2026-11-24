@@ -52,10 +52,15 @@ and Mesh switches to its chat page:
   are orange. **Tab** switches between chat and the info page (QR code, on/off).
   A message that arrives while you're in another app shows at the top of the
   screen with a beep.
-- **From your phone:** scan the QR code; it opens the Meshtastic web client
-  on the Cardputer (accept the certificate warning once). Or in the
-  Meshtastic app, add a node by IP address (the address under the QR code).
-  The phone and Cardputer need the same Wi-Fi, a phone hotspot, or Tailscale.
+- **From your phone:** on the info page choose **Allow phones**, then scan the
+  QR code; it opens the Meshtastic web client on the Cardputer (accept the
+  certificate warning once). Or in the Meshtastic app, add a node by IP
+  address (the address under the QR code). The phone and Cardputer need the
+  same Wi-Fi, a phone hotspot, or Tailscale. The web client and API have no
+  login, so anyone who reaches them could read your messages, send as you
+  and change the node: until you choose **Allow phones**, they answer only
+  the Cardputer itself and your tailnet (Tailscale works without it). It
+  lasts until the mesh is turned off; **Block phones** ends it sooner.
 - **On a monitor:** in Dock mode, **Open on monitor** opens the web client in
   the browser.
 
@@ -91,7 +96,7 @@ uses its own battery: leave it off when you don't need it **(measure)**.
 | 5 V | An LED-class supply under `/sys/class/leds/` (`ext_5v_out` on M5's image). ZeroShell switches every `*5v*` one; `power-perms` lets it. |
 | `config.txt`, `cmdline.txt` | `enable_uart=1`; no serial console on the UART, so it's free for GPS. |
 | `gpsd` | Reads `/dev/serial0` at 115200 (and USB GPS dongles). Socket-activated: it starts when the GPS app connects and stops reading the receiver when they stop watching. Config: `/etc/default/gpsd`. |
-| `meshtasticd` | Meshtastic's Linux daemon, from Meshtastic's Debian repository (beta channel), installed with the Mesh app ([APPS.md](APPS.md)); the repository's key is checked against `MESHTASTIC_KEY_FPR` in `image/build.sh`. The repository keeps only its newest build, so that is what you get; to stay on one, `sudo apt-mark hold meshtasticd`. Off at boot; the Mesh app starts it (polkit allows `pi` exactly this unit). Radio config: `/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml` (SX1262 on `spidev0.1` at 1 MHz, RESET 26, BUSY 22, IRQ 23, DIO2 as RF switch, 3.0 V TCXO on DIO3), as in Meshtastic's own `lora-cardputer-zero.yaml`. Before every start, `/usr/lib/zeroos/mesh-cap-power` (run as root by the unit) turns on the expansion 5 V and drives P0 of the cap's IO expander (PI4IOE5V6408, I2C 0x43 on `/dev/i2c-1`) high: that is the antenna switch, and the expander forgets it whenever the 5 V goes off. Before Mesh 1.0.2 the TCXO was set to 1.8 V and the antenna switch was never set, so the radio couldn't work. It doesn't use the GPS (it can't read gpsd, and a second reader on the UART would garble gpsd's). It serves the web client on port 9443 and the app API on TCP 4403. |
+| `meshtasticd` | Meshtastic's Linux daemon, from Meshtastic's Debian repository (beta channel), installed with the Mesh app ([APPS.md](APPS.md)); the repository's key is checked against `MESHTASTIC_KEY_FPR` in `image/build.sh`. The repository keeps only its newest build, so that is what you get; to stay on one, `sudo apt-mark hold meshtasticd`. Off at boot; the Mesh app starts it (polkit allows `pi` exactly this unit). Radio config: `/etc/meshtasticd/config.d/zeroos-cap-lora-1262.yaml` (SX1262 on `spidev0.1` at 1 MHz, RESET 26, BUSY 22, IRQ 23, DIO2 as RF switch, 3.0 V TCXO on DIO3), as in Meshtastic's own `lora-cardputer-zero.yaml`. Before every start, `/usr/lib/zeroos/mesh-cap-power` (run as root by the unit) turns on the expansion 5 V and drives P0 of the cap's IO expander (PI4IOE5V6408, I2C 0x43 on `/dev/i2c-1`) high: that is the antenna switch, and the expander forgets it whenever the 5 V goes off. Before Mesh 1.0.2 the TCXO was set to 1.8 V and the antenna switch was never set, so the radio couldn't work. It doesn't use the GPS (it can't read gpsd, and a second reader on the UART would garble gpsd's). It serves the web client on port 9443 and the app API on TCP 4403. Before every start, `/usr/lib/zeroos/mesh-firewall close` adds an nftables table (`inet zeroos_mesh`) that drops those two ports unless they arrive on `lo` or `tailscale0`; `zeroos-mesh-lan.service` (Mesh's **Allow phones**, allowed to `pi` by polkit) empties it, and stopping the mesh removes it. |
 | Chat in ZeroShell | A small client for that API (`hal/meshtastic.cpp`, hand-written protobuf, no library): asks for the node list, reads text messages, sends to the primary channel. |
 
 ## To confirm on hardware

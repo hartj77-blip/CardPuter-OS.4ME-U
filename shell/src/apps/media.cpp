@@ -164,7 +164,8 @@ public:
             shown_title_.clear();
             std::string sub = tab_ == 0   ? fmt("%zu tracks in ~/Music", music_.size())
                               : tab_ == 1 ? fmt("%zu notes in ~/Recordings", notes_.size())
-                              : jf_.signed_in() ? jf_.user + " on " + host_of(jf_.server)
+                              : jf_.signed_in() ? jf_.user + " on " + host_of(jf_.server) +
+                                                    (jf::is_encrypted(jf_.server) ? "" : " (no https)")
                                                 : std::string("Not signed in");
             lv_label_set_text(artist_, sub.c_str());
             if (!listed_playing_.empty() && !input_) rebuild_list();   // clear the play mark
@@ -500,7 +501,10 @@ private:
             ask("User name", jf_.user, false, [this](const std::string& user) {
                 if (user.empty()) return;
                 typed_user_ = user;
-                ask("Password", "", true, [this](const std::string& password) {
+                // An address typed with http:// sends the password as it is.
+                bool plain = typed_server_.find("http://") != std::string::npos;
+                ask(plain ? "Password (sent unencrypted: http)" : "Password", "", true,
+                    [this](const std::string& password) {
                     shell_toast("Signing in...");
                     lv_refr_now(nullptr);
                     JfSession s;
@@ -515,7 +519,9 @@ private:
                     prefs::set_str("jellyfin.user_id", s.user_id);
                     prefs::set_str("jellyfin.token", s.token);
                     stack_.clear();
-                    shell_toast("Signed in as " + s.user);
+                    // No https: say so, so it isn't used on a network nobody trusts.
+                    shell_toast("Signed in as " + s.user +
+                                (jf::is_encrypted(s.server) ? std::string() : std::string(" - not encrypted (http)")));
                     rebuild_list();
                 });
             });

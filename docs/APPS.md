@@ -35,7 +35,7 @@ list is more than 6 hours old. Type to find an app.
 | Source row (top) | Left / Right shows only one source's apps (**All**, then each source, M5Stack's store as **M5Stack**); Tab > S does the same |
 | Tab > U | update every app that has a newer version |
 | Tab > R | look for new apps now |
-| Tab > P | sources: where apps come from, in order (the higher one wins). Tab > K / Tab > J moves the highlighted one up / down; Tab > D removes one (it asks first); **Add a GitHub repo** adds one |
+| Tab > P | sources: where apps come from, in order (the higher one wins). Tab > K / Tab > J moves the highlighted one up / down; Tab > D removes one (it asks first); **Add a GitHub repo** adds one, after your password |
 
 Ctrl and the letter does the same without opening the menu (Ctrl + U updates every app).
 
@@ -84,9 +84,28 @@ Any other repository that publishes the same files works too: add it in
 **Apps > Tab > P > Add a GitHub repo**, or add a line to `/etc/zeroos/apps.sources` (an `owner/repo`,
 or any `https://` address that serves the index).
 
+Adding a source asks for your password (the one you log in with). A source decides what runs as
+root on the device, so it is the one thing in Apps that needs it. Installing, updating, removing
+and reordering don't: they only use sources that are already on the list. Behind the scenes,
+polkit lets the home screen run those jobs without a password, but not `add-source`
+(`image/stage-zeroos/files/90-zeroos.rules`). Apps starts that job with `sudo`, which reads your
+password from a pipe, never from the command line.
+
 **Trust.** An app runs with the same access as the home screen, and installing one runs its
 package's scripts as root. The SHA-256 in the index only proves the download is complete; the
-index comes from the same place. Only add sources you trust.
+index comes from the same place. Once ZeroOS has a release key, this project's two sources must
+sign their index ([UPDATE.md, "Signatures"](UPDATE.md#signatures)). Only add sources you trust.
+
+Other checks on every install:
+
+- **No going back.** Apps never installs an older version than the one already there, so a stale
+  or replayed list can't put back a version with a known hole. `sudo zeroos-apps install-file`
+  still can, if you mean it.
+- **An app's own package source is checked.** An app may add an apt repository for what it needs
+  (Mesh adds Meshtastic's, Remote adds Tailscale's). That repository must name the app's own key
+  (`signed-by=/usr/share/keyrings/zeroos-app-<id>.gpg` or `.asc`), and nothing in it may switch
+  apt's checks off (`trusted=yes`, `allow-insecure` and the like). Otherwise the app isn't
+  installed.
 
 ## M5Stack's app store
 
@@ -116,6 +135,12 @@ What's different from ZeroOS's own apps:
   download is the one M5's list names. Like any app, installing one runs its package's scripts
   as root, and some change system settings (a battery saver that adds a service, apps that add
   you to hardware groups).
+- **They can't replace what's already on the device.** Only apps M5's list marks as reviewed
+  (`"review": {"status": "approved"}`) are offered; one without a review status is left out. An
+  M5 package can't take the name of a package already installed that didn't come from M5's store
+  (`sudo`, `openssh-server`...), or replace, conflict with or break one. Before installing, apt
+  does a dry run, and if it would remove anything but another M5 app, nothing is installed. (Every
+  relation in M5's list today is between M5 apps: an app's old name.)
 - **Some may not work.** They were tested on M5's system with M5's launcher running. An app that
   talks to that launcher, expects its services, or draws somewhere other than the LCD's
   framebuffer won't work here. Most apps (Python with pygame or Pillow, LVGL, SDL) only need the

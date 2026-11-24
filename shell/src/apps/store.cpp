@@ -71,7 +71,7 @@ public:
     }
 
     bool on_back() override {
-        if (page_ == Page::Add) {
+        if (page_ == Page::Add || page_ == Page::Password) {
             show_sources();
             return true;
         }
@@ -88,7 +88,7 @@ public:
     }
 
 private:
-    enum class Page { List, Details, Sources, Add };
+    enum class Page { List, Details, Sources, Add, Password };
 
     bool online() {
         NetStatus n = hal().net();
@@ -205,7 +205,7 @@ private:
                 }
             }
         }
-        defer(page_ == Page::Add ? Page::Sources : page_);
+        defer(page_ == Page::Add || page_ == Page::Password ? Page::Sources : page_);
     }
 
     // Rebuild a page after the current event handler returns.
@@ -220,6 +220,7 @@ private:
             case Page::Details: s->show_details(); break;
             case Page::Sources: s->show_sources(); break;
             case Page::Add: s->show_add(); break;
+            case Page::Password: s->show_password(); break;
         }
     }
 
@@ -542,7 +543,60 @@ private:
                 shell_toast("Already there");
                 return;
             }
-        if (self->start([src] { store::add_source(src); })) self->defer(Page::Sources);
+        if (self->busy()) {
+            shell_toast("Busy: wait for the current job");
+            return;
+        }
+        self->new_source_ = src;
+        self->defer(Page::Password);
+    }
+
+    // Adding a source decides what runs as root (its apps' install scripts),
+    // so it takes the user's password, like sudo would. The other jobs don't.
+    void show_password() {
+        clear();
+        page_ = Page::Password;
+        shell_set_actions({{"Add", 0, "Enter", nullptr}, {"Back", 0, "Esc", nullptr}});
+        lv_obj_t* t = label(root_, "Your password, to add a source", &zs_font_14);
+        lv_obj_set_pos(t, 10, 6);
+        ta_ = lv_textarea_create(root_);
+        lv_textarea_set_one_line(ta_, true);
+        lv_textarea_set_password_mode(ta_, true);
+        lv_textarea_set_max_length(ta_, 256);
+        lv_obj_set_size(ta_, kScreenW - 20, 34);
+        lv_obj_set_pos(ta_, 10, 28);
+        lv_obj_set_style_bg_color(ta_, c(kSurface), 0);
+        lv_obj_set_style_border_color(ta_, c(kAccent), 0);
+        lv_obj_add_event_cb(ta_, on_password, LV_EVENT_READY, this);
+        shell_add_focus(ta_);
+        lv_obj_t* h = label(root_, ("Adding " + store::source_label(new_source_) +
+                                    ". Its apps will be able to run anything on this device.").c_str(),
+                            &zs_font_12, kWarn);
+        lv_obj_set_width(h, kScreenW - 20);
+        lv_label_set_long_mode(h, LV_LABEL_LONG_WRAP);
+        lv_obj_set_pos(h, 10, 68);
+    }
+
+    static void on_password(lv_event_t* e) {
+        auto* self = static_cast<StoreApp*>(lv_event_get_user_data(e));
+        std::string pw = lv_textarea_get_text(self->ta_);
+        lv_textarea_set_text(self->ta_, "");
+        if (pw.empty()) {
+            shell_toast("Type your password");
+            return;
+        }
+        std::string src = self->new_source_;
+        store::AddResult r = store::AddResult::Refused;
+        bool started = self->start([&] { r = store::add_source(src, pw); });
+        std::fill(pw.begin(), pw.end(), '\0');
+        if (!started) return;
+        if (r != store::AddResult::Started) {
+            self->watching_ = false;
+            self->wait_ = 0;
+            shell_toast("Wrong password");
+            return;
+        }
+        self->defer(Page::Sources);
     }
 
     lv_obj_t* root_ = nullptr;
@@ -555,6 +609,7 @@ private:
     std::vector<std::string> sources_;
     std::string sel_id_;
     std::string sel_source_;
+    std::string new_source_;                  // being added: waits for the password
     std::string src_filter_;                  // the list shows only this source's apps ("" = all)
     std::vector<std::string> shown_sources_;  // the sources the Source row offers
     bool focus_source_row_ = false;           // the filter just changed: keep the Source row focused   // the source just moved, to keep it highlighted

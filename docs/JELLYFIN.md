@@ -19,10 +19,31 @@ you signed in through Media, you're still signed in here.
 Open **Jellyfin** and press **Enter** on **Sign in**. Three questions, as in
 Jellyfin's own apps:
 
-- **Server address**: its name or address. `nas` or `192.168.1.20` means
-  `http://nas:8096` (Jellyfin's usual port); type the whole address, such as
-  `https://music.example.com`, for anything else.
+- **Server address**: its name or address. For a bare name such as `nas` or
+  `192.168.1.20`, the Cardputer looks for the server over **https** first
+  (`https://nas`, then `https://nas:8920`, Jellyfin's https port) and only
+  then over plain **http** on Jellyfin's usual port, `http://nas:8096`. Type
+  the whole address, such as `https://music.example.com`, for anything else;
+  an address you type with `http://` is used as it is. Before the password is
+  sent, the Cardputer asks the server for its public info (nothing secret), so
+  a server that moves http to https on the same host is signed in to over https.
 - **User** and **Password**: the ones you use in Jellyfin's own apps.
+
+**Unencrypted servers.** Over plain http, the password, the sign-in token and
+what you play cross the network as they are, readable by anyone on it. The
+password question says *sent unencrypted* when you typed `http://`, and
+signing in says *not encrypted (http)* when the server only answered over
+http. That is fine on your own home network or over Tailscale (which encrypts
+everything, see below); on other networks, give the server https (a reverse
+proxy, or Jellyfin's own https setting) and type its `https://` address. A
+server whose https certificate isn't trusted (self-signed) is refused over
+https: use its http address on a network you trust instead.
+
+Requests don't follow redirects to other addresses, so the token and password
+only ever go to the server you signed in to; a sign-in the server redirects
+says *The server moved; type its full address*. The token is handed to curl
+and mpv in files only you can read, never on a command line other programs
+can see.
 
 The password is used once and not kept. The server gives back a sign-in token,
 which is saved in `~/.config/zeroos/settings.conf` (readable only by you).
