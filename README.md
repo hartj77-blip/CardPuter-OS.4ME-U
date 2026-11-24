@@ -956,8 +956,9 @@ It produces one self-contained HTML file you can open directly. It is also publi
 by the [emu-cardputer-os.4me-u](https://github.com/hartj77-blip/emu-cardputer-os.4me-u) repository,
 which rebuilds it from `main` within an hour of every change.
 
-The page draws the Cardputer Zero to M5's dimension drawing: the power switch on top, Esc and Tab
-beside the screen, and four rows of 11 keys with their Fn (orange) and Sym (blue) legends. Tapping
+The page draws the Cardputer Zero face on, from M5's dimension drawing and product photo: the red
+power slider at the top right, Esc and Tab under the screen's corners, and four rows of 11 keys under
+white legend strips (black, Fn in orange, Sym in blue, coloured sym/shift/fn/ctrl/alt labels). Tapping
 those keys goes through a copy of M5's keyboard driver (`tca8418_keypad_m5stack`: tap Shift, Fn or
 Sym for the next key, tap twice to lock, hold to hold, with the lights), then the same
 `KeyTranslator` the device uses. The computer's own keyboard counts as a USB keyboard plugged in.

@@ -47,99 +47,108 @@ h1 { font: 700 30px/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em;
 h1 span { color: var(--accent); }
 .lede { color: var(--muted); margin: 6px 0 0; max-width: 62ch; }
 
-/* ---- The device. 1 mm = var(--mm); everything is placed in mm from the drawing. */
-.holder { container-type: inline-size; width: 100%; max-width: 720px; padding-top: 3.2%; }
+/* ---- The device, face on, from M5's product photo and dimension drawing
+   (84 x 54 mm). 1 mm = var(--mm); everything is placed in mm. */
+.holder { container-type: inline-size; width: 100%; max-width: 720px; }
 .device {
   --mm: calc(100cqw / 84);
+  --face: #dcdcdb; --face-hi: #ececeb; --face-lo: #c4c4c3;
   position: relative; width: 100%; aspect-ratio: 84 / 54;
-  border-radius: calc(3.2 * var(--mm));
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 18%),
-    linear-gradient(180deg, var(--case-hi), var(--case) 40%, var(--case-lo));
+  border-radius: calc(3 * var(--mm));
+  background: linear-gradient(180deg, var(--face-hi), var(--face) 30%, var(--face) 80%, var(--face-lo));
   box-shadow:
-    0 calc(0.4 * var(--mm)) 0 rgba(255,255,255,0.25) inset,
-    0 calc(-0.5 * var(--mm)) 0 rgba(0,0,0,0.25) inset,
-    0 calc(2 * var(--mm)) calc(6 * var(--mm)) rgba(0,0,0,0.55);
+    inset 0 calc(0.35 * var(--mm)) 0 rgba(255,255,255,0.8),
+    inset 0 calc(-0.45 * var(--mm)) 0 rgba(0,0,0,0.12),
+    0 calc(1.2 * var(--mm)) 0 #8d8f92,
+    0 calc(2.2 * var(--mm)) calc(5 * var(--mm)) rgba(0,0,0,0.55);
   touch-action: none; user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  font-family: "Space Grotesk", var(--font-body);
 }
 .device > * { position: absolute; }
 .mm { left: calc(var(--x) * var(--mm)); top: calc(var(--y) * var(--mm)); width: calc(var(--w) * var(--mm)); height: calc(var(--h) * var(--mm)); }
 
-/* Power switch on the top edge: slide right for on, left for off (M5's guide). */
-.power {
-  top: calc(-1.9 * var(--mm)); left: calc(8.6 * var(--mm));
-  width: calc(7.2 * var(--mm)); height: calc(2.2 * var(--mm));
-  border-radius: calc(0.6 * var(--mm)) calc(0.6 * var(--mm)) 0 0;
-  background: #3b3e42; border: 0; padding: 0; cursor: pointer;
-  box-shadow: 0 0 0 calc(0.25 * var(--mm)) var(--case-lo);
-}
-.power::after {
-  content: ""; position: absolute; top: calc(0.35 * var(--mm)); left: calc(0.4 * var(--mm));
-  width: calc(3 * var(--mm)); height: calc(1.5 * var(--mm)); border-radius: calc(0.4 * var(--mm));
-  background: linear-gradient(180deg, #e8e8e8, #9a9a9a);
-  transition: transform 140ms ease;
-}
-.power[aria-checked="true"]::after { transform: translateX(calc(3.4 * var(--mm))); }
-.power:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.power-label {
-  position: absolute; top: calc(-1.55 * var(--mm)); left: calc(16.6 * var(--mm)); pointer-events: none;
-  font: 700 calc(1.25 * var(--mm)) / 1 var(--font-mono); color: var(--muted); letter-spacing: 0.06em; white-space: nowrap;
-}
-
-/* Front details from the drawing */
-.logo { font: 700 calc(5.2 * var(--mm)) / 1 var(--font-display); color: rgba(30,32,35,0.55); letter-spacing: -0.04em;
-  text-shadow: 0 1px 0 rgba(255,255,255,0.25); }
-.grille { border-radius: calc(1.2 * var(--mm)); background:
-  radial-gradient(circle, rgba(0,0,0,0.45) 32%, transparent 36%) 0 0 / calc(1.3 * var(--mm)) calc(1.3 * var(--mm));
-  box-shadow: inset 0 0 0 calc(0.25 * var(--mm)) rgba(0,0,0,0.18); }
-.slot { border-radius: calc(0.4 * var(--mm)); background: rgba(0,0,0,0.22); box-shadow: inset 0 1px 1px rgba(0,0,0,0.3); }
-.screw { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #c9ccd0, #5d6166 70%); }
-.lens { border-radius: 50%; background: radial-gradient(circle at 38% 34%, #3c5a8a 0 12%, #0b0d12 30%, #22262c 62%, #4b4f55 66%, #7a7e83 70%, transparent 71%); }
-.ir { border-radius: calc(0.8 * var(--mm)); background: linear-gradient(160deg, #4a1414, #1a0606); box-shadow: inset 0 0 0 calc(0.2 * var(--mm)) rgba(0,0,0,0.5); }
-.glass { border-radius: calc(0.9 * var(--mm)); background: #050607;
-  box-shadow: inset 0 0 0 calc(0.3 * var(--mm)) #000, 0 1px 0 rgba(255,255,255,0.25); }
-canvas#screen {
-  position: absolute; image-rendering: pixelated; image-rendering: crisp-edges;
-  background: #000; outline: none; display: block;
-}
+/* Moulded details */
+.emboss { font: 700 calc(6.4 * var(--mm)) / 1 var(--font-display); color: var(--face); letter-spacing: -0.06em;
+  text-shadow: calc(-0.12 * var(--mm)) calc(-0.12 * var(--mm)) 0 #fff, calc(0.14 * var(--mm)) calc(0.14 * var(--mm)) 0 #b3b3b2; }
+.rib { border-radius: calc(0.5 * var(--mm)); background: linear-gradient(90deg, #f3f3f2, #d2d2d1 45%, #bdbdbc);
+  box-shadow: 0 0 0 calc(0.12 * var(--mm)) rgba(0,0,0,0.06); }
+.screw { border-radius: 50%; background: radial-gradient(circle at 42% 38%, #f4f4f4 0 18%, #9a9da1 45%, #5f6266 72%, #c9cbcd 76%, #8b8e91 100%); }
+.mic { border-radius: 999px; background: #1a1a1a; }
+.glass { border-radius: calc(1.1 * var(--mm)); background: #020203;
+  box-shadow: 0 0 0 calc(0.18 * var(--mm)) #9a9a99, inset 0 0 calc(0.4 * var(--mm)) #000; }
+canvas#screen { position: absolute; image-rendering: pixelated; image-rendering: crisp-edges; background: #000; outline: none; display: block; }
 .boot { display: grid; place-items: center; font: 500 calc(1.6 * var(--mm)) var(--font-mono); color: #8d877f; pointer-events: none; }
-.ready .boot { display: none; }
-.off .boot { display: none; }
+.ready .boot, .off .boot { display: none; }
 .off canvas#screen { opacity: 0; }
 
-/* The keyboard: legend strips above each row, keys as small black pills */
-.strip { background: var(--deck); border-radius: calc(0.5 * var(--mm)); box-shadow: inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.18); }
-.legend {
-  display: flex; align-items: center; justify-content: center; gap: calc(0.45 * var(--mm));
-  pointer-events: none; white-space: nowrap; line-height: 1;
+/* Stickers */
+.sticker { background: #fbfbfb; border-radius: calc(1 * var(--mm)); box-shadow: 0 0 0 calc(0.1 * var(--mm)) rgba(0,0,0,0.08); overflow: hidden; }
+.sticker .t { position: absolute; left: 0; right: 0; text-align: center; color: #111; line-height: 1; white-space: nowrap; }
+.brand1 { top: calc(1.3 * var(--mm)); font: 600 calc(1.45 * var(--mm)) var(--font-body); letter-spacing: 0.04em; }
+.brand2 { top: calc(3.1 * var(--mm)); font: 800 calc(3.2 * var(--mm)) var(--font-display); letter-spacing: 0.02em; }
+.corner { position: absolute; width: calc(1.2 * var(--mm)); height: calc(1.2 * var(--mm)); border: calc(0.3 * var(--mm)) solid #c21a8a; }
+.bar { position: absolute; left: 0; right: 0; bottom: 0; height: calc(3.2 * var(--mm)); background: #111;
+  border-radius: calc(0.8 * var(--mm)) calc(0.8 * var(--mm)) 0 0; color: #fff;
+  display: flex; align-items: flex-end; justify-content: space-between; padding: 0 calc(0.9 * var(--mm)) calc(0.45 * var(--mm));
+  font: 700 calc(1.45 * var(--mm)) / 1 var(--font-display); letter-spacing: 0.02em; }
+.bar .icons { position: absolute; top: calc(0.45 * var(--mm)); left: calc(0.9 * var(--mm)); right: calc(0.9 * var(--mm)); display: flex; justify-content: space-between; align-items: center; }
+.bar .pip { width: calc(0.8 * var(--mm)); height: calc(0.8 * var(--mm)); border-radius: 50%; background: #fff; }
+.bar .dash { width: calc(3 * var(--mm)); height: calc(0.8 * var(--mm)); border-radius: 999px; background: #fff; }
+.pw-title { top: calc(6.6 * var(--mm)); font: 800 calc(2.1 * var(--mm)) var(--font-display); }
+.pw-sub { top: calc(8.7 * var(--mm)); font: 600 calc(1.1 * var(--mm)) var(--font-body); }
+.usb { top: calc(11 * var(--mm)); font: 700 calc(1.25 * var(--mm)) / 1.15 var(--font-display); text-align: right !important; padding-right: calc(3.6 * var(--mm)); }
+.usb b { color: #1b9b4b; }
+.chg { top: calc(14.9 * var(--mm)); font: 700 calc(1.15 * var(--mm)) / 1.05 var(--font-display); text-align: right !important; padding-right: calc(0.9 * var(--mm)); }
+.chg .r { color: #d21f1f; }
+.bracket { position: absolute; right: calc(1 * var(--mm)); top: calc(10.8 * var(--mm)); width: calc(2 * var(--mm)); height: calc(3.4 * var(--mm));
+  border: calc(0.35 * var(--mm)) solid #111; border-left: 0; border-radius: 0 calc(0.6 * var(--mm)) calc(0.6 * var(--mm)) 0; }
+
+/* Power switch: a red slider on the right sticker. Right = on (M5's guide). */
+.power { border: 0; padding: 0; cursor: pointer; border-radius: calc(0.7 * var(--mm)); background: #2a2a2a;
+  box-shadow: inset 0 calc(0.2 * var(--mm)) calc(0.4 * var(--mm)) #000; }
+.power::after {
+  content: ""; position: absolute; top: calc(0.3 * var(--mm)); left: calc(0.3 * var(--mm));
+  width: calc(2.6 * var(--mm)); height: calc(3.6 * var(--mm)); border-radius: calc(0.6 * var(--mm));
+  background: linear-gradient(90deg, #a83a20, #e35a33 45%, #b8441f);
+  box-shadow: inset 0 0 0 calc(0.12 * var(--mm)) rgba(0,0,0,0.25), 0 calc(0.15 * var(--mm)) calc(0.3 * var(--mm)) rgba(0,0,0,0.5);
+  transition: transform 140ms ease;
 }
-.legend .f { font: 700 calc(1.12 * var(--mm)) var(--font-mono); color: var(--fn); }
-.legend .m { font: 700 calc(1.5 * var(--mm)) var(--font-mono); color: #f3f3f3; }
-.legend .m.word { font-size: calc(1.15 * var(--mm)); letter-spacing: 0.02em; }
-.legend .s { font: 700 calc(1.25 * var(--mm)) var(--font-mono); color: var(--sym); }
-.side-legend { justify-content: center; }
-.side-legend .m { color: #1f2124; } .side-legend .f { color: #b4520c; }
-.key {
-  border: 0; padding: 0; background: transparent; cursor: pointer;
-  display: grid; place-items: center;
-}
+.power[aria-checked="true"]::after { transform: translateX(calc(1.6 * var(--mm))); }
+.power:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.onpill { border-radius: 999px; background: #d63a1f; color: #fff; display: flex; align-items: center; justify-content: center; gap: calc(0.3 * var(--mm));
+  font: 800 calc(1.6 * var(--mm)) / 1 var(--font-display); pointer-events: none; }
+.onpill i { font-style: normal; display: grid; place-items: center; width: calc(2.1 * var(--mm)); height: calc(2.1 * var(--mm)); border-radius: 50%; background: #fff; color: #d63a1f; font-size: calc(1.3 * var(--mm)); }
+
+/* Keyboard: white legend strips, black pill keys below them */
+.strip { background: #fbfbfb; border-radius: calc(0.25 * var(--mm)); box-shadow: 0 0 0 calc(0.08 * var(--mm)) rgba(0,0,0,0.08); }
+.legend { display: flex; align-items: center; justify-content: center; gap: calc(0.25 * var(--mm)); pointer-events: none; white-space: nowrap; line-height: 1; }
+.legend .f { font: 700 calc(1.5 * var(--mm)) var(--font-display); color: #f26522; display: inline-flex; align-items: center; }
+.legend .f.st { flex-direction: column; font-size: calc(0.95 * var(--mm)); line-height: 0.95; }
+.legend .f.big { font-size: calc(1.7 * var(--mm)); }
+.legend .m { font: 800 calc(2.6 * var(--mm)) var(--font-display); color: #0c0c0c; }
+.legend .m.small { font-size: calc(1.3 * var(--mm)); }
+.legend .s { font: 800 calc(1.9 * var(--mm)) var(--font-display); color: #1f6fb8; }
+.legend .sp { display: inline-block; width: calc(3.2 * var(--mm)); height: calc(0.9 * var(--mm)); border: calc(0.35 * var(--mm)) solid #0c0c0c; border-top: 0; margin-top: calc(0.6 * var(--mm)); }
+.chiplab { display: grid; place-items: center; border-radius: calc(0.2 * var(--mm)); font: 700 calc(1.55 * var(--mm)) / 1 var(--font-display); pointer-events: none; transition: box-shadow 80ms; }
+.chiplab.sym { background: #2a6db5; color: #fff; } .chiplab.shift { background: #8e1ea0; color: #fff; }
+.chiplab.fn { background: #f26522; color: #fff; } .chiplab.ctrl { background: #f6c500; color: #111; } .chiplab.alt { background: #35c99a; color: #111; }
+/* The modifier's state, as M5's guide describes its light: on while held,
+   slow blink after one tap, fast blink when locked. */
+.chiplab.on { box-shadow: 0 0 0 calc(0.3 * var(--mm)) #fff, 0 0 calc(1.2 * var(--mm)) calc(0.3 * var(--mm)) #ffb347; }
+.chiplab.blink { animation: chipblink 900ms steps(1) infinite; }
+.chiplab.fast { animation: chipblink 240ms steps(1) infinite; }
+@keyframes chipblink { 0% { box-shadow: 0 0 0 calc(0.3 * var(--mm)) #fff, 0 0 calc(1.2 * var(--mm)) calc(0.3 * var(--mm)) #ffb347; } 50% { box-shadow: none; } }
+.key { border: 0; padding: 0; background: transparent; cursor: pointer; display: grid; place-items: center; }
 .key::before {
-  content: ""; width: calc(4.7 * var(--mm)); height: calc(2.6 * var(--mm)); border-radius: 999px;
-  background: linear-gradient(180deg, #2a2c30, var(--key) 55%);
-  box-shadow: 0 calc(0.35 * var(--mm)) 0 #000, 0 calc(0.5 * var(--mm)) calc(0.6 * var(--mm)) rgba(0,0,0,0.4),
-    inset 0 1px 0 rgba(255,255,255,0.12);
+  content: ""; width: calc(4.8 * var(--mm)); height: calc(2.35 * var(--mm)); border-radius: 999px;
+  background: radial-gradient(ellipse at 50% 30%, #3a3a3c, #121213 60%);
+  box-shadow: 0 calc(0.3 * var(--mm)) 0 #000, 0 calc(0.45 * var(--mm)) calc(0.5 * var(--mm)) rgba(0,0,0,0.35);
   transition: transform 50ms, box-shadow 50ms;
 }
-.key.down::before { transform: translateY(calc(0.3 * var(--mm))); background: #050506;
-  box-shadow: 0 calc(0.05 * var(--mm)) 0 #000, inset 0 1px 2px rgba(0,0,0,0.8); }
+.key.down::before { transform: translateY(calc(0.25 * var(--mm))); background: #0a0a0a; box-shadow: 0 calc(0.05 * var(--mm)) 0 #000; }
 .key:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
-.led { border-radius: 50%; background: #3a2a1a; box-shadow: inset 0 0 1px #000; }
-.led.on { background: #ffb347; box-shadow: 0 0 calc(0.9 * var(--mm)) #ff9d2e, inset 0 0 1px #fff; }
-.led.blink { animation: blink 900ms steps(1) infinite; }
-.led.fast { animation: blink 240ms steps(1) infinite; }
-@keyframes blink { 0% { background: #ffb347; box-shadow: 0 0 calc(0.9 * var(--mm)) #ff9d2e; } 50% { background: #3a2a1a; box-shadow: none; } }
-@media (prefers-reduced-motion: reduce) { .led.blink, .led.fast { animation-duration: 2s; } .key::before, .power::after { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .chiplab.blink, .chiplab.fast { animation-duration: 2s; } .key::before, .power::after { transition: none; } }
 
 .status { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font: 500 12px var(--font-mono); color: var(--faint); }
 .status b { color: var(--muted); font-weight: 500; }
@@ -216,22 +225,37 @@ a { color: #ff9b6e; }
 
     <div class="holder">
       <div class="device" id="device">
-        <span class="power-label">POWER</span>
-        <button class="power" id="power" role="switch" aria-checked="true" aria-label="Power switch"></button>
+        <span class="emboss mm" style="--x:2.2;--y:1.6;--w:13;--h:7">M5</span>
+        <span class="rib mm" style="--x:16.4;--y:0.9;--w:2;--h:24.6"></span>
+        <span class="rib mm" style="--x:65.4;--y:0.9;--w:2;--h:24.6"></span>
 
-        <span class="logo mm" style="--x:3;--y:3.2;--w:11;--h:6">M5</span>
-        <span class="grille mm" style="--x:1.6;--y:11.2;--w:13.8;--h:8.6" aria-hidden="true"></span>
-        <span class="screw mm" style="--x:11.2;--y:23;--w:2.6;--h:2.6"></span>
-        <span class="slot mm" style="--x:17.4;--y:1.6;--w:1.9;--h:22.8"></span>
-        <span class="slot mm" style="--x:65.2;--y:1.6;--w:1.9;--h:22.8"></span>
-        <span class="slot mm" style="--x:81.2;--y:1.6;--w:1.5;--h:8"></span>
-        <span class="ir mm" style="--x:68.8;--y:2.6;--w:4.6;--h:4.8" title="IR window"></span>
-        <span class="lens mm" style="--x:67.6;--y:10.8;--w:6.4;--h:6.4" title="Camera"></span>
-        <span class="screw mm" style="--x:78.4;--y:23;--w:2.6;--h:2.6"></span>
+        <div class="sticker mm" style="--x:0.9;--y:11.5;--w:14.4;--h:11.2" aria-hidden="true">
+          <span class="corner" style="left:4%;top:5%;border-right:0;border-bottom:0"></span>
+          <span class="corner" style="right:4%;top:5%;border-left:0;border-bottom:0"></span>
+          <span class="corner" style="left:4%;top:52%;border-right:0;border-top:0"></span>
+          <span class="corner" style="right:4%;top:52%;border-left:0;border-top:0"></span>
+          <span class="t brand1">CARDPUTER</span>
+          <span class="t brand2">ZERO</span>
+          <div class="bar"><span class="icons"><span class="pip"></span><span class="dash"></span></span><span>ESC</span><span>HOME</span></div>
+        </div>
+        <span class="mic mm" style="--x:8.3;--y:23.1;--w:0.7;--h:2.6"></span>
+        <span class="screw mm" style="--x:11.4;--y:22.7;--w:2.5;--h:2.5"></span>
 
-        <span class="glass mm" style="--x:20.4;--y:2.2;--w:43.6;--h:23.9"></span>
-        <canvas id="screen" class="mm" width="320" height="170" style="--x:22.2;--y:3.6;--w:40;--h:21.25" tabindex="0" aria-label="ZeroOS screen. Type on your keyboard, or tap the keys below."></canvas>
-        <div class="boot mm" style="--x:22.2;--y:3.6;--w:40;--h:21.25">Booting ZeroOS…</div>
+        <div class="sticker mm" style="--x:68.3;--y:1.1;--w:14.7;--h:21.6" aria-hidden="true">
+          <span class="t pw-title">POWER</span>
+          <span class="t pw-sub">SWITCH</span>
+          <span class="t usb">USB<br><b>C2</b></span>
+          <span class="bracket"></span>
+          <span class="t chg"><span class="r">5V</span> &nbsp;CHG <span class="r">◀</span><br>ONLY&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+          <div class="bar"><span class="icons"><span class="dash"></span><span class="pip"></span></span><span>L🔒CK</span><span>TAB</span></div>
+        </div>
+        <button class="power mm" id="power" role="switch" aria-checked="true" aria-label="Power switch" title="Power switch" style="--x:69.1;--y:2.2;--w:4.8;--h:4.2"></button>
+        <span class="onpill mm" style="--x:74.6;--y:2.7;--w:5.6;--h:3.1"><i>➜</i>ON</span>
+        <span class="screw mm" style="--x:68.9;--y:12.5;--w:2.5;--h:2.5"></span>
+
+        <span class="glass mm" style="--x:20.5;--y:2.8;--w:42.9;--h:22.7"></span>
+        <canvas id="screen" class="mm" width="320" height="170" style="--x:21.95;--y:3.4;--w:40;--h:21.25" tabindex="0" aria-label="ZeroOS screen. Type on your keyboard, or tap the keys below."></canvas>
+        <div class="boot mm" style="--x:21.95;--y:3.4;--w:40;--h:21.25">Booting ZeroOS…</div>
         <!-- keys, strips and LEDs are added by the script -->
       </div>
     </div>
@@ -261,7 +285,7 @@ a { color: #ff9b6e; }
       <p>ZeroOS is an operating system for the M5Stack Cardputer Zero: Debian Linux underneath, with a home screen made for its 320 × 170 screen and keyboard. No mouse, no touch: everything is done from the keys. This page runs the same code as the device, with pretend hardware (battery, Wi-Fi, sensors and sound are made up).</p>
 
       <h2>1. Turn it on</h2>
-      <p>The <strong>power switch</strong> is on the top edge. Slide it right for on, left for off. Off and on again starts fresh, like the real thing.</p>
+      <p>The <strong>power switch</strong> is the red slider at the top right, above <kbd>tab</kbd>. Slide it right for on, left for off. Off and on again starts fresh, like the real thing.</p>
 
       <h2>2. Two ways to type</h2>
       <ul>
@@ -299,7 +323,7 @@ a { color: #ff9b6e; }
 
     <section class="pane" id="pane-keys" role="tabpanel">
       <h2>On the device</h2>
-      <p>Four rows of 11 keys, with <kbd>esc</kbd> and <kbd>tab</kbd> beside the screen. Each key's labels are printed on the strip above it: white on its own, <span style="color:var(--fn)">orange</span> with <kbd class="fn">fn</kbd>, <span style="color:var(--sym)">blue</span> with <kbd class="sym">sym</kbd>.</p>
+      <p>Four rows of 11 keys, with <kbd>esc</kbd> (HOME when held) and <kbd>tab</kbd> (LOCK when held) under the corners of the screen. Each key's labels are printed on the white strip above it: black on its own, <span style="color:var(--fn)">orange</span> with <kbd class="fn">fn</kbd>, <span style="color:var(--sym)">blue</span> with <kbd class="sym">sym</kbd>.</p>
       <table>
         <tr><th>Key</th><th>What it does</th></tr>
         <tr><td><kbd class="fn">fn</kbd>+<kbd>F</kbd> <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd></td><td>Up, Left, Down, Right</td></tr>
@@ -393,19 +417,22 @@ a { color: #ff9b6e; }
   // fn code, fn legend, sym legend]. Codes are Linux key codes from M5's
   // cardputerzero overlay: keymap (plain), keymap1 (Sym), keymap2 (Fn).
   // 0 = the key does nothing on that layer.
+  // [label, base code, sym code, fn code, fn legend, sym legend] as printed on
+  // the strips (M5's product photo). An fn legend "A|B" is printed stacked.
   const ROWS = [
     [["1",2,26,59,"F1","!"],["2",3,27,60,"F2","@"],["3",4,39,61,"F3","#"],["4",5,40,62,"F4","$"],["5",6,41,63,"F5","%"],
      ["6",7,43,64,"F6","^"],["7",8,51,65,"F7","&"],["8",9,52,66,"F8","*"],["9",10,53,67,"F9","("],["0",11,94,68,"F10",")"],
-     ["⌫",14,14,111,"DEL",""]],
-    [["sym","SYM"],["q",16,55,164,"⏯","~"],["w",17,69,165,"⏮","`"],["e",18,70,163,"⏭","_"],["r",19,71,19,"","-"],["t",20,72,20,"","+"],
-     ["y",21,73,21,"","="],["u",22,74,224,"☀−","["],["i",23,75,225,"☀+","]"],["o",24,76,87,"F11","{"],["p",25,77,88,"F12","}"]],
-    [["shift","SHIFT"],["a",30,79,113,"MUTE",";"],["s",31,80,114,"VOL−",":"],["d",32,81,115,"VOL+","'"],["f",33,0,103,"▲",""],
-     ["g",34,82,34,"","\""],["h",35,83,138,"HELP","<"],["j",36,85,99,"PRSC",">"],["k",37,86,102,"HOME","\\"],["l",38,89,104,"PGUP","|"],
-     ["↵",28,28,28,"",""]],
+     ["⬅",14,14,111,"DEL",""]],
+    [["sym","SYM"],["q",16,55,164,"▶‖","~"],["w",17,69,165,"◀◀","`"],["e",18,70,163,"▶▶","_"],["r",19,71,19,"","−"],["t",20,72,20,"","+"],
+     ["y",21,73,21,"","="],["u",22,74,224,"☼","["],["i",23,75,225,"☀","]"],["o",24,76,87,"F11","{"],["p",25,77,88,"F12","}"]],
+    [["shift","SHIFT"],["a",30,79,113,"◁×",";"],["s",31,80,114,"◁",":"],["d",32,81,115,"◁))","'"],["f",33,0,103,"▲",""],
+     ["g",34,82,34,"","\u201c"],["h",35,83,138,"HE|LP","<"],["j",36,85,99,"PRSC",">"],["k",37,86,102,"HO|ME","\\"],["l",38,89,104,"PG|UP","|"],
+     ["↵OK",28,28,28,"",""]],
     [["fn","FN"],["ctrl",29,29,29,"",""],["alt",56,56,56,"",""],["z",44,0,105,"◀",""],["x",45,0,108,"▼",""],["c",46,0,106,"▶",""],
-     ["v",47,90,47,"",","],["b",48,91,110,"INS","."],["n",49,92,107,"END","/"],["m",50,93,109,"PGDN","?"],["space",57,57,57,"",""]],
+     ["v",47,90,47,"",","],["b",48,91,110,"INS","."],["n",49,92,107,"END","/"],["m",50,93,109,"PG|DN","?"],["space",57,57,57,"",""]],
   ];
-  const ESC = ["esc", 1, 1, 1, "HOME", ""], TAB = ["tab", 15, 15, 15, "LOCK", ""];
+  const ESC = ["esc", 1, 1, 1, "", ""], TAB = ["tab", 15, 15, 15, "", ""];
+  const CHIPS = { sym: "sym", shift: "shift", fn: "fn", ctrl: "ctrl", alt: "alt" };
 
   // M5's driver (tca8418_keypad_m5stack + tca8418_fsm), step for step.
   // Shift, Fn and Sym each run this state machine; the layer is on from
@@ -414,11 +441,11 @@ a { color: #ff9b6e; }
   const S = { IDLE: 0, ACTIVE: 1, WAIT: 2, ONESHOT: 3, HOLD: 4, LOCKED: 5, LOCKED_WAIT: 6, LOCKED_LEAVE: 7 };
   const E = { PRES: 0, RELE: 1, OTHER: 2, TIMEOUT: 3 };
   const mods = {
-    SYM:   { code: 0x17f, state: 0, layer: false, timer: 0, led: null },
-    SHIFT: { code: 42,    state: 0, layer: false, timer: 0, led: null },
-    FN:    { code: 0x185, state: 0, layer: false, timer: 0, led: null },
+    SYM:   { chip: "sym", code: 0x17f, state: 0, layer: false, timer: 0, led: null },
+    SHIFT: { chip: "shift", code: 42,    state: 0, layer: false, timer: 0, led: null },
+    FN:    { chip: "fn", code: 0x185, state: 0, layer: false, timer: 0, led: null },
   };
-  function setLed(m, how) { if (m.led) m.led.className = "led mm" + (how ? " " + how : ""); }
+  function setLed(m, how) { if (m.led) m.led.className = "chiplab mm " + m.chip + (how ? " " + how : ""); }
   function entry(m, s) {
     if (s === S.ACTIVE) { m.layer = true; evdev(0, m.code, 1); setLed(m, "on"); }
     else if (s === S.ONESHOT) setLed(m, "blink");
@@ -479,15 +506,23 @@ a { color: #ff9b6e; }
   // Build the keys, strips and LEDs from the drawing's measurements (mm).
   const KEYS = [];     // index -> {k, el}
   function place(el, x, y, w, h) { el.classList.add("mm"); el.style.cssText += `--x:${x};--y:${y};--w:${w};--h:${h}`; }
-  function legend(k, extra) {
+  function legend(k) {
     const d = document.createElement("div");
-    d.className = "legend" + (extra ? " " + extra : "");
+    d.className = "legend";
     const f = k[4] || "", s = k[5] || "";
-    if (f) { const e = document.createElement("span"); e.className = "f"; e.textContent = f; d.appendChild(e); }
+    if (f) {
+      const e = document.createElement("span");
+      e.className = "f" + (f.includes("|") ? " st" : "") + (f === "☀" || f === "▲" || f === "◀" || f === "▼" || f === "▶" ? " big" : "");
+      if (f.includes("|")) f.split("|").forEach((part) => { const x = document.createElement("span"); x.textContent = part; e.appendChild(x); });
+      else e.textContent = f;
+      d.appendChild(e);
+    }
     const m = document.createElement("span");
-    m.className = "m" + (k[0].length > 1 && k[0] !== "⌫" ? " word" : "");
-    m.textContent = k[0].length === 1 ? k[0].toUpperCase() : k[0];
-    d.appendChild(m);
+    m.className = "m";
+    if (k[0] === "space") { m.className = "sp"; }
+    else if (k[0] === "↵OK") { m.textContent = "↵"; const o = document.createElement("span"); o.className = "m small"; o.textContent = "OK"; d.appendChild(m); m.after(o); }
+    else m.textContent = k[0].toUpperCase();
+    if (!m.parentNode) d.appendChild(m);
     if (s) { const e = document.createElement("span"); e.className = "s"; e.textContent = s; d.appendChild(e); }
     return d;
   }
@@ -495,36 +530,34 @@ a { color: #ff9b6e; }
     const i = KEYS.length;
     const b = document.createElement("button");
     b.type = "button"; b.className = "key"; b.dataset.i = i; b.tabIndex = -1;
-    b.setAttribute("aria-label", k[1] && typeof k[1] === "string" ? k[0] : k[0]);
-    place(b, (cx - 3.7).toFixed(2), (cy - 2.6).toFixed(2), 7.4, 5.2);
+    b.setAttribute("aria-label", k[0] === "↵OK" ? "enter" : k[0] === "⬅" ? "backspace" : k[0]);
+    place(b, (cx - 3.75).toFixed(2), (cy - 3.1).toFixed(2), 7.5, 6.2);
     device.appendChild(b);
     KEYS.push({ k, el: b });
     return b;
   }
-  const STRIPS_Y = [26.5, 32.9, 39.5, 46.1], ROWS_Y = [30.9, 37.3, 44.0, 50.4];
-  STRIPS_Y.forEach((y) => { const s = document.createElement("div"); s.className = "strip"; place(s, 0.9, y, 82.2, 2.7); device.appendChild(s); });
+  const STRIPS_Y = [26.6, 33.3, 39.8, 46.3], ROWS_Y = [31.0, 37.5, 44.0, 50.5];
+  STRIPS_Y.forEach((y) => { const s = document.createElement("div"); s.className = "strip"; place(s, 1.1, y, 81.9, 2.7); device.appendChild(s); });
   ROWS.forEach((row, r) => {
     row.forEach((k, c) => {
-      const cx = 4.4 + c * 7.47;
-      const lg = legend(k);
-      place(lg, (cx - 3.7).toFixed(2), STRIPS_Y[r], 7.4, 2.7);
-      device.appendChild(lg);
-      addKey(k, cx, ROWS_Y[r]);
-      if (typeof k[1] === "string") {   // a modifier: its light sits at the left of its strip
-        const led = document.createElement("span");
-        place(led, 0.95, STRIPS_Y[r] + 0.95, 0.8, 0.8);
-        led.className = "led mm";
-        device.appendChild(led);
-        mods[k[1]].led = led;
+      const cx = 4.2 + c * 7.53;
+      if (CHIPS[k[0]]) {   // sym, shift, fn, ctrl, alt: a coloured label
+        const chip = document.createElement("span");
+        chip.className = "chiplab " + CHIPS[k[0]];
+        chip.textContent = k[0];
+        place(chip, (cx - 2.5).toFixed(2), STRIPS_Y[r] + 0.2, 5, 2.3);
+        device.appendChild(chip);
+        if (typeof k[1] === "string") mods[k[1]].led = chip;
+      } else {
+        const lg = legend(k);
+        place(lg, (cx - 3.75).toFixed(2), STRIPS_Y[r], 7.5, 2.7);
+        device.appendChild(lg);
       }
+      addKey(k, cx, ROWS_Y[r]);
     });
   });
-  [[ESC, 4.6], [TAB, 79.5]].forEach(([k, cx]) => {
-    const lg = legend(k, "side-legend");
-    place(lg, (cx - 3.7).toFixed(2), 20.6, 7.4, 2.2);
-    device.appendChild(lg);
-    addKey(k, cx, 24.5);
-  });
+  addKey(ESC, 4.2, 24.6);    // under the CARDPUTER ZERO sticker (ESC / HOME)
+  addKey(TAB, 79.6, 24.6);   // under the power sticker (LOCK / TAB)
 
   function keyEvent(i, pressed, fromReplay) {
     const { k, el } = KEYS[i];
