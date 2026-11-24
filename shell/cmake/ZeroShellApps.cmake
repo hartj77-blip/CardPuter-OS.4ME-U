@@ -69,6 +69,24 @@ function(zs_link_lvgl target)
   endif()
 endfunction()
 
+# With ZS_BACKEND=web, build <target> as the browser simulator: one
+# self-contained zeroshell.js that web/template.html loads (web/build.sh).
+# The apps repository calls this too, to build the simulator with every app.
+function(zs_web_link target)
+  if(NOT ZS_BACKEND STREQUAL "web")
+    return()
+  endif()
+  if(NOT EMSCRIPTEN)
+    message(FATAL_ERROR "ZS_BACKEND=web needs Emscripten: emcmake cmake ...")
+  endif()
+  set_target_properties(${target} PROPERTIES SUFFIX ".js")
+  target_link_options(${target} PRIVATE
+    -sMODULARIZE=1 -sEXPORT_NAME=createZeroShell -sENVIRONMENT=web
+    -sSINGLE_FILE=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0
+    -sEXPORTED_FUNCTIONS=_main,_zs_web_evdev,_zs_web_power,_zs_web_frame,_zs_web_take_dirty,_zs_web_hdmi,_zs_web_pose,_zs_web_app_count,_zs_web_app_id,_zs_web_app_name,_zs_web_current_app
+    -sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString)
+endfunction()
+
 # Build every app registered with zs_app(): into <target>, or as modules.
 # <shell-src> is the base OS's shell/src (for the headers).
 function(zs_apps_build target shell_src)
