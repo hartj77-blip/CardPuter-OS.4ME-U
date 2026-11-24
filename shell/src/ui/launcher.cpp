@@ -1,5 +1,6 @@
 // Home (docs/UX.md): a search box, the pinned apps on 1 to 7, what you opened
-// last, and All apps. Typing searches apps, settings and actions; Enter (or
+// last, and All apps, with what is playing, the time and the date in the
+// corner. Typing searches apps, settings and actions; Enter (or
 // the result's number) opens the one in focus.
 //
 //   home      letters search; 1-7 pinned; Up/Down/Left/Right move; Enter opens;
@@ -12,6 +13,7 @@
 // (home.pinned, home.recent: app ids, comma-separated).
 #include <algorithm>
 #include <cctype>
+#include <ctime>
 #include <functional>
 #include <map>
 #include <sstream>
@@ -19,6 +21,7 @@
 #include "hal/hal.h"
 #include "platform/keys.h"
 #include "ui/list_view.h"
+#include "ui/player.h"
 #include "ui/power.h"
 #include "ui/prefs.h"
 #include "ui/quick_panel.h"
@@ -37,6 +40,8 @@ constexpr int kPins = 7;           // keys 1..7
 constexpr int kPinW = kScreenW / kPins;
 constexpr int kSearchH = 22, kPinsY = kSearchH + 5, kPinsH = 36, kRecentY = kPinsY + kPinsH + 2;
 constexpr int kRowH = 19, kRecents = 5;
+// Recent and All apps take the left of the screen; the clock, the bottom right.
+constexpr int kRowW = 150;   // room for a 16-letter name
 // A fresh ZeroOS pins the first of these that are installed, then Settings.
 const char* const kDefaultPins[] = {"terminal", "files", "notes", "media", "remote", "camera", "apps"};
 
@@ -325,6 +330,32 @@ public:
         show_home();
     }
 
+    // Home's clock, once a minute, and what is playing.
+    void tick() override {
+        if (!time_) return;
+        PlaybackState pb = hal().playback();
+        std::string playing;
+        if (!pb.path.empty()) {
+            const QueueItem* q = player_current();
+            playing = std::string(pb.paused ? LV_SYMBOL_PAUSE "  " : LV_SYMBOL_PLAY "  ") +
+                      (q ? q->title : pb.path.substr(pb.path.rfind('/') + 1));
+        }
+        if (playing != shown_playing_) {
+            shown_playing_ = playing;
+            lv_label_set_text(playing_, playing.c_str());
+        }
+        time_t now = time(nullptr);
+        tm lt{};
+        localtime_r(&now, &lt);
+        if (lt.tm_min == shown_minute_) return;
+        shown_minute_ = lt.tm_min;
+        char buf[32];
+        strftime(buf, sizeof buf, "%H:%M", &lt);
+        lv_label_set_text(time_, buf);
+        strftime(buf, sizeof buf, "%a %-d %b", &lt);
+        lv_label_set_text(date_, buf);
+    }
+
     bool on_key(uint32_t key) override {
         if (all_apps_) {
             if (!pin_pending_.empty()) {   // Tab, P: waiting for 1 to 7
@@ -390,6 +421,7 @@ private:
         open_ids_.clear();
         row_runs_.clear();
         results_.reset();   // their rows went with the screen
+        time_ = date_ = playing_ = nullptr;
         all_.reset();
         box_ = nullptr;
         all_head_ = nullptr;
@@ -473,7 +505,7 @@ private:
         rows_box_ = lv_obj_create(root_);
         style_plain(rows_box_);
         lv_obj_set_pos(rows_box_, 4, kRecentY + 14);
-        lv_obj_set_size(rows_box_, kScreenW - 8, kBodyH - kRecentY - 14);
+        lv_obj_set_size(rows_box_, kRowW, kBodyH - kRecentY - 14);
         lv_obj_set_flex_flow(rows_box_, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_style_pad_row(rows_box_, 1, 0);
         lv_obj_set_scrollbar_mode(rows_box_, LV_SCROLLBAR_MODE_OFF);
@@ -491,6 +523,21 @@ private:
         }
         add_row(ZS_ICON_GRID, 0x5e6c7b, "All apps", "",
                 [this] { lv_async_call(all_apps_cb, this); }, std::to_string(app_registry().size()));
+
+        // The time and date, in the corner under the pins.
+        time_ = label(root_, "", &zs_font_28, kText);
+        lv_obj_align(time_, LV_ALIGN_BOTTOM_RIGHT, -8, -18);
+        date_ = label(root_, "", &zs_font_12, kGrey7);
+        lv_obj_align(date_, LV_ALIGN_BOTTOM_RIGHT, -9, -3);
+        // Above them, the track playing or paused (none: nothing).
+        playing_ = label(root_, "", &zs_font_12, kGrey7);
+        lv_obj_set_size(playing_, kScreenW - kRowW - 14, 14);
+        lv_label_set_long_mode(playing_, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_align(playing_, LV_TEXT_ALIGN_RIGHT, 0);
+        lv_obj_align(playing_, LV_ALIGN_BOTTOM_RIGHT, -9, -50);
+        shown_playing_.clear();
+        shown_minute_ = -1;
+        tick();
 
         if (!pin_objs_.empty()) lv_group_focus_obj(pin_objs_[std::min<size_t>(pin_sel_, pin_objs_.size() - 1)]);
         set_home_actions();
@@ -513,7 +560,7 @@ private:
                  std::function<void()> run, const std::string& value = "") {
         lv_obj_t* row = lv_obj_create(rows_box_);
         style_row(row);
-        lv_obj_set_size(row, kScreenW - 8, kRowH);
+        lv_obj_set_size(row, kRowW, kRowH);
         lv_obj_add_flag(row, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
         lv_obj_t* ic = lv_obj_create(row);
         style_plain(ic);
@@ -526,6 +573,8 @@ private:
         lv_obj_align(ic, LV_ALIGN_LEFT_MID, 4, 0);
         lv_obj_t* t = label(row, text.c_str(), &zs_font_14);
         lv_obj_remove_local_style_prop(t, LV_STYLE_TEXT_COLOR, 0);   // the row's, so focus turns it black
+        lv_obj_set_size(t, kRowW - 26 - (value.empty() ? 4 : 26), 17);   // a long name ends in "..."
+        lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 26, 0);
         if (!value.empty()) {
             lv_obj_t* v = label(row, value.c_str(), &zs_font_12, kMuted);
@@ -740,6 +789,11 @@ private:
     lv_obj_t* root_ = nullptr;
     lv_obj_t* box_ = nullptr;
     lv_obj_t* rows_box_ = nullptr;
+    lv_obj_t* time_ = nullptr;
+    lv_obj_t* date_ = nullptr;
+    lv_obj_t* playing_ = nullptr;
+    std::string shown_playing_;
+    int shown_minute_ = -1;
     lv_obj_t* all_head_ = nullptr;
     std::string query_;
     std::string pin_pending_;   // All apps: Tab, P, then 1 to 7

@@ -273,7 +273,7 @@ def main():
         time.sleep(0.4)
         # LOCK (Tab held): the screen goes off (the simulated hardware has no
         # backlight, so ZeroShell draws it black); the next key wakes it to the
-        # lock screen and the one after unlocks (ui/lock_face.h).
+        # lock screen; other keys leave it up, Tab unlocks (ui/lock_face.h).
         mark = len(d.read_log())
         d.tap(KEY["tab"], hold=1.0)
         time.sleep(0.6)
@@ -286,9 +286,12 @@ def main():
         check("it wakes to the lock screen", d.frame()[body] != home_body)
         d.tap(KEY["space"])
         time.sleep(0.6)
+        check("another key leaves the lock screen up", d.frame()[body] != home_body)
+        d.tap(KEY["tab"])
+        time.sleep(0.6)
         d.shot("14-unlocked")
         # Tab on Home opens All apps; held to lock, it unlocks on Home again.
-        check("the next key unlocks to the screen it was locked from", d.frame()[body] == home_body)
+        check("tab unlocks to the screen it was locked from", d.frame()[body] == home_body)
         check("the waking and unlocking keys do nothing else", not opened_since(mark), str(opened_since(mark)))
 
         note = os.path.join(d.dir, "Notes", "notes.txt")

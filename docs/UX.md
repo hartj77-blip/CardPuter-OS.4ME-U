@@ -41,7 +41,7 @@ These work on every screen, in every app, including in a text box.
 | **Esc** (or \`) | Back one step. At an app's first screen, back to home. On home, clear the search |
 | **Hold Esc** (0.6 s) | Home, from anywhere |
 | **Tab** | The menu: every action for the item in focus and the screen |
-| **Hold Tab** (0.6 s) | Lock: screen off now (LOCK on the key). The next key wakes it to the lock screen; the one after unlocks |
+| **Hold Tab** (0.6 s) | Lock: screen off now (LOCK on the key). The next key wakes it to the lock screen (the time, the date and what is playing); Tab unlocks, other keys do nothing |
 | **Fn + J** (PRSC) | Screenshot to ~/Pictures/Screenshots, from anywhere, even the Terminal |
 | **Fn + H** (HELP) | The key help sheet, the same as 0 |
 | **Ctrl + Space** | The taskbar panel (Wi-Fi, Bluetooth, volume, brightness, battery, clock) |
@@ -149,17 +149,17 @@ This replaces today's "press D again" and "Del twice" patterns.
 
 ## Home
 
-Home is a search box, the pinned apps, and what you used last. It replaces the app grid and the
-dock.
+Home is a search box, the pinned apps, what you used last, and in the bottom right corner the
+track playing (or paused), the time and the date. It replaces the app grid and the dock.
 
 ```
 ┌ 21:44 ─────────────────── ⚡78% ┐
 │ › _                              │  typing goes here
 │ ①Term ②Files ③Notes ④Media ⑤…   │  pinned: 1 to 9
 │ RECENT                           │
-│   Media · Night Drive ▶          │  opens where you left off
-│   IR Remote · Living room TV     │
-│   Wi-Fi · HomeNet                │
+│   Media · Night   ▶ Night Drive  │  what is playing, over the clock
+│   IR Remote · Living    21:44    │  the time and date, bottom right
+│   All apps         28 Tue 24 Nov │
 │ ⏎ Open  ↓ All apps  ⇥ Menu       │
 └──────────────────────────────────┘
 ```
