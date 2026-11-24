@@ -137,7 +137,7 @@ On the home screen:
 | Letters | Search apps, settings and actions ("wifi", "bright", "mute"). Enter opens the first |
 | 1 to 7 | Open the pinned apps. While searching, 1 to 9 pick a result |
 | Esc | Clear the search |
-| Tab | Pin or unpin an app, move a pin, or open All apps (every app, A to Z) |
+| Tab | Open All apps (every app, A to Z). There, Tab on an app, P, then 1 to 7 pins it on that key |
 
 Ctrl, Shift, Fn and Sym are sticky: tap one and then press the next key. Apps show their own keys
 on screen. For example, in Media Space pauses and N skips, and in IR Remote L learns a button from
