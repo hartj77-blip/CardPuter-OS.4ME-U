@@ -48,6 +48,7 @@ install -m 0644 "$F/remote/tmux.conf"          "$D/etc/zeroos/tmux.conf"
 # app now, with its own files: image/apps/<id>.pkg (docs/APPS.md).
 # The Apps app: zeroos-apps installs and removes them.
 install -m 0755 "$F/apps/zeroos-apps"          "$D/usr/bin/zeroos-apps"
+install -m 0755 "$F/apps/m5-fb0-link"         "$D/usr/lib/zeroos/m5-fb0-link"
 install -m 0755 "$F/apps/m5-registry"         "$D/usr/lib/zeroos/m5-registry"
 install -m 0644 "$F/apps/zeroos-apps@.service" "$D/etc/systemd/system/"
 install -m 0644 "$F/apps/apps.sources"         "$D/etc/zeroos/apps.sources"

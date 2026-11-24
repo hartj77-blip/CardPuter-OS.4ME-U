@@ -9,5 +9,7 @@ SUBSYSTEM=="rc", RUN+="/bin/chgrp -R video /sys%p", RUN+="/bin/chmod -R g+w /sys
 # Move tty1 onto the LCD whichever number it got, and tty3 (the Terminal app)
 # with it. Same match as M5's fb_lcd rule.
 SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", ATTRS{of_node/compatible}=="*st7789v*", RUN+="/usr/bin/con2fbmap 1 %n", RUN+="/usr/bin/con2fbmap 3 %n"
+# M5Stack's apps draw on /dev/fb0: make that the LCD when nothing else is fb0.
+SUBSYSTEM=="graphics", KERNEL=="fb[0-9]*", ACTION=="add|remove", RUN+="/usr/lib/zeroos/m5-fb0-link"
 # Bluetooth on/off in Settings: rfkill (ZeroShell runs as pi, in netdev).
 KERNEL=="rfkill", SUBSYSTEM=="misc", GROUP="netdev", MODE="0664"
