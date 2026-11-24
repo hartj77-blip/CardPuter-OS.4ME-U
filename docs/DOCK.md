@@ -48,7 +48,7 @@ battery.
 
 | Piece | What |
 | --- | --- |
-| `zeroos-dock.service` | Runs as `pi` in its own login session on tty2, so it gets the monitor and input devices from logind. Started and stopped by ZeroShell (polkit allows `pi` exactly this unit). |
+| `zeroos-dock.service` | Runs as `pi` in its own login session on tty2, so it gets the monitor and input devices from logind. It switches to tty2 first (logind only hands them to the session in front) and back to tty1 when it stops. Started and stopped by ZeroShell (polkit allows `pi` exactly this unit). |
 | `/usr/lib/zeroos/dock-session` | Finds the DRM card that has the HDMI connector (the vc4 GPU) and starts labwc on it only. The built-in LCD is a separate DRM card that ZeroShell keeps drawing to. |
 | labwc | Small Wayland compositor (also what Raspberry Pi OS uses). Config in `/etc/zeroos/dock/`. |
 | waybar, swaybg, fuzzel, foot | Top bar, background, app search, terminal. |
