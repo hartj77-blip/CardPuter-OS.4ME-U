@@ -7,7 +7,7 @@ Google, and the Cardputer cannot stand in for one.
 | | USB stick mode | Bluetooth |
 | --- | --- | --- |
 | Works with | Any stereo that plays music from a USB stick | Stereos, speakers and headphones with Bluetooth music |
-| What plays | Files in `~/Music` | Anything the Media app plays, Jellyfin included |
+| What plays | Files in `~/Music` | Anything the Media or Jellyfin app plays |
 | Who is the player | The car | The Cardputer |
 | Car buttons | All of them (it is the car's own player) | Play, pause, next, previous |
 | Cable | One USB-C cable, data and power | None for sound; any USB charger for power |
