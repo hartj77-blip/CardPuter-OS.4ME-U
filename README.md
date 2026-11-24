@@ -135,6 +135,9 @@ keyboard the arrows are Fn + F, Z, X and C.
 | 0 | Show the keys for the current screen |
 | Tab | Menu of everything you can do on the current screen (on screens using the new layout) |
 | Ctrl + a letter | Run the menu item with that letter without opening the menu |
+| Fn + J (PRSC) | Screenshot of the screen, saved as a PNG in `~/Pictures/Screenshots` |
+| Fn + H (HELP) | Same as 0: the keys for the current screen |
+| Hold the top-right button | Screen off (LOCK); the next key only wakes it |
 | Letters | In a list, find a row: only the rows that match stay |
 
 On the home screen:
