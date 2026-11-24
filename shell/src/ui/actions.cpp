@@ -24,6 +24,7 @@ lv_obj_t* g_rows = nullptr;     // the menu's rows (scrolls past kMaxRows)
 std::vector<int> g_menu_items;  // g_actions index of each menu row
 std::vector<lv_obj_t*> g_menu_rows;
 int g_sel = -1;
+std::string g_menu_head;        // the open menu's heading, to open it again over new actions
 lv_obj_t* g_sheet = nullptr;    // the key sheet (0)
 lv_obj_t* g_confirm = nullptr;  // the confirm box, over g_confirm_dim
 lv_obj_t* g_confirm_dim = nullptr;
@@ -149,6 +150,7 @@ std::string focused_name(lv_obj_t* focused) {
     return "";
 }
 
+void open_menu(const std::string& heading);   // below: the menu, under this heading
 }  // namespace
 
 void actions_build(lv_obj_t* screen) {
@@ -167,9 +169,22 @@ void actions_build(lv_obj_t* screen) {
 }
 
 void actions_set(std::vector<Action> actions) {
+    // An open menu stays open over the new actions (a screen refreshes them
+    // when something finishes in the background, such as an AI reply), on
+    // the same action if it's still there. Running an action from the menu
+    // closes it first, so this never keeps it open after a choice.
+    bool reopen = g_menu != nullptr;
+    std::string head = g_menu_head;
+    std::string sel = reopen && g_sel >= 0 ? g_actions[size_t(g_menu_items[size_t(g_sel)])].label : "";
     actions_menu_close();
     actions_sheet_close();
     g_actions = std::move(actions);
+    if (reopen) {
+        open_menu(head);
+        for (size_t k = 0; k < g_menu_items.size(); ++k)
+            if (g_actions[size_t(g_menu_items[k])].label == sel && g_actions[size_t(g_menu_items[k])].enabled)
+                menu_select(int(k));
+    }
     if (!g_bar) return;
     if (g_actions.empty()) lv_obj_add_flag(g_bar, LV_OBJ_FLAG_HIDDEN);
     else lv_obj_remove_flag(g_bar, LV_OBJ_FLAG_HIDDEN);
@@ -188,7 +203,14 @@ bool actions_have_menu() {
 }
 
 void actions_menu_open(lv_obj_t* focused, const std::string& title) {
+    std::string name = focused_name(focused);
+    open_menu(name.empty() ? title : name);
+}
+
+namespace {
+void open_menu(const std::string& heading) {
     actions_menu_close();
+    g_menu_head = heading;
     g_menu_items.clear();
     for (int pass = 0; pass < 2; ++pass)   // the dangerous ones last
         for (size_t i = 0; i < g_actions.size(); ++i)
@@ -217,8 +239,7 @@ void actions_menu_open(lv_obj_t* focused, const std::string& title) {
     lv_obj_set_style_pad_row(g_menu, 0, 0);
     lv_obj_remove_flag(g_menu, LV_OBJ_FLAG_SCROLLABLE);
 
-    std::string name = focused_name(focused);
-    lv_obj_t* head = label(g_menu, (name.empty() ? title : name).c_str(), &zs_font_12, kMuted);
+    lv_obj_t* head = label(g_menu, heading.c_str(), &zs_font_12, kMuted);
     lv_obj_set_size(head, kMenuW - 14, 17);   // one line, cut with "..."
     lv_label_set_long_mode(head, LV_LABEL_LONG_DOT);
     lv_obj_set_style_pad_left(head, 4, 0);
@@ -272,6 +293,7 @@ void actions_menu_open(lv_obj_t* focused, const std::string& title) {
     menu_select(next_enabled(-1, +1));
     render_bar();
 }
+}  // namespace
 
 void actions_menu_close() {
     if (!g_menu) return;
