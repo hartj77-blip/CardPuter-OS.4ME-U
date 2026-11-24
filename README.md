@@ -212,7 +212,8 @@ separate package with its own version, so updating one app never touches another
 | Compass | Compass and spirit level |
 | Battery | Time left, power draw and power profiles ([guide](docs/PERFORMANCE.md)) |
 | System | CPU, memory, storage and temperature |
-| Media | Music, voice recordings, and Jellyfin music and video ([guide](docs/JELLYFIN.md)) |
+| Media | Music and video from the SD card, USB drives and server shares, in a classic MP3-player look |
+| Jellyfin | Music, movies and shows from your Jellyfin server ([guide](docs/JELLYFIN.md)) |
 | Recorder | Voice notes: record, play back, rename, delete |
 | Camera | Photos, a gallery, and a QR reader that can join Wi-Fi. Needs a model with a camera ([guide](docs/CAMERA.md)) |
 | IR Remote | Universal remote with about 2,000 TVs, projectors, AC units and more, and it can learn from your own remotes ([guide](docs/IR.md)) |
@@ -1107,7 +1108,7 @@ Apps:
 [Remote](docs/REMOTE.md) ·
 [Sync](docs/SYNC.md) ·
 [Tether](docs/TETHER.md) ·
-[Media and Jellyfin](docs/JELLYFIN.md) ·
+[Jellyfin](docs/JELLYFIN.md) ·
 [Car](docs/CAR.md) ·
 [Camera](docs/CAMERA.md) ·
 [Dock](docs/DOCK.md) ·
