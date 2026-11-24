@@ -95,7 +95,7 @@ if(ZS_BACKEND STREQUAL "web")
   target_link_options(zeroshell PRIVATE
     -sMODULARIZE=1 -sEXPORT_NAME=createZeroShell -sENVIRONMENT=web
     -sSINGLE_FILE=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0
-    -sEXPORTED_FUNCTIONS=_main,_zs_web_key,_zs_web_open,_zs_web_frame,_zs_web_take_dirty,_zs_web_hdmi,_zs_web_pose,_zs_web_app_count,_zs_web_app_id,_zs_web_app_name,_zs_web_current_app
+    -sEXPORTED_FUNCTIONS=_main,_zs_web_evdev,_zs_web_power,_zs_web_frame,_zs_web_take_dirty,_zs_web_hdmi,_zs_web_pose,_zs_web_app_count,_zs_web_app_id,_zs_web_app_name,_zs_web_current_app
     -sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString)
 endif()
 

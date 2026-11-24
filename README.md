@@ -954,9 +954,19 @@ web/build.sh build/zeroos-simulator.html
 It produces one self-contained HTML file you can open directly. It is also published at
 [hartj77-blip.github.io/emu-cardputer-os.4me-u](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/)
 by the [emu-cardputer-os.4me-u](https://github.com/hartj77-blip/emu-cardputer-os.4me-u) repository,
-which rebuilds it from `main` within an hour of every change. Its **Report a problem** button opens a GitHub issue filled in
-with the commit, the open app, the browser, the shell's log and a replay link: the page address
-plus `#replay=` and the keys pressed, which opens the simulator and presses them again.
+which rebuilds it from `main` within an hour of every change.
+
+The page draws the Cardputer Zero to M5's dimension drawing: the power switch on top, Esc and Tab
+beside the screen, and four rows of 11 keys with their Fn (orange) and Sym (blue) legends. Tapping
+those keys goes through a copy of M5's keyboard driver (`tca8418_keypad_m5stack`: tap Shift, Fn or
+Sym for the next key, tap twice to lock, hold to hold, with the lights), then the same
+`KeyTranslator` the device uses. The computer's own keyboard counts as a USB keyboard plugged in.
+Both send real presses and releases, so holding Esc or Tab works. Beside it is a guide to the keys
+and every app in the store (`apps.json`, written by the site's build from the Apps repository).
+
+Its **Report a problem** tab opens a GitHub issue filled in with the commit, the open app, the
+browser, the shell's log and a replay link: the page address plus `#replay=` and every key press
+and release with its timing, which opens the simulator and plays them back.
 
 ### Command-line options and environment variables
 

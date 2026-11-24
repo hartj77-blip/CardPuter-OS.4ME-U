@@ -1,165 +1,353 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ZeroOS Simulator</title>
+<meta name="description" content="ZeroOS for the M5Stack Cardputer Zero, running in your browser.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
 <style>
-/* Layout: a handheld body (screen over keys) centred on a dark bench; notes beside it on wide screens, below on phones. */
+/* The page: the Cardputer Zero drawn to M5's dimension drawing (84 x 54 mm),
+   with a guide beside it on wide screens and below it on narrow ones. */
 :root {
-  --bench: #1a0012;
-  --shell: #262626;
-  --shell-edge: #3a3a3a;
-  --key: #333333;
-  --key-down: #e95420;
-  --ink: #f7f7f7;
-  --muted: #aea79f;
+  --bench: #14090f;
+  --panel: #1e1418;
+  --line: #3a2b31;
+  --ink: #f4f1ee;
+  --muted: #b6aca4;
+  --faint: #8a7f78;
   --accent: #e95420;
+  --fn: #ff8a1f;        /* Fn legends: orange on the device */
+  --sym: #45a6ff;       /* Sym legends: blue */
+  --case: #8c9196;
+  --case-hi: #a9aeb3;
+  --case-lo: #6d7176;
+  --deck: #23262a;
+  --key: #0d0e10;
   --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   color-scheme: dark;
 }
+* { box-sizing: border-box; }
 html, body { background: var(--bench); color: var(--ink); }
 body {
-  font-family: var(--font-body);
-  margin: 0;
+  font-family: var(--font-body); margin: 0; line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 20px 32px;
+  padding-block: 24px 40px;
 }
 .wrap {
-  max-width: 1040px; margin: 0 auto;
-  display: grid; grid-template-columns: minmax(0, 600px) minmax(0, 1fr); gap: 32px; align-items: start;
+  max-width: 1240px; margin: 0 auto;
+  display: grid; grid-template-columns: minmax(0, 720px) minmax(0, 1fr); gap: 36px; align-items: start;
 }
-@media (max-width: 860px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 20px; } }
-
-.device {
-  background: linear-gradient(180deg, var(--shell-edge), var(--shell) 18%);
-  border-radius: 22px; padding: 14px 14px 16px;
-  box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 24px 60px rgba(0,0,0,0.45);
-  display: grid; gap: 12px;
-  touch-action: manipulation; user-select: none; -webkit-user-select: none;
-}
-.bezel { background: #050607; border-radius: 10px; padding: 10px; display: grid; gap: 6px; }
-canvas {
-  width: 100%; aspect-ratio: 320 / 170; max-width: 100%;
-  image-rendering: pixelated; image-rendering: crisp-edges;
-  border-radius: 3px; display: block; background: #1e1e1e; outline: none;
-}
-.bezel-label { display: flex; justify-content: space-between; font: 500 10px/1 var(--font-mono); color: #8a837c; letter-spacing: 0.08em; text-transform: uppercase; }
-.loading { position: relative; }
-.loading::after {
-  content: "Booting ZeroOS…"; position: absolute; inset: 0; display: grid; place-items: center;
-  font: 500 13px var(--font-mono); color: var(--muted);
-}
-.ready .loading::after { content: none; }
-
-.controls { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: stretch; }
-.pad { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(3, 40px); gap: 5px; align-self: center; }
-.pad .up { grid-column: 2; grid-row: 1; } .pad .left { grid-column: 1; grid-row: 2; }
-.pad .ok { grid-column: 2; grid-row: 2; } .pad .right { grid-column: 3; grid-row: 2; }
-.pad .down { grid-column: 2; grid-row: 3; } .pad .back { grid-column: 1; grid-row: 1; } .pad .tab { grid-column: 3; grid-row: 1; }
-.keys { display: grid; gap: 5px; min-width: 0; }
-.row { display: grid; gap: 5px; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
-button.k {
-  appearance: none; border: 0; border-radius: 7px; min-height: 38px; padding: 0;
-  background: var(--key); color: var(--ink);
-  font: 500 14px/1 var(--font-mono);
-  box-shadow: 0 2px 0 #141414; cursor: pointer;
-  transition: background 60ms, transform 60ms;
-}
-button.k.wide2 { grid-column: span 2; } button.k.wide4 { grid-column: span 4; }
-button.k.mod { color: var(--muted); font-size: 12px; }
-button.k.mod.on { color: var(--accent); }
-button.k.ok { background: #4a2313; color: var(--accent); }
-button.k.held, button.k:active { background: var(--key-down); color: #fff; transform: translateY(1px); box-shadow: none; }
-button.k:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-@media (max-width: 520px) {
-  .controls { grid-template-columns: 1fr; }
-  .pad { justify-self: center; grid-template-columns: repeat(3, 56px); }
-  button.k { min-height: 40px; font-size: 13px; }
-}
-@media (prefers-reduced-motion: reduce) { button.k { transition: none; } }
-
-.notes { display: grid; gap: 18px; min-width: 0; }
-h1 { font: 700 30px/1.1 var(--font-display); margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+@media (max-width: 1040px) { .wrap { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+.stage { display: grid; gap: 14px; min-width: 0; }
+h1 { font: 700 30px/1.1 var(--font-display); margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
 h1 span { color: var(--accent); }
-.lede { color: var(--muted); line-height: 1.55; margin: 0; max-width: 60ch; }
-h2 { font: 500 12px/1 var(--font-mono); text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin: 0 0 8px; }
-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 0; font-size: 14px; }
-dt { font-family: var(--font-mono); font-size: 12px; color: var(--ink); background: var(--key); border-radius: 5px; padding: 3px 7px; justify-self: start; }
-dd { margin: 0; color: var(--muted); align-self: center; }
-.apps { display: flex; flex-wrap: wrap; gap: 6px; }
-.apps button {
-  appearance: none; border: 1px solid var(--shell-edge); background: transparent; color: var(--ink);
-  border-radius: 999px; padding: 5px 11px; font: 500 13px var(--font-body); cursor: pointer;
+.lede { color: var(--muted); margin: 6px 0 0; max-width: 62ch; }
+
+/* ---- The device. 1 mm = var(--mm); everything is placed in mm from the drawing. */
+.holder { container-type: inline-size; width: 100%; max-width: 720px; padding-top: 3.2%; }
+.device {
+  --mm: calc(100cqw / 84);
+  position: relative; width: 100%; aspect-ratio: 84 / 54;
+  border-radius: calc(3.2 * var(--mm));
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 18%),
+    linear-gradient(180deg, var(--case-hi), var(--case) 40%, var(--case-lo));
+  box-shadow:
+    0 calc(0.4 * var(--mm)) 0 rgba(255,255,255,0.25) inset,
+    0 calc(-0.5 * var(--mm)) 0 rgba(0,0,0,0.25) inset,
+    0 calc(2 * var(--mm)) calc(6 * var(--mm)) rgba(0,0,0,0.55);
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
-.apps button:hover, .apps button:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
-.apps button.on { border-color: var(--accent); color: var(--accent); }
-.help { display: flex; flex-wrap: wrap; gap: 8px; }
-.help button, .help a {
-  appearance: none; border: 1px solid var(--shell-edge); background: transparent; color: var(--ink);
-  border-radius: 8px; padding: 8px 12px; font: 500 13px var(--font-body); cursor: pointer; text-decoration: none;
+.device > * { position: absolute; }
+.mm { left: calc(var(--x) * var(--mm)); top: calc(var(--y) * var(--mm)); width: calc(var(--w) * var(--mm)); height: calc(var(--h) * var(--mm)); }
+
+/* Power switch on the top edge: slide right for on, left for off (M5's guide). */
+.power {
+  top: calc(-1.9 * var(--mm)); left: calc(8.6 * var(--mm));
+  width: calc(7.2 * var(--mm)); height: calc(2.2 * var(--mm));
+  border-radius: calc(0.6 * var(--mm)) calc(0.6 * var(--mm)) 0 0;
+  background: #3b3e42; border: 0; padding: 0; cursor: pointer;
+  box-shadow: 0 0 0 calc(0.25 * var(--mm)) var(--case-lo);
 }
-.help .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.help button:hover, .help a:hover, .help button:focus-visible, .help a:focus-visible { border-color: var(--accent); outline: none; }
-.help .primary:hover { filter: brightness(1.1); }
-.crash {
-  display: none; border: 1px solid var(--accent); background: #2a0a0a; border-radius: 10px;
-  padding: 12px 14px; font-size: 14px; line-height: 1.5;
+.power::after {
+  content: ""; position: absolute; top: calc(0.35 * var(--mm)); left: calc(0.4 * var(--mm));
+  width: calc(3 * var(--mm)); height: calc(1.5 * var(--mm)); border-radius: calc(0.4 * var(--mm));
+  background: linear-gradient(180deg, #e8e8e8, #9a9a9a);
+  transition: transform 140ms ease;
 }
+.power[aria-checked="true"]::after { transform: translateX(calc(3.4 * var(--mm))); }
+.power:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.power-label {
+  position: absolute; top: calc(-1.55 * var(--mm)); left: calc(16.6 * var(--mm)); pointer-events: none;
+  font: 700 calc(1.25 * var(--mm)) / 1 var(--font-mono); color: var(--muted); letter-spacing: 0.06em; white-space: nowrap;
+}
+
+/* Front details from the drawing */
+.logo { font: 700 calc(5.2 * var(--mm)) / 1 var(--font-display); color: rgba(30,32,35,0.55); letter-spacing: -0.04em;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.25); }
+.grille { border-radius: calc(1.2 * var(--mm)); background:
+  radial-gradient(circle, rgba(0,0,0,0.45) 32%, transparent 36%) 0 0 / calc(1.3 * var(--mm)) calc(1.3 * var(--mm));
+  box-shadow: inset 0 0 0 calc(0.25 * var(--mm)) rgba(0,0,0,0.18); }
+.slot { border-radius: calc(0.4 * var(--mm)); background: rgba(0,0,0,0.22); box-shadow: inset 0 1px 1px rgba(0,0,0,0.3); }
+.screw { border-radius: 50%; background: radial-gradient(circle at 40% 35%, #c9ccd0, #5d6166 70%); }
+.lens { border-radius: 50%; background: radial-gradient(circle at 38% 34%, #3c5a8a 0 12%, #0b0d12 30%, #22262c 62%, #4b4f55 66%, #7a7e83 70%, transparent 71%); }
+.ir { border-radius: calc(0.8 * var(--mm)); background: linear-gradient(160deg, #4a1414, #1a0606); box-shadow: inset 0 0 0 calc(0.2 * var(--mm)) rgba(0,0,0,0.5); }
+.glass { border-radius: calc(0.9 * var(--mm)); background: #050607;
+  box-shadow: inset 0 0 0 calc(0.3 * var(--mm)) #000, 0 1px 0 rgba(255,255,255,0.25); }
+canvas#screen {
+  position: absolute; image-rendering: pixelated; image-rendering: crisp-edges;
+  background: #000; outline: none; display: block;
+}
+.boot { display: grid; place-items: center; font: 500 calc(1.6 * var(--mm)) var(--font-mono); color: #8d877f; pointer-events: none; }
+.ready .boot { display: none; }
+.off .boot { display: none; }
+.off canvas#screen { opacity: 0; }
+
+/* The keyboard: legend strips above each row, keys as small black pills */
+.strip { background: var(--deck); border-radius: calc(0.5 * var(--mm)); box-shadow: inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.18); }
+.legend {
+  display: flex; align-items: center; justify-content: center; gap: calc(0.45 * var(--mm));
+  pointer-events: none; white-space: nowrap; line-height: 1;
+}
+.legend .f { font: 700 calc(1.12 * var(--mm)) var(--font-mono); color: var(--fn); }
+.legend .m { font: 700 calc(1.5 * var(--mm)) var(--font-mono); color: #f3f3f3; }
+.legend .m.word { font-size: calc(1.15 * var(--mm)); letter-spacing: 0.02em; }
+.legend .s { font: 700 calc(1.25 * var(--mm)) var(--font-mono); color: var(--sym); }
+.side-legend { justify-content: center; }
+.side-legend .m { color: #1f2124; } .side-legend .f { color: #b4520c; }
+.key {
+  border: 0; padding: 0; background: transparent; cursor: pointer;
+  display: grid; place-items: center;
+}
+.key::before {
+  content: ""; width: calc(4.7 * var(--mm)); height: calc(2.6 * var(--mm)); border-radius: 999px;
+  background: linear-gradient(180deg, #2a2c30, var(--key) 55%);
+  box-shadow: 0 calc(0.35 * var(--mm)) 0 #000, 0 calc(0.5 * var(--mm)) calc(0.6 * var(--mm)) rgba(0,0,0,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  transition: transform 50ms, box-shadow 50ms;
+}
+.key.down::before { transform: translateY(calc(0.3 * var(--mm))); background: #050506;
+  box-shadow: 0 calc(0.05 * var(--mm)) 0 #000, inset 0 1px 2px rgba(0,0,0,0.8); }
+.key:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.led { border-radius: 50%; background: #3a2a1a; box-shadow: inset 0 0 1px #000; }
+.led.on { background: #ffb347; box-shadow: 0 0 calc(0.9 * var(--mm)) #ff9d2e, inset 0 0 1px #fff; }
+.led.blink { animation: blink 900ms steps(1) infinite; }
+.led.fast { animation: blink 240ms steps(1) infinite; }
+@keyframes blink { 0% { background: #ffb347; box-shadow: 0 0 calc(0.9 * var(--mm)) #ff9d2e; } 50% { background: #3a2a1a; box-shadow: none; } }
+@media (prefers-reduced-motion: reduce) { .led.blink, .led.fast { animation-duration: 2s; } .key::before, .power::after { transition: none; } }
+
+.status { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font: 500 12px var(--font-mono); color: var(--faint); }
+.status b { color: var(--muted); font-weight: 500; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #4b4b4b; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.dot.live { background: #3fbf6f; box-shadow: 0 0 6px #3fbf6f; }
+.pretend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pretend span { font: 500 12px var(--font-mono); color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; margin-right: 4px; }
+.chip {
+  appearance: none; border: 1px solid var(--line); background: transparent; color: var(--ink);
+  border-radius: 999px; padding: 6px 12px; font: 500 13px var(--font-body); cursor: pointer;
+}
+.chip:hover, .chip:focus-visible { border-color: var(--accent); outline: none; }
+.chip.on { border-color: var(--accent); color: var(--accent); }
+.crash { display: none; border: 1px solid var(--accent); background: #2a0a0a; border-radius: 10px; padding: 12px 14px; font-size: 14px; }
 .crashed .crash { display: block; }
 .crash strong { color: var(--accent); }
-.fine { font-size: 12px; color: #8a837c; line-height: 1.5; margin: 0; }
+
+/* ---- The guide */
+.guide { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.tabs { display: flex; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tabs button {
+  appearance: none; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  padding: 13px 16px; font: 600 14px var(--font-body); border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pane { padding: 18px 20px 22px; display: none; }
+.pane.on { display: block; }
+.pane h2 { font: 700 18px/1.25 var(--font-display); margin: 18px 0 6px; }
+.pane h2:first-child { margin-top: 0; }
+.pane p { margin: 0 0 10px; color: var(--muted); }
+.pane p strong, .pane li strong { color: var(--ink); font-weight: 600; }
+.pane ol, .pane ul { margin: 0 0 10px; padding-left: 20px; color: var(--muted); }
+.pane li { margin: 3px 0; }
+kbd {
+  font: 700 12px var(--font-mono); color: var(--ink); background: #2c2226; border: 1px solid #4a3a40;
+  border-bottom-width: 2px; border-radius: 5px; padding: 1px 5px; white-space: nowrap;
+}
+kbd.fn { color: var(--fn); } kbd.sym { color: var(--sym); }
+table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 12px; }
+td, th { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 600 12px var(--font-mono); color: var(--faint); text-transform: uppercase; letter-spacing: 0.06em; }
+td:first-child { white-space: nowrap; width: 1%; padding-right: 14px; }
+td { color: var(--muted); }
+.applist { display: grid; gap: 2px; margin: 6px 0 14px; }
+.app { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.app .name { font-weight: 600; color: var(--ink); }
+.app .name a { color: inherit; text-decoration: none; }
+.app .name a:hover { color: var(--accent); text-decoration: underline; }
+.app .ver { font: 500 12px var(--font-mono); color: var(--faint); }
+.app .sum { grid-column: 1 / -1; color: var(--muted); font-size: 14px; }
+.tag { font: 600 11px var(--font-mono); text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 999px; margin-left: 8px; vertical-align: 2px; }
+.tag.here { color: #6fe39b; background: rgba(63,191,111,0.12); }
+.tag.dev { color: var(--faint); background: rgba(255,255,255,0.06); }
+.filter { width: 100%; padding: 9px 12px; border-radius: 9px; border: 1px solid var(--line); background: #150d11; color: var(--ink); font: 14px var(--font-body); }
+.filter:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+.help { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 10px; }
+.help button {
+  appearance: none; border: 1px solid var(--line); background: transparent; color: var(--ink);
+  border-radius: 8px; padding: 9px 13px; font: 500 14px var(--font-body); cursor: pointer;
+}
+.help .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.help button:hover, .help button:focus-visible { border-color: var(--accent); outline: none; }
+.fine { font-size: 12px; color: var(--faint); margin: 0; }
+a { color: #ff9b6e; }
 </style>
 
 <div class="wrap">
-  <div class="device" id="device">
-    <div class="bezel">
-      <div class="loading"><canvas id="screen" width="320" height="170" tabindex="0" aria-label="ZeroOS screen. Click, then use your keyboard."></canvas></div>
-      <div class="bezel-label"><span>320 × 170 · ST7789V3</span><span id="status">keyboard: click screen</span></div>
+  <div class="stage">
+    <div>
+      <h1>Zero<span>OS</span> simulator</h1>
+      <p class="lede">The real ZeroOS for the M5Stack Cardputer Zero, compiled to run in your browser. Type on your computer's keyboard, or tap the keys on the device.</p>
     </div>
-    <div class="controls">
-      <div class="pad" aria-label="Navigation keys">
-        <button class="k mod back" data-key="27" title="Back (Esc)">Back</button>
-        <button class="k up" data-key="17" aria-label="Up">▲</button>
-        <button class="k mod tab" data-key="9" title="Next field (Tab)">Tab</button>
-        <button class="k left" data-key="20" aria-label="Left">◀</button>
-        <button class="k ok" data-key="10" aria-label="Enter">OK</button>
-        <button class="k right" data-key="19" aria-label="Right">▶</button>
-        <button class="k down" data-key="18" aria-label="Down">▼</button>
+
+    <div class="holder">
+      <div class="device" id="device">
+        <span class="power-label">POWER</span>
+        <button class="power" id="power" role="switch" aria-checked="true" aria-label="Power switch"></button>
+
+        <span class="logo mm" style="--x:3;--y:3.2;--w:11;--h:6">M5</span>
+        <span class="grille mm" style="--x:1.6;--y:11.2;--w:13.8;--h:8.6" aria-hidden="true"></span>
+        <span class="screw mm" style="--x:11.2;--y:23;--w:2.6;--h:2.6"></span>
+        <span class="slot mm" style="--x:17.4;--y:1.6;--w:1.9;--h:22.8"></span>
+        <span class="slot mm" style="--x:65.2;--y:1.6;--w:1.9;--h:22.8"></span>
+        <span class="slot mm" style="--x:81.2;--y:1.6;--w:1.5;--h:8"></span>
+        <span class="ir mm" style="--x:68.8;--y:2.6;--w:4.6;--h:4.8" title="IR window"></span>
+        <span class="lens mm" style="--x:67.6;--y:10.8;--w:6.4;--h:6.4" title="Camera"></span>
+        <span class="screw mm" style="--x:78.4;--y:23;--w:2.6;--h:2.6"></span>
+
+        <span class="glass mm" style="--x:20.4;--y:2.2;--w:43.6;--h:23.9"></span>
+        <canvas id="screen" class="mm" width="320" height="170" style="--x:22.2;--y:3.6;--w:40;--h:21.25" tabindex="0" aria-label="ZeroOS screen. Type on your keyboard, or tap the keys below."></canvas>
+        <div class="boot mm" style="--x:22.2;--y:3.6;--w:40;--h:21.25">Booting ZeroOS…</div>
+        <!-- keys, strips and LEDs are added by the script -->
       </div>
-      <div class="keys" id="keys" aria-label="Keyboard"></div>
     </div>
+
+    <div class="status" id="statusbar">
+      <span><span class="dot" id="live"></span><b id="status">booting</b></span>
+      <span id="kbhint">Your keyboard works like a USB keyboard plugged into the Cardputer.</span>
+    </div>
+    <div class="pretend" aria-label="Pretend hardware">
+      <span>Pretend</span>
+      <button type="button" class="chip" id="hdmi">HDMI monitor: unplugged</button>
+      <button type="button" class="chip" id="pose">Lying: flat on a table</button>
+    </div>
+    <div class="crash" role="alert"><strong>ZeroOS crashed.</strong> That's a bug. Use Report a problem (in the guide): the keys you pressed and the log are filled in for you. Slide the power switch off and on to start again.</div>
   </div>
 
-  <div class="notes">
-    <h1>Zero<span>OS</span> simulator</h1>
-    <p class="lede">This is the real ZeroShell code from ZeroOS, compiled to WebAssembly and running at the Cardputer Zero's native 320 × 170. Sensors, battery, Wi-Fi and audio are simulated until the hardware arrives.</p>
-    <div class="crash" role="alert"><strong>The simulator crashed.</strong> That's a bug in ZeroOS. Report it below: the keys you pressed and the log are filled in for you. Reload the page to start again.</div>
-    <section>
-      <h2>Jump to an app</h2>
-      <div class="apps" id="apps"></div>
+  <div class="guide" id="guide">
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-pane="start">Start here</button>
+      <button role="tab" aria-selected="false" data-pane="keys">Keys</button>
+      <button role="tab" aria-selected="false" data-pane="apps">Apps</button>
+      <button role="tab" aria-selected="false" data-pane="report">Report a problem</button>
+    </div>
+
+    <section class="pane on" id="pane-start" role="tabpanel">
+      <h2>What this is</h2>
+      <p>ZeroOS is an operating system for the M5Stack Cardputer Zero: Debian Linux underneath, with a home screen made for its 320 × 170 screen and keyboard. No mouse, no touch: everything is done from the keys. This page runs the same code as the device, with pretend hardware (battery, Wi-Fi, sensors and sound are made up).</p>
+
+      <h2>1. Turn it on</h2>
+      <p>The <strong>power switch</strong> is on the top edge. Slide it right for on, left for off. Off and on again starts fresh, like the real thing.</p>
+
+      <h2>2. Two ways to type</h2>
+      <ul>
+        <li><strong>Your computer's keyboard</strong> works like a USB keyboard plugged into the Cardputer: arrows, <kbd>Esc</kbd>, <kbd>Tab</kbd>, <kbd>Enter</kbd>, <kbd>Shift</kbd> and <kbd>Ctrl</kbd> all do what they do on the device.</li>
+        <li><strong>The keys on the device</strong> behave like the real ones. The Cardputer has no arrow keys of its own: arrows are <kbd>fn</kbd> with <kbd class="fn">F</kbd> <kbd class="fn">Z</kbd> <kbd class="fn">X</kbd> <kbd class="fn">C</kbd>.</li>
+      </ul>
+      <p><kbd>shift</kbd>, <kbd class="fn">fn</kbd> and <kbd class="sym">sym</kbd> don't need holding. <strong>Tap</strong> one and it applies to the next key (its light blinks). <strong>Tap twice</strong> to lock it on (fast blink), and tap again to unlock. <strong>Hold</strong> it and it stays on while held. <span style="color:var(--fn)">Orange</span> labels need <kbd class="fn">fn</kbd>, <span style="color:var(--sym)">blue</span> ones need <kbd class="sym">sym</kbd>.</p>
+
+      <h2>3. The home screen</h2>
+      <p>Home is a search box, seven pinned apps and the apps you opened last.</p>
+      <ul>
+        <li><strong>Type</strong> to search apps, settings and actions: <code>wifi</code>, <code>bright</code>, <code>mute</code>. <kbd>Enter</kbd> opens the first result.</li>
+        <li><kbd>1</kbd> to <kbd>7</kbd> open the pinned apps.</li>
+        <li><kbd>Tab</kbd> lists every app, A to Z.</li>
+      </ul>
+
+      <h2>4. Keys that work everywhere</h2>
+      <table>
+        <tr><td><kbd>Esc</kbd></td><td>Back. <strong>Hold</strong> it to go home from anywhere</td></tr>
+        <tr><td><kbd>Tab</kbd></td><td>A menu of everything you can do on this screen, each with a letter. <strong>Hold</strong> it to lock the screen</td></tr>
+        <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Pick the item with that number</td></tr>
+        <tr><td><kbd>0</kbd> or <kbd class="fn">fn</kbd>+<kbd class="fn">H</kbd></td><td>Show every key for this screen</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Quick panel: Wi-Fi, Bluetooth, volume, brightness, battery, clock</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd class="fn">J</kbd></td><td>Screenshot</td></tr>
+      </table>
+      <p>The bar along the bottom of the screen always says what the keys do there.</p>
+
+      <h2>5. Get more apps</h2>
+      <p>ZeroOS comes with the basics (Wi-Fi, Bluetooth, Settings, Update and Apps). Everything else is installed from the <strong>Apps</strong> app: type <code>apps</code> on the home screen, pick one, press <kbd>Enter</kbd>. The <strong>Apps</strong> tab above lists what's there. In this simulator the store is pretend, but most apps are already built in to try.</p>
+
+      <h2>6. Keep it up to date</h2>
+      <p>The <strong>Update</strong> app checks for a new ZeroOS, downloads it, checks it and installs it, and goes back to the old one if something fails.</p>
+      <p class="fine" style="margin-top:14px">Files and notes you make here live in this browser tab only. <a href="https://github.com/hartj77-blip/CardPuter-OS.4ME-U#install">Put ZeroOS on a real Cardputer Zero</a>.</p>
     </section>
-    <section>
-      <h2>Keys</h2>
-      <dl>
-        <dt>← ↑ → ↓</dt><dd>Move around the home screen and lists</dd>
-        <dt>Enter / OK</dt><dd>Open an app or choose an item</dd>
-        <dt>Esc / Back</dt><dd>Go back (the ` key does the same, like on the device)</dd>
-        <dt>a–z</dt><dd>On the home screen, jump to the app starting with that letter</dd>
-        <dt>Space · N · R</dt><dd>In Media: pause, next track, record a voice note</dd>
-        <dt>R · L</dt><dd>Rescan Wi-Fi · learn an IR code</dd>
-      </dl>
+
+    <section class="pane" id="pane-keys" role="tabpanel">
+      <h2>On the device</h2>
+      <p>Four rows of 11 keys, with <kbd>esc</kbd> and <kbd>tab</kbd> beside the screen. Each key's labels are printed on the strip above it: white on its own, <span style="color:var(--fn)">orange</span> with <kbd class="fn">fn</kbd>, <span style="color:var(--sym)">blue</span> with <kbd class="sym">sym</kbd>.</p>
+      <table>
+        <tr><th>Key</th><th>What it does</th></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>F</kbd> <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd></td><td>Up, Left, Down, Right</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>K</kbd> / <kbd>N</kbd></td><td>Home / End: the first or last row of a list</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>L</kbd> / <kbd>M</kbd></td><td>Page up / Page down</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></td><td>Sound on or off, volume down, volume up</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>U</kbd> / <kbd>I</kbd></td><td>Brightness down / up</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd></td><td>Play or pause, previous, next track</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>J</kbd></td><td>Screenshot (PRSC)</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>H</kbd></td><td>Every key for this screen (HELP)</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>⌫</kbd></td><td>Delete</td></tr>
+        <tr><td><kbd class="fn">fn</kbd>+<kbd>1</kbd>…<kbd>0</kbd> <kbd>O</kbd> <kbd>P</kbd></td><td>F1 to F12</td></tr>
+        <tr><td><kbd class="sym">sym</kbd>+a key</td><td>The blue symbol on it: <code>! @ # $ % ^ &amp; * ( )</code> on the numbers, <code>~ ` _ - + = [ ] { }</code> on Q–P, <code>; : ' " &lt; &gt; \ |</code> on A–L, <code>, . / ?</code> on V–M</td></tr>
+        <tr><td><kbd>ctrl</kbd></td><td>Tap it, then a letter: the menu action with that letter. The status bar shows <b>Ctrl</b> until the next key</td></tr>
+      </table>
+      <h2>On your computer</h2>
+      <p>Your keyboard counts as a USB keyboard plugged into the Cardputer, so it types normally and has real arrow keys.</p>
+      <table>
+        <tr><td><kbd>Esc</kbd> or <kbd>`</kbd></td><td>Back. Hold for home</td></tr>
+        <tr><td><kbd>Tab</kbd></td><td>The menu. Hold to lock</td></tr>
+        <tr><td>Arrows</td><td>Move</td></tr>
+        <tr><td><kbd>Home</kbd> <kbd>End</kbd> <kbd>PgUp</kbd> <kbd>PgDn</kbd></td><td>Jump in lists</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Space</kbd></td><td>Quick panel</td></tr>
+        <tr><td><kbd>PrtSc</kbd></td><td>Screenshot</td></tr>
+      </table>
+      <p class="fine">Some Ctrl shortcuts (like Ctrl+W) belong to your browser and can't reach the simulator. Tap <kbd>ctrl</kbd> on the device instead.</p>
     </section>
-    <section>
+
+    <section class="pane" id="pane-apps" role="tabpanel">
+      <h2>In the Apps store</h2>
+      <p id="apps-intro">Every app you can install from <strong>Apps</strong> on the device. <span class="tag here">Try it here</span> means it's built into this simulator: type its name on the home screen.</p>
+      <input class="filter" id="appfilter" type="search" placeholder="Find an app" aria-label="Find an app">
+      <div class="applist" id="applist"><p class="fine">Loading the app list…</p></div>
+      <h2>Built into ZeroOS</h2>
+      <p><strong>Wi-Fi</strong>, <strong>Bluetooth</strong>, <strong>Settings</strong>, <strong>Update</strong> and <strong>Apps</strong> (the store) are part of ZeroOS itself and can't be removed.</p>
+      <p class="fine">The apps' code is in <a href="https://github.com/hartj77-blip/CardPuter-Apps.4ME-U">CardPuter-Apps.4ME-U</a>. Each one has its own guide there.</p>
+    </section>
+
+    <section class="pane" id="pane-report" role="tabpanel">
       <h2>Found a problem?</h2>
+      <p><strong>Report a problem</strong> opens a new GitHub issue with this build, the open app, your browser, ZeroOS's log and a replay link already filled in. The replay link opens this page and presses the same keys again, at the same speed, so whoever fixes it can watch it happen. Nothing is sent until you submit the issue.</p>
       <div class="help">
         <button type="button" class="primary" id="report">Report a problem</button>
         <button type="button" id="copy-replay">Copy replay link</button>
         <button type="button" id="copy-debug">Copy debug info</button>
       </div>
-      <p class="fine" style="margin-top:8px">Report a problem opens a new GitHub issue with this build, the open app, your browser and the keys you pressed already filled in. The replay link opens this page and presses the same keys again, so whoever fixes it can watch it happen. Nothing is sent until you submit the issue.</p>
+      <p class="fine"><span id="build">Build __ZS_COMMIT__</span>. If it happened on a real Cardputer Zero, <a href="https://github.com/hartj77-blip/CardPuter-OS.4ME-U/issues/new">open an issue</a> and say which version you're on (<code>cat /etc/zeroos-release</code>).</p>
     </section>
-    <p class="fine">Notes, voice notes and IR codes you change live in this browser tab only and reset on reload. <span id="build">Build __ZS_COMMIT__</span>.</p>
   </div>
 </div>
 
@@ -168,37 +356,243 @@ dd { margin: 0; color: var(--muted); align-self: center; }
 </script>
 <script>
 (function () {
-  const KEY = { up: 17, down: 18, right: 19, left: 20, enter: 10, esc: 27, bksp: 8, tab: 9, del: 127 };
+  const REPO = "hartj77-blip/CardPuter-OS.4ME-U";
+  const COMMIT = "__ZS_COMMIT__";
+  const device = document.getElementById("device");
   const canvas = document.getElementById("screen");
   const ctx = canvas.getContext("2d");
   const img = ctx.createImageData(320, 170);
-  const status = document.getElementById("status");
-  let mod = null;
+  const statusEl = document.getElementById("status");
+  const live = document.getElementById("live");
+  let mod = null, powered = true, crashedFlag = false;
+  function setStatus(t) { statusEl.textContent = t; }
 
-  const REPO = "hartj77-blip/CardPuter-OS.4ME-U";
-  const COMMIT = "__ZS_COMMIT__";
-  // Everything the user does, as replay tokens: a key code, "@<app id>" for a
-  // jump chip, "h0/h1" monitor, "p<n>" pose, "w" for each idle second (max 5).
+  // ---------------------------------------------------------------- log
+  // Everything the user does, for replay links: kind + id + d/u + "_" + gap
+  // since the previous one in 10 ms. k = a key on the device (its index),
+  // p = a computer key (Linux code), m = monitor, o = pose.
   const log = [];
   let lastAct = performance.now(), replaying = false;
-  function note(tok) {
+  function note(kind, id, dir) {
     if (replaying) return;
-    const idle = Math.min(5, Math.floor((performance.now() - lastAct) / 1000));
-    for (let i = 0; i < idle && log.length; i++) log.push("w");
-    log.push(String(tok));
-    if (log.length > 400) log.splice(0, log.length - 400);
-    lastAct = performance.now();
+    const now = performance.now();
+    const gap = Math.min(300, Math.round((now - lastAct) / 10));
+    lastAct = now;
+    log.push(kind + id + (dir || "") + "_" + (log.length ? gap : 0));
+    if (log.length > 600) log.splice(0, log.length - 600);
   }
   const errors = [];
   function err(line) { errors.push(String(line)); if (errors.length > 40) errors.shift(); }
   window.addEventListener("error", (e) => err(e.message));
   window.addEventListener("unhandledrejection", (e) => err(e.reason));
-  function send(code) { if (mod) { note(code >>> 0); mod._zs_web_key(code >>> 0); } }
-  function typeText(s) { for (const ch of s) send(ch.codePointAt(0)); }
 
-  // Screen refresh: copy the RGBA frame whenever LVGL flushed something.
+  function evdev(kbd, code, value) { if (mod && powered && code) mod._zs_web_evdev(kbd, code, value); }
+
+  // ---------------------------------------------------------------- keyboard
+  // The 46 keys, in M5's driver order. Each: [label, base code, sym code,
+  // fn code, fn legend, sym legend]. Codes are Linux key codes from M5's
+  // cardputerzero overlay: keymap (plain), keymap1 (Sym), keymap2 (Fn).
+  // 0 = the key does nothing on that layer.
+  const ROWS = [
+    [["1",2,26,59,"F1","!"],["2",3,27,60,"F2","@"],["3",4,39,61,"F3","#"],["4",5,40,62,"F4","$"],["5",6,41,63,"F5","%"],
+     ["6",7,43,64,"F6","^"],["7",8,51,65,"F7","&"],["8",9,52,66,"F8","*"],["9",10,53,67,"F9","("],["0",11,94,68,"F10",")"],
+     ["⌫",14,14,111,"DEL",""]],
+    [["sym","SYM"],["q",16,55,164,"⏯","~"],["w",17,69,165,"⏮","`"],["e",18,70,163,"⏭","_"],["r",19,71,19,"","-"],["t",20,72,20,"","+"],
+     ["y",21,73,21,"","="],["u",22,74,224,"☀−","["],["i",23,75,225,"☀+","]"],["o",24,76,87,"F11","{"],["p",25,77,88,"F12","}"]],
+    [["shift","SHIFT"],["a",30,79,113,"MUTE",";"],["s",31,80,114,"VOL−",":"],["d",32,81,115,"VOL+","'"],["f",33,0,103,"▲",""],
+     ["g",34,82,34,"","\""],["h",35,83,138,"HELP","<"],["j",36,85,99,"PRSC",">"],["k",37,86,102,"HOME","\\"],["l",38,89,104,"PGUP","|"],
+     ["↵",28,28,28,"",""]],
+    [["fn","FN"],["ctrl",29,29,29,"",""],["alt",56,56,56,"",""],["z",44,0,105,"◀",""],["x",45,0,108,"▼",""],["c",46,0,106,"▶",""],
+     ["v",47,90,47,"",","],["b",48,91,110,"INS","."],["n",49,92,107,"END","/"],["m",50,93,109,"PGDN","?"],["space",57,57,57,"",""]],
+  ];
+  const ESC = ["esc", 1, 1, 1, "HOME", ""], TAB = ["tab", 15, 15, 15, "LOCK", ""];
+
+  // M5's driver (tca8418_keypad_m5stack + tca8418_fsm), step for step.
+  // Shift, Fn and Sym each run this state machine; the layer is on from
+  // ACTIVE until ONESHOT, HOLD or LOCKED_LEAVE ends. Shift is reported as
+  // Left Shift held; Fn and Sym pick the code an ordinary key sends.
+  const S = { IDLE: 0, ACTIVE: 1, WAIT: 2, ONESHOT: 3, HOLD: 4, LOCKED: 5, LOCKED_WAIT: 6, LOCKED_LEAVE: 7 };
+  const E = { PRES: 0, RELE: 1, OTHER: 2, TIMEOUT: 3 };
+  const mods = {
+    SYM:   { code: 0x17f, state: 0, layer: false, timer: 0, led: null },
+    SHIFT: { code: 42,    state: 0, layer: false, timer: 0, led: null },
+    FN:    { code: 0x185, state: 0, layer: false, timer: 0, led: null },
+  };
+  function setLed(m, how) { if (m.led) m.led.className = "led mm" + (how ? " " + how : ""); }
+  function entry(m, s) {
+    if (s === S.ACTIVE) { m.layer = true; evdev(0, m.code, 1); setLed(m, "on"); }
+    else if (s === S.ONESHOT) setLed(m, "blink");
+    else if (s === S.LOCKED) setLed(m, "fast");
+  }
+  function exit(m, s) {
+    if (s === S.ONESHOT || s === S.HOLD || s === S.LOCKED_LEAVE) { m.layer = false; evdev(0, m.code, 0); setLed(m, ""); }
+  }
+  function transition(m, next) { exit(m, m.state); m.state = next; entry(m, next); }
+  function dispatch(m, e) {
+    switch (m.state) {
+      case S.IDLE: if (e === E.PRES) transition(m, S.ACTIVE); break;
+      case S.ACTIVE: if (e === E.RELE) transition(m, S.WAIT); else if (e === E.TIMEOUT) transition(m, S.HOLD); break;
+      case S.WAIT: if (e === E.TIMEOUT) transition(m, S.ONESHOT); else if (e === E.PRES) transition(m, S.LOCKED); break;
+      case S.ONESHOT: if (e === E.OTHER) transition(m, S.IDLE); break;
+      case S.HOLD: if (e === E.RELE) transition(m, S.IDLE); break;
+      case S.LOCKED: if (e === E.RELE) transition(m, S.LOCKED_WAIT); break;
+      case S.LOCKED_WAIT: if (e === E.PRES) transition(m, S.LOCKED_LEAVE); break;
+      case S.LOCKED_LEAVE: if (e === E.RELE) transition(m, S.IDLE); break;
+    }
+  }
+  function updateTimer(m) {   // mod_delayed_work: (re)start 300 ms while ACTIVE or WAIT
+    clearTimeout(m.timer); m.timer = 0;
+    if (m.state === S.ACTIVE || m.state === S.WAIT)
+      m.timer = setTimeout(() => { m.timer = 0; dispatch(m, E.TIMEOUT); updateTimer(m); }, 300);
+  }
+  function canActivate(m) {
+    if (m.layer) return true;
+    if (m === mods.SYM) return !mods.SHIFT.layer && !mods.FN.layer;
+    return !mods.SYM.layer;
+  }
+  function modKey(m, pressed) {
+    if (!pressed && m.state === S.ONESHOT) { dispatch(m, E.OTHER); updateTimer(m); return; }
+    if (pressed && !canActivate(m)) return;
+    dispatch(m, pressed ? E.PRES : E.RELE);
+    updateTimer(m);
+  }
+  const held = new Map();   // key index -> code it sent on press
+  function ordinaryKey(i, k, pressed) {
+    if (pressed) {
+      if (held.has(i)) return;
+      const code = mods.SYM.layer ? k[2] : mods.FN.layer ? k[3] : k[1];
+      held.set(i, code);
+      evdev(0, code, 1);
+    } else {
+      if (!held.has(i)) return;
+      evdev(0, held.get(i), 0);
+      held.delete(i);
+      if (held.size === 0)
+        for (const m of Object.values(mods)) if (m.state === S.ONESHOT) dispatch(m, E.OTHER);
+    }
+  }
+  function resetDriver() {
+    for (const m of Object.values(mods)) { clearTimeout(m.timer); m.timer = 0; m.state = S.IDLE; m.layer = false; setLed(m, ""); }
+    held.clear();
+  }
+
+  // Build the keys, strips and LEDs from the drawing's measurements (mm).
+  const KEYS = [];     // index -> {k, el}
+  function place(el, x, y, w, h) { el.classList.add("mm"); el.style.cssText += `--x:${x};--y:${y};--w:${w};--h:${h}`; }
+  function legend(k, extra) {
+    const d = document.createElement("div");
+    d.className = "legend" + (extra ? " " + extra : "");
+    const f = k[4] || "", s = k[5] || "";
+    if (f) { const e = document.createElement("span"); e.className = "f"; e.textContent = f; d.appendChild(e); }
+    const m = document.createElement("span");
+    m.className = "m" + (k[0].length > 1 && k[0] !== "⌫" ? " word" : "");
+    m.textContent = k[0].length === 1 ? k[0].toUpperCase() : k[0];
+    d.appendChild(m);
+    if (s) { const e = document.createElement("span"); e.className = "s"; e.textContent = s; d.appendChild(e); }
+    return d;
+  }
+  function addKey(k, cx, cy) {
+    const i = KEYS.length;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "key"; b.dataset.i = i; b.tabIndex = -1;
+    b.setAttribute("aria-label", k[1] && typeof k[1] === "string" ? k[0] : k[0]);
+    place(b, (cx - 3.7).toFixed(2), (cy - 2.6).toFixed(2), 7.4, 5.2);
+    device.appendChild(b);
+    KEYS.push({ k, el: b });
+    return b;
+  }
+  const STRIPS_Y = [26.5, 32.9, 39.5, 46.1], ROWS_Y = [30.9, 37.3, 44.0, 50.4];
+  STRIPS_Y.forEach((y) => { const s = document.createElement("div"); s.className = "strip"; place(s, 0.9, y, 82.2, 2.7); device.appendChild(s); });
+  ROWS.forEach((row, r) => {
+    row.forEach((k, c) => {
+      const cx = 4.4 + c * 7.47;
+      const lg = legend(k);
+      place(lg, (cx - 3.7).toFixed(2), STRIPS_Y[r], 7.4, 2.7);
+      device.appendChild(lg);
+      addKey(k, cx, ROWS_Y[r]);
+      if (typeof k[1] === "string") {   // a modifier: its light sits at the left of its strip
+        const led = document.createElement("span");
+        place(led, 0.95, STRIPS_Y[r] + 0.95, 0.8, 0.8);
+        led.className = "led mm";
+        device.appendChild(led);
+        mods[k[1]].led = led;
+      }
+    });
+  });
+  [[ESC, 4.6], [TAB, 79.5]].forEach(([k, cx]) => {
+    const lg = legend(k, "side-legend");
+    place(lg, (cx - 3.7).toFixed(2), 20.6, 7.4, 2.2);
+    device.appendChild(lg);
+    addKey(k, cx, 24.5);
+  });
+
+  function keyEvent(i, pressed, fromReplay) {
+    const { k, el } = KEYS[i];
+    el.classList.toggle("down", pressed);
+    if (!fromReplay) note("k", i, pressed ? "d" : "u");
+    if (typeof k[1] === "string") modKey(mods[k[1]], pressed);
+    else ordinaryKey(i, k, pressed);
+  }
+
+  // Touch and mouse: every pointer holds its own key, so two fingers work.
+  const pointers = new Map();
+  device.addEventListener("pointerdown", (e) => {
+    const b = e.target.closest(".key");
+    if (!b) return;
+    e.preventDefault();
+    if (!powered) return;
+    try { b.setPointerCapture(e.pointerId); } catch (_) {}
+    pointers.set(e.pointerId, +b.dataset.i);
+    keyEvent(+b.dataset.i, true);
+  });
+  function pointerEnd(e) {
+    if (!pointers.has(e.pointerId)) return;
+    const i = pointers.get(e.pointerId);
+    pointers.delete(e.pointerId);
+    keyEvent(i, false);
+  }
+  ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => device.addEventListener(t, pointerEnd));
+  device.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  // The computer's keyboard: a USB keyboard plugged in (US layout). Each key
+  // goes down and up for real, so holding Esc or Tab works.
+  const PC = {
+    Escape: 1, Digit1: 2, Digit2: 3, Digit3: 4, Digit4: 5, Digit5: 6, Digit6: 7, Digit7: 8, Digit8: 9, Digit9: 10, Digit0: 11,
+    Minus: 12, Equal: 13, Backspace: 14, Tab: 15, KeyQ: 16, KeyW: 17, KeyE: 18, KeyR: 19, KeyT: 20, KeyY: 21, KeyU: 22,
+    KeyI: 23, KeyO: 24, KeyP: 25, BracketLeft: 26, BracketRight: 27, Enter: 28, NumpadEnter: 96, ControlLeft: 29,
+    KeyA: 30, KeyS: 31, KeyD: 32, KeyF: 33, KeyG: 34, KeyH: 35, KeyJ: 36, KeyK: 37, KeyL: 38, Semicolon: 39, Quote: 40,
+    Backquote: 41, ShiftLeft: 42, Backslash: 43, KeyZ: 44, KeyX: 45, KeyC: 46, KeyV: 47, KeyB: 48, KeyN: 49, KeyM: 50,
+    Comma: 51, Period: 52, Slash: 53, ShiftRight: 54, AltLeft: 56, Space: 57, CapsLock: 58,
+    F1: 59, F2: 60, F3: 61, F4: 62, F5: 63, F6: 64, F7: 65, F8: 66, F9: 67, F10: 68, F11: 87, F12: 88,
+    ControlRight: 97, PrintScreen: 99, AltRight: 100, Home: 102, ArrowUp: 103, PageUp: 104, ArrowLeft: 105,
+    ArrowRight: 106, End: 107, ArrowDown: 108, PageDown: 109, Insert: 110, Delete: 111,
+  };
+  const pcDown = new Set();
+  function pcKey(code, pressed, fromReplay) {
+    if (pressed === pcDown.has(code)) return;
+    pressed ? pcDown.add(code) : pcDown.delete(code);
+    if (!fromReplay) note("p", code, pressed ? "d" : "u");
+    evdev(1, code, pressed ? 1 : 0);
+  }
+  function typingElsewhere(t) { return t && t.closest && t.closest(".guide, .pretend"); }
+  document.addEventListener("keydown", (e) => {
+    const code = PC[e.code];
+    if (code === undefined || e.metaKey || typingElsewhere(e.target)) return;
+    e.preventDefault();
+    if (!e.repeat && powered) pcKey(code, true);
+  });
+  document.addEventListener("keyup", (e) => {
+    const code = PC[e.code];
+    if (code === undefined) return;
+    if (!typingElsewhere(e.target)) e.preventDefault();
+    pcKey(code, false);
+  });
+  // A key still down when the window loses focus would stay down forever.
+  window.addEventListener("blur", () => { for (const c of [...pcDown]) pcKey(c, false); });
+
+  // ---------------------------------------------------------------- screen
   function frame() {
-    if (mod && mod._zs_web_take_dirty()) {
+    if (mod && powered && mod._zs_web_take_dirty()) {
       const ptr = mod._zs_web_frame();
       img.data.set(mod.HEAPU8.subarray(ptr, ptr + 320 * 170 * 4));
       ctx.putImageData(img, 0, 0);
@@ -206,165 +600,91 @@ dd { margin: 0; color: var(--muted); align-self: center; }
     requestAnimationFrame(frame);
   }
 
-  // Physical keyboard (desktop).
-  const map = { ArrowUp: KEY.up, ArrowDown: KEY.down, ArrowLeft: KEY.left, ArrowRight: KEY.right,
-                Enter: KEY.enter, Escape: KEY.esc, Backspace: KEY.bksp, Tab: KEY.tab, Delete: KEY.del };
-  document.addEventListener("keydown", (e) => {
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.target.closest && e.target.closest(".apps, .help")) return;
-    let code = map[e.key];
-    if (code === undefined && e.key.length === 1) code = e.key.codePointAt(0);
-    if (code === undefined) return;
-    e.preventDefault();
-    send(code);
-  });
-  canvas.addEventListener("focus", () => { status.textContent = "keyboard: on"; });
-  canvas.addEventListener("blur", () => { status.textContent = "keyboard: on (page)"; });
-
-  // On-screen keyboard with letters and a symbol layer.
-  const layers = {
-    abc: [["q","w","e","r","t","y","u","i","o","p"],
-          ["a","s","d","f","g","h","j","k","l","'"],
-          ["shift","z","x","c","v","b","n","m","bksp"],
-          ["sym","`","space","-","enter"]],
-    sym: [["1","2","3","4","5","6","7","8","9","0"],
-          ["@","#","$","%","&","*","(",")","/",":"],
-          ["shift","!","?",",",".",";","\"","+","bksp"],
-          ["abc","_","space","=","enter"]],
-  };
-  const labels = { shift: "⇧", bksp: "⌫", space: "space", enter: "↵", sym: "123", abc: "abc" };
-  const keysEl = document.getElementById("keys");
-  let layer = "abc", shift = false;
-
-  function render() {
-    keysEl.textContent = "";
-    for (const row of layers[layer]) {
-      const r = document.createElement("div");
-      r.className = "row";
-      for (const k of row) {
-        const b = document.createElement("button");
-        b.className = "k";
-        b.type = "button";
-        if (k === "space") b.classList.add("wide4");
-        if (["shift", "bksp", "sym", "abc", "enter"].includes(k)) b.classList.add("mod");
-        if (k === "enter" || k === "bksp") b.classList.add("wide2");
-        if (k === "shift" && shift) b.classList.add("on");
-        let text = labels[k] || (shift && layer === "abc" ? k.toUpperCase() : k);
-        b.textContent = text;
-        b.dataset.k = k;
-        r.appendChild(b);
-      }
-      keysEl.appendChild(r);
+  // ---------------------------------------------------------------- power
+  // Off stops ZeroOS and blanks the screen; on starts it again from scratch.
+  const powerBtn = document.getElementById("power");
+  function setPower(on) {
+    if (on === powered) return;
+    powerBtn.setAttribute("aria-checked", on ? "true" : "false");
+    if (!on) {
+      powered = false;
+      if (mod) mod._zs_web_power(0);
+      resetDriver();
+      KEYS.forEach(({ el }) => el.classList.remove("down"));
+      device.classList.add("off");
+      live.classList.remove("live");
+      setStatus("off");
+    } else {
+      setStatus("booting");
+      setTimeout(() => location.replace(location.href.split("#")[0]), 250);
     }
   }
+  powerBtn.addEventListener("click", () => setPower(!powered));
 
-  function pressSoft(k) {
-    if (k === "shift") { shift = !shift; render(); return false; }
-    if (k === "sym") { layer = "sym"; render(); return false; }
-    if (k === "abc") { layer = "abc"; render(); return false; }
-    if (k === "space") send(32);
-    else if (k === "bksp") send(KEY.bksp);
-    else if (k === "enter") send(KEY.enter);
-    else {
-      send((shift && layer === "abc" ? k.toUpperCase() : k).codePointAt(0));
-      if (shift) { shift = false; render(); }
-    }
-    return true;
-  }
-
-  // Press-and-hold repeats, like a held key on the device.
-  let holdTimer = null, repeatTimer = null;
-  function stopHold() { clearTimeout(holdTimer); clearInterval(repeatTimer); holdTimer = repeatTimer = null;
-    document.querySelectorAll("button.k.held").forEach((b) => b.classList.remove("held")); }
-  document.getElementById("device").addEventListener("pointerdown", (e) => {
-    const b = e.target.closest("button.k");
-    if (!b) return;
-    e.preventDefault();
-    b.classList.add("held");
-    let fire;
-    if (b.dataset.key) { const c = +b.dataset.key; fire = () => send(c); fire(); }
-    else if (pressSoft(b.dataset.k)) { const k = b.dataset.k; fire = () => pressSoft(k); }
-    if (fire) holdTimer = setTimeout(() => { repeatTimer = setInterval(fire, 80); }, 420);
-  });
-  ["pointerup", "pointercancel", "pointerleave"].forEach((t) => document.addEventListener(t, stopHold));
-  // Keyboard users: Enter/Space on a focused on-screen key.
-  document.getElementById("device").addEventListener("click", (e) => {
-    const b = e.target.closest("button.k");
-    if (!b || e.detail !== 0) return;  // detail 0 = keyboard-activated
-    if (b.dataset.key) send(+b.dataset.key); else pressSoft(b.dataset.k);
-  });
-
-  // Jump-to-app chips, in launcher order.
-  // The list comes from the shell itself once it has booted, so it always
-  // matches this build (positions shift whenever an app is added).
-  const appsEl = document.getElementById("apps");
-  const appIds = [];
-  function openApp(id) {
-    if (!mod) return;
-    const i = id ? appIds.indexOf(id) : -1;
-    if (id && i < 0) return;
-    note("@" + (id || "home"));
-    mod._zs_web_open(i);
-  }
-  function chip(label, id) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = label;
-    b.addEventListener("click", () => { openApp(id); canvas.focus({ preventScroll: true }); });
-    return b;
-  }
-  const chipsEnd = document.createElement("span");
-  chipsEnd.hidden = true;
-  appsEl.appendChild(chip("Home", ""));
-  appsEl.appendChild(chipsEnd);
-  function listApps() {
-    const n = mod._zs_web_app_count();
-    for (let i = 0; i < n; i++) {
-      const id = mod.UTF8ToString(mod._zs_web_app_id(i));
-      appIds.push(id);
-      appsEl.insertBefore(chip(mod.UTF8ToString(mod._zs_web_app_name(i)), id), chipsEnd);
-    }
-  }
-  // Pretend HDMI monitor: try Dock mode. Docked, the real keyboard types on the
-  // monitor, so the device screen ignores keys until you unplug.
-  let hdmi = false;
-  const hdmiBtn = document.createElement("button");
-  hdmiBtn.type = "button";
-  hdmiBtn.textContent = "Plug in monitor";
-  hdmiBtn.addEventListener("click", () => {
-    setHdmi(!hdmi);
-    canvas.focus({ preventScroll: true });
-  });
-  function setHdmi(on) {
+  // ---------------------------------------------------------------- pretend hardware
+  let hdmi = false, pose = 0;
+  const poses = ["flat on a table", "face down", "in a hand", "in a pocket"];
+  const hdmiBtn = document.getElementById("hdmi"), poseBtn = document.getElementById("pose");
+  function setHdmi(on, fromReplay) {
     hdmi = on;
-    note(hdmi ? "h1" : "h0");
-    if (mod) mod._zs_web_hdmi(hdmi ? 1 : 0);
-    hdmiBtn.textContent = hdmi ? "Unplug monitor" : "Plug in monitor";
-    hdmiBtn.classList.toggle("on", hdmi);
+    if (!fromReplay) note("m", on ? 1 : 0);
+    if (mod) mod._zs_web_hdmi(on ? 1 : 0);
+    hdmiBtn.textContent = "HDMI monitor: " + (on ? "plugged in" : "unplugged");
+    hdmiBtn.classList.toggle("on", on);
   }
-  appsEl.appendChild(hdmiBtn);
-  // Pretend motion: how the Cardputer is lying (face down turns the screen
-  // off; picking it up turns it back on).
-  const poses = ["Flat on table", "Face down", "In hand", "In pocket"];
-  let pose = 0;
-  const poseBtn = document.createElement("button");
-  poseBtn.type = "button";
-  poseBtn.textContent = "Pose: " + poses[0];
-  poseBtn.addEventListener("click", () => {
-    setPose((pose + 1) % poses.length);
-    canvas.focus({ preventScroll: true });
-  });
-  function setPose(p) {
-    pose = p;
-    note("p" + pose);
+  function setPose(p, fromReplay) {
+    pose = p % poses.length;
+    if (!fromReplay) note("o", pose);
     if (mod) mod._zs_web_pose(pose);
-    poseBtn.textContent = "Pose: " + poses[pose];
+    poseBtn.textContent = "Lying: " + poses[pose];
+    poseBtn.classList.toggle("on", pose !== 0);
   }
-  appsEl.appendChild(poseBtn);
+  hdmiBtn.addEventListener("click", () => setHdmi(!hdmi));
+  poseBtn.addEventListener("click", () => setPose(pose + 1));
 
-  render();
-  requestAnimationFrame(frame);
-  // ---- Replay: #replay=10.17.@files.w.27 presses those keys after boot.
+  // ---------------------------------------------------------------- guide tabs
+  const tabs = document.querySelectorAll(".tabs button");
+  tabs.forEach((t) => t.addEventListener("click", () => {
+    tabs.forEach((o) => o.setAttribute("aria-selected", o === t ? "true" : "false"));
+    document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("on", p.id === "pane-" + t.dataset.pane));
+  }));
+
+  // The app list: apps.json, written next to this page by the site's build
+  // from the Apps repository. Apps built into this simulator get a tag.
+  const simApps = new Set();
+  let catalog = null;
+  function renderApps() {
+    const list = document.getElementById("applist");
+    const q = document.getElementById("appfilter").value.trim().toLowerCase();
+    list.textContent = "";
+    if (!catalog) {
+      const p = document.createElement("p"); p.className = "fine";
+      p.innerHTML = 'The list isn\'t available here. See <a href="https://github.com/hartj77-blip/CardPuter-Apps.4ME-U">CardPuter-Apps.4ME-U</a>.';
+      list.appendChild(p);
+      return;
+    }
+    const shown = catalog.apps.filter((a) => !q || (a.name + " " + a.summary).toLowerCase().includes(q));
+    for (const a of shown) {
+      const row = document.createElement("div"); row.className = "app";
+      const name = document.createElement("div"); name.className = "name";
+      const link = document.createElement("a"); link.href = a.url; link.target = "_blank"; link.rel = "noopener"; link.textContent = a.name;
+      name.appendChild(link);
+      const here = a.ids.some((id) => simApps.has(id));
+      const tag = document.createElement("span");
+      tag.className = "tag " + (here ? "here" : "dev");
+      tag.textContent = here ? "Try it here" : "On the device";
+      name.appendChild(tag);
+      const ver = document.createElement("div"); ver.className = "ver"; ver.textContent = a.version;
+      const sum = document.createElement("div"); sum.className = "sum"; sum.textContent = a.summary;
+      row.append(name, ver, sum);
+      list.appendChild(row);
+    }
+    if (!shown.length) { const p = document.createElement("p"); p.className = "fine"; p.textContent = "No app matches."; list.appendChild(p); }
+  }
+  document.getElementById("appfilter").addEventListener("input", renderApps);
+  fetch("apps.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).then((j) => { catalog = j; }).catch(() => {}).finally(renderApps);
+
+  // ---------------------------------------------------------------- replay
   function replayTokens() {
     const m = location.hash.match(/replay=([^&]*)/);
     return m ? decodeURIComponent(m[1]).split(".").filter(Boolean) : [];
@@ -373,66 +693,58 @@ dd { margin: 0; color: var(--muted); align-self: center; }
     if (!tokens.length) return;
     replaying = true;
     let i = 0;
-    status.textContent = "replaying 0/" + tokens.length;
     (function step() {
       if (i >= tokens.length) {
         replaying = false;
         log.push(...tokens);
-        status.textContent = "replay done: your turn";
+        lastAct = performance.now();
+        setStatus("replay done: your turn");
         return;
       }
-      const t = tokens[i++];
-      let wait = 120;
-      if (t === "w") wait = 1000;
-      else if (t[0] === "@") openApp(t === "@home" ? "" : t.slice(1));
-      else if (t[0] === "h") setHdmi(t === "h1");
-      else if (t[0] === "p") setPose(+t.slice(1) % poses.length);
-      else if (/^\d+$/.test(t)) send(+t);
-      status.textContent = "replaying " + i + "/" + tokens.length;
-      setTimeout(step, wait);
+      const t = tokens[i++].match(/^([kpmo])(\d+)([du]?)_(\d+)$/);
+      const next = tokens[i] && tokens[i].match(/_(\d+)$/);
+      if (t) {
+        const id = +t[2], down = t[3] === "d";
+        if (t[1] === "k" && KEYS[id]) keyEvent(id, down, true);
+        else if (t[1] === "p") pcKey(id, down, true);
+        else if (t[1] === "m") setHdmi(id === 1, true);
+        else if (t[1] === "o") setPose(id, true);
+      }
+      setStatus("replaying " + i + "/" + tokens.length);
+      setTimeout(step, next ? +next[1] * 10 : 60);
     })();
   }
-  function replayLink() {
-    const base = location.href.split("#")[0];
-    return base + "#replay=" + log.join(".");
-  }
+  function replayLink() { return location.href.split("#")[0] + "#replay=" + log.join("."); }
 
-  // ---- Bug reports
+  // ---------------------------------------------------------------- reports
   function str(fn) { try { return mod ? mod.UTF8ToString(fn()) : ""; } catch (e) { return ""; } }
   function debugInfo() {
-    const app = str(() => mod._zs_web_current_app()) || "home";
     return [
       "- Build: commit " + COMMIT,
       "- Page: " + location.href.split("#")[0],
-      "- Open app: " + app,
-      "- Monitor: " + (hdmi ? "plugged in" : "not plugged in") + ", pose: " + poses[pose],
+      "- Open app: " + (str(() => mod._zs_web_current_app()) || "home"),
+      "- Monitor: " + (hdmi ? "plugged in" : "not plugged in") + ", lying: " + poses[pose],
       "- Browser: " + navigator.userAgent,
-      "- Screen: " + window.innerWidth + "x" + window.innerHeight + " @" + window.devicePixelRatio + "x",
-      "- Crashed: " + (document.body.classList.contains("crashed") ? "yes" : "no"),
+      "- Window: " + window.innerWidth + "x" + window.innerHeight + " @" + window.devicePixelRatio + "x",
+      "- Crashed: " + (crashedFlag ? "yes" : "no"),
     ].join("\n");
   }
-  function issueBody() {
-    const errs = errors.length ? errors.join("\n") : "(none)";
-    return [
+  function issueUrl() {
+    const app = str(() => mod._zs_web_current_app()) || "home";
+    const title = "Simulator: " + (crashedFlag ? "crash in " : "") + app + ": ";
+    const body = [
       "**What happened?**", "", "", "",
       "**What did you expect?**", "", "", "",
       "**Replay** (opens the simulator and presses the same keys)", replayLink(), "",
       "**Debug info**", debugInfo(), "",
-      "<details><summary>Log (last lines)</summary>", "", "```", errs.slice(-1500), "```", "</details>", "",
+      "<details><summary>Log (last lines)</summary>", "", "```", (errors.join("\n") || "(none)").slice(-1500), "```", "</details>", "",
       "_Reported from the browser simulator._",
     ].join("\n");
+    return "https://github.com/" + REPO + "/issues/new?labels=simulator&title=" + encodeURIComponent(title) + "&body=" + encodeURIComponent(body);
   }
   function report() {
-    const app = str(() => mod._zs_web_current_app()) || "home";
-    const title = "Simulator: " + (document.body.classList.contains("crashed") ? "crash in " : "") + app + ": ";
-    let url = "https://github.com/" + REPO + "/issues/new?labels=simulator&title=" +
-      encodeURIComponent(title) + "&body=" + encodeURIComponent(issueBody());
-    // GitHub rejects very long URLs: drop the oldest keys until it fits.
-    while (url.length > 7500 && log.length > 20) {
-      log.splice(0, 20);
-      url = "https://github.com/" + REPO + "/issues/new?labels=simulator&title=" +
-        encodeURIComponent(title) + "&body=" + encodeURIComponent(issueBody());
-    }
+    let url = issueUrl();
+    while (url.length > 7500 && log.length > 20) { log.splice(0, 20); url = issueUrl(); }   // GitHub refuses very long URLs
     window.open(url, "_blank", "noopener");
   }
   async function copy(text, btn) {
@@ -446,20 +758,27 @@ dd { margin: 0; color: var(--muted); align-self: center; }
   document.getElementById("copy-debug").addEventListener("click", (e) => copy(debugInfo() + "\nReplay: " + replayLink(), e.currentTarget));
   document.getElementById("build").textContent = "Build " + COMMIT.slice(0, 7);
 
+  // ---------------------------------------------------------------- boot
   function crashed(what) {
     err(what);
+    crashedFlag = true;
     document.body.classList.add("crashed");
-    status.textContent = "crashed: see report";
+    live.classList.remove("live");
+    setStatus("crashed");
   }
+  requestAnimationFrame(frame);
   createZeroShell({
     arguments: [],
     printErr: (line) => { err(line); console.warn(line); },
     onAbort: (what) => crashed("abort: " + what),
   }).then((m) => {
     mod = m;
-    listApps();
-    document.getElementById("device").classList.add("ready");
-    status.textContent = "keyboard: on";
+    for (let i = 0, n = mod._zs_web_app_count(); i < n; i++) simApps.add(mod.UTF8ToString(mod._zs_web_app_id(i)));
+    if (catalog) renderApps();
+    device.classList.add("ready");
+    live.classList.add("live");
+    setStatus("on");
+    canvas.focus({ preventScroll: true });
     replay(replayTokens());
   }).catch((e) => {
     crashed("failed to start: " + e);
