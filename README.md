@@ -1073,10 +1073,19 @@ There's also a browser version, which needs [Emscripten](https://emscripten.org)
 web/build.sh build/zeroos-simulator.html
 ```
 
-It produces one self-contained HTML file you can open directly. It is also published at
+It produces one self-contained HTML file you can open directly. That build has only the apps this
+repository still lists. To build it with every app from
+[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U), point it at a
+checkout of that repository:
+
+```sh
+ZS_APPS=../CardPuter-Apps.4ME-U web/build.sh build/zeroos-simulator.html
+```
+
+That's the version published at
 [hartj77-blip.github.io/emu-cardputer-os.4me-u](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/)
 by the [emu-cardputer-os.4me-u](https://github.com/hartj77-blip/emu-cardputer-os.4me-u) repository,
-which rebuilds it from `main` within an hour of every change.
+which rebuilds it from both repositories' `main` within about 5-15 minutes of a change.
 
 The page draws the Cardputer Zero face on, from M5's dimension drawing and product photo: the red
 power slider at the top right, Esc and Tab under the screen's corners, and four rows of 11 keys under
