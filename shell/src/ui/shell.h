@@ -21,8 +21,11 @@ public:
     void go_home();
     // Esc held down (keypad hook): close the panel and go home now.
     void hold_home();
-    // Tab held down (LOCK on the key): the screen off now, as if idle.
+    // Tab held down (LOCK on the key): the screen off now, and the lock
+    // screen (ui/lock_face.h) when it wakes.
     void hold_lock();
+    // Home's photograph behind the whole screen, status bar included.
+    void set_photo(bool on);
     // PRSC: save the screen to ~/Pictures/Screenshots and say so.
     void screenshot();
     // The Terminal, the camera or an M5Stack app has the screen.
@@ -80,6 +83,7 @@ private:
     lv_obj_t* screen_ = nullptr;
     lv_obj_t* content_ = nullptr;
     lv_obj_t* app_root_ = nullptr;   // the open app's area
+    lv_obj_t* statusbar_ = nullptr;
     lv_obj_t* sb_time_ = nullptr;
     lv_obj_t* sb_title_ = nullptr;
     lv_obj_t* sb_home_ = nullptr;    // workspace pill, shown on the home screen

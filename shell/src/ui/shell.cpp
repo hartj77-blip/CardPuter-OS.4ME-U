@@ -10,6 +10,7 @@
 #include "platform/platform.h"
 #include "ui/actions.h"
 #include "ui/app_watch.h"
+#include "ui/lock_face.h"
 #include "ui/numkeys.h"
 #include "ui/player.h"
 #include "ui/power.h"
@@ -20,6 +21,7 @@
 #include "ui/sync.h"
 #include "ui/theme.h"
 #include "ui/tracker.h"
+#include "ui/wallpaper.h"
 
 // lv_theme_t is opaque in the public API; a child theme needs its size.
 #include "src/themes/lv_theme_private.h"
@@ -69,6 +71,9 @@ void keypad_hook(lv_indev_t* indev, lv_indev_data_t* data) {
     if (new_press && data->key == kKeyPrintScreen && Shell::get().handed_off() && !power().screen_off())
         Shell::get().screenshot();
     if (new_press && power().on_key(lv_tick_get())) {
+        g_swallowed = true;
+    } else if (new_press && lock_face_shown()) {   // locked: this key unlocks, nothing else
+        lock_face_hide();
         g_swallowed = true;
     } else if (new_press) {
         g_press_ms = g_repeat_ms = lv_tick_get();
@@ -211,6 +216,8 @@ void Shell::start(lv_indev_t* keypad) {
     actions_build(screen_);
     suggest_build(screen_);
 
+    lock_face_build();   // under the backlight stand-in
+
     // Simulator stand-in for the backlight: a black layer over everything.
     blank_ = lv_obj_create(lv_layer_top());
     style_plain(blank_);
@@ -230,7 +237,7 @@ void Shell::start(lv_indev_t* keypad) {
 // Ubuntu's top bar: what's open on the left, date and time in the middle,
 // system status on the right.
 void Shell::build_statusbar() {
-    lv_obj_t* bar = lv_obj_create(screen_);
+    lv_obj_t* bar = statusbar_ = lv_obj_create(screen_);
     style_plain(bar);
     lv_obj_set_size(bar, kScreenW, kStatusH);
     lv_obj_set_pos(bar, 0, 0);
@@ -405,7 +412,10 @@ void Shell::tick_cb(lv_timer_t* t) {
         }
     }
     // Screen off or terminal: the timer runs every 500 ms and nothing is drawn.
-    if (!power().screen_off() && !s->handoff_ && ++n % 10 == 0) s->update_statusbar();
+    if (!power().screen_off() && !s->handoff_ && ++n % 10 == 0) {
+        s->update_statusbar();
+        lock_face_tick();
+    }
     if (s->app_) s->app_->tick();
     number_hints_tick();
     suggest_tick();
@@ -434,6 +444,7 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
         group_ = nullptr;
     }
     lv_obj_clean(content_);
+    set_photo(false);   // home turns it back on
     app_ = std::move(app);
 
     group_ = lv_group_create();
@@ -522,6 +533,14 @@ void Shell::hold_lock() {
     if (tab_by_app_ && app_id_ == "home" && app_) app_->on_back();
     tab_by_app_ = false;
     power().lock_now(lv_tick_get());
+    if (power().screen_off()) lock_face_show();
+}
+
+// Home's photograph runs under the status bar: the screen carries it and the
+// bar turns see-through. Every other screen has the black bar.
+void Shell::set_photo(bool on) {
+    lv_obj_set_style_bg_image_src(screen_, on ? wallpaper_home() : nullptr, 0);
+    lv_obj_set_style_bg_opa(statusbar_, on ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
 }
 
 void Shell::screenshot() {

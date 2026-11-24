@@ -97,14 +97,30 @@ lv_obj_t* app_icon(lv_obj_t* parent, const AppInfo& info, int size) {
 }
 
 // Translucent white behind the item in focus, as in GNOME.
-void style_item(lv_obj_t* o, int radius) {
+void style_item(lv_obj_t* o) {
     style_plain(o);
-    lv_obj_set_style_radius(o, 0, 0);
-    lv_obj_set_style_bg_color(o, c(0xffffff), 0);
-    lv_obj_set_style_bg_opa(o, LV_OPA_30, LV_STATE_FOCUSED);
     lv_obj_set_style_outline_width(o, 0, LV_STATE_FOCUS_KEY);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(o, LV_OBJ_FLAG_CLICKABLE);
+}
+
+// A pinned app: its icon as the author drew it; in focus, a white frame
+// round the cell over a faint lift of the photo.
+void style_pin(lv_obj_t* o) {
+    style_item(o);
+    lv_obj_set_style_bg_color(o, c(kGrey8), LV_STATE_FOCUSED);
+    lv_obj_set_style_bg_opa(o, LV_OPA_20, LV_STATE_FOCUSED);
+    lv_obj_set_style_border_color(o, c(kGrey8), LV_STATE_FOCUSED);
+    lv_obj_set_style_border_width(o, 1, LV_STATE_FOCUSED);
+}
+
+// A Recent row: lit white with black text in focus, like every list. Labels
+// that should follow it take their colour from the row (no colour of their own).
+void style_row(lv_obj_t* o) {
+    style_item(o);
+    lv_obj_set_style_text_color(o, c(kText), 0);
+    style_focus_fill(o, LV_STATE_FOCUSED);
+    lv_obj_set_style_text_color(o, c(kOnFocus), LV_STATE_FOCUSED);
 }
 
 // ---- Search ---------------------------------------------------------------
@@ -303,11 +319,9 @@ public:
 
     void build(lv_obj_t* root) override {
         root_ = root;
-        // Wallpaper: black fading to dark grey, until the photographs land.
-        lv_obj_set_style_bg_color(root, c(kAubergine), 0);
-        lv_obj_set_style_bg_grad_color(root, c(kAubergineLight), 0);
-        lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_HOR, 0);
-        lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
+        // The photograph is the screen's, under the status bar too (Shell::
+        // set_photo). Search and All apps cover it with plain black.
+        lv_obj_set_style_bg_color(root, c(kBg), 0);
         show_home();
     }
 
@@ -394,7 +408,7 @@ private:
         lv_obj_set_pos(box_, 4, 3);
         lv_obj_set_style_radius(box_, 0, 0);
         lv_obj_set_style_bg_color(box_, c(0x000000), 0);
-        lv_obj_set_style_bg_opa(box_, LV_OPA_40, 0);
+        lv_obj_set_style_bg_opa(box_, LV_OPA_60, 0);
         lv_obj_remove_flag(box_, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_t* p = label(box_, LV_SYMBOL_RIGHT, &zs_font_12, kAccent);
         lv_obj_align(p, LV_ALIGN_LEFT_MID, 7, 0);
@@ -406,8 +420,14 @@ private:
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 22, 0);
     }
 
+    void photo(bool on) {
+        Shell::get().set_photo(on);
+        lv_obj_set_style_bg_opa(root_, on ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
+    }
+
     void refresh() {
         clear();
+        photo(query_.empty());
         search_box();
         if (query_.empty()) home_page();
         else results_page();
@@ -421,7 +441,7 @@ private:
             const AppInfo* a = app_find(pins_[size_t(i)]);
             if (!a) continue;
             lv_obj_t* cell = lv_obj_create(root_);
-            style_item(cell, 6);
+            style_pin(cell);
             lv_obj_set_size(cell, kPinW - 2, kPinsH);
             lv_obj_set_pos(cell, 1 + i * kPinW, kPinsY);
             lv_obj_t* ic = app_icon(cell, *a, 20);
@@ -492,7 +512,7 @@ private:
     void add_row(const char* icon, uint32_t color, const std::string& text, const std::string& id,
                  std::function<void()> run, const std::string& value = "") {
         lv_obj_t* row = lv_obj_create(rows_box_);
-        style_item(row, 4);
+        style_row(row);
         lv_obj_set_size(row, kScreenW - 8, kRowH);
         lv_obj_add_flag(row, LV_OBJ_FLAG_SCROLL_ON_FOCUS);
         lv_obj_t* ic = lv_obj_create(row);
@@ -504,7 +524,8 @@ private:
         lv_obj_remove_flag(ic, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_center(label(ic, icon, &zs_font_12, 0xffffff));
         lv_obj_align(ic, LV_ALIGN_LEFT_MID, 4, 0);
-        lv_obj_t* t = label(row, text.c_str(), &zs_font_14, 0xffffff);
+        lv_obj_t* t = label(row, text.c_str(), &zs_font_14);
+        lv_obj_remove_local_style_prop(t, LV_STYLE_TEXT_COLOR, 0);   // the row's, so focus turns it black
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 26, 0);
         if (!value.empty()) {
             lv_obj_t* v = label(row, value.c_str(), &zs_font_12, kMuted);
@@ -687,6 +708,7 @@ private:
         all_apps_ = true;
         query_.clear();
         clear();
+        photo(false);
         std::vector<const AppInfo*> apps;
         for (const AppInfo& a : app_registry()) apps.push_back(&a);
         std::sort(apps.begin(), apps.end(), [](const AppInfo* x, const AppInfo* y) { return norm(x->name) < norm(y->name); });
