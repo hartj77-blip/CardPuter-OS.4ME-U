@@ -278,7 +278,8 @@ private:
             src_filter_.clear();   // that source is gone
         bool by_source = shown_sources_.size() > 1;
         int updates = 0;
-        for (auto& e : cat_) updates += e.update();
+        // Apps a ZeroOS update took off count too: Update all puts them back.
+        for (auto& e : cat_) updates += e.update() || e.to_restore();
         shell_set_actions({
             {"Details", 0, "Enter", nullptr},
             {fmt("Update all (%d)", updates), 'u', nullptr, [this] { update_all(); }, updates > 0},
@@ -308,7 +309,7 @@ private:
             if (!src_filter_.empty() && e.source != src_filter_) continue;
             std::string right;
             uint32_t color = kMuted;
-            if (e.update()) {
+            if (e.update() || e.to_restore()) {
                 right = "Update";
                 color = kAccent;
             } else if (!e.installed.empty()) {
