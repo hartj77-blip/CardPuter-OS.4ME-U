@@ -57,7 +57,7 @@ bool app_modules_stale();
 // matches ZS_APP_ABI. Bump ZS_APP_ABI whenever a header an app includes
 // (ui/, hal/, apps/common.h, LVGL or lv_conf.h) changes in a way that
 // breaks already-built modules: the store then offers only matching builds.
-#define ZS_APP_ABI 3
+#define ZS_APP_ABI 4
 
 struct AppModule {
     int abi;                  // ZS_APP_ABI the module was built with

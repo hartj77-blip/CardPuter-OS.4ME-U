@@ -81,7 +81,7 @@ layer for the Cardputer Zero.
 | U / I | Brightness down / up |
 | Q | Play or pause music |
 | W / E | Previous / next track |
-| K / N | Home / End |
+| K / N | Home / End: the first or last row of a list |
 | L / M | Page up / Page down: five items at a time in a list |
 | Backspace | Delete |
 | 1 to 0, O, P | F1 to F12 (not used yet) |
