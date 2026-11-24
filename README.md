@@ -16,7 +16,7 @@ inside, not a Raspberry Pi, and can't run it.
 This is a community project. It isn't made, endorsed or supported by M5Stack.
 
 - [Download](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest)
-- [Try it in your browser](https://hartj77-blip.github.io/CardPuter-OS.4ME-U/) (the real home screen and apps, simulated hardware)
+- [Try it in your browser](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) (the real home screen and apps, simulated hardware)
 - [Report a problem](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/issues)
 - [The apps repository](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U)
 
@@ -951,9 +951,10 @@ There's also a browser version, which needs [Emscripten](https://emscripten.org)
 web/build.sh build/zeroos-simulator.html
 ```
 
-It produces one self-contained HTML file you can open directly. Every push to `main` also publishes
-it to [GitHub Pages](https://hartj77-blip.github.io/CardPuter-OS.4ME-U/)
-(`.github/workflows/pages.yml`). Its **Report a problem** button opens a GitHub issue filled in
+It produces one self-contained HTML file you can open directly. It is also published at
+[hartj77-blip.github.io/emu-cardputer-os.4me-u](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/)
+by the [emu-cardputer-os.4me-u](https://github.com/hartj77-blip/emu-cardputer-os.4me-u) repository,
+which rebuilds it from `main` within an hour of every change. Its **Report a problem** button opens a GitHub issue filled in
 with the commit, the open app, the browser, the shell's log and a replay link: the page address
 plus `#replay=` and the keys pressed, which opens the simulator and presses them again.
 
