@@ -70,7 +70,7 @@ button.k.wide2 { grid-column: span 2; } button.k.wide4 { grid-column: span 4; }
 button.k.mod { color: var(--muted); font-size: 12px; }
 button.k.mod.on { color: var(--accent); }
 button.k.ok { background: #4a2313; color: var(--accent); }
-button.k.down, button.k:active { background: var(--key-down); color: #fff; transform: translateY(1px); box-shadow: none; }
+button.k.held, button.k:active { background: var(--key-down); color: #fff; transform: translateY(1px); box-shadow: none; }
 button.k:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media (max-width: 520px) {
   .controls { grid-template-columns: 1fr; }
@@ -94,6 +94,20 @@ dd { margin: 0; color: var(--muted); align-self: center; }
 }
 .apps button:hover, .apps button:focus-visible { border-color: var(--accent); color: var(--accent); outline: none; }
 .apps button.on { border-color: var(--accent); color: var(--accent); }
+.help { display: flex; flex-wrap: wrap; gap: 8px; }
+.help button, .help a {
+  appearance: none; border: 1px solid var(--shell-edge); background: transparent; color: var(--ink);
+  border-radius: 8px; padding: 8px 12px; font: 500 13px var(--font-body); cursor: pointer; text-decoration: none;
+}
+.help .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.help button:hover, .help a:hover, .help button:focus-visible, .help a:focus-visible { border-color: var(--accent); outline: none; }
+.help .primary:hover { filter: brightness(1.1); }
+.crash {
+  display: none; border: 1px solid var(--accent); background: #2a0a0a; border-radius: 10px;
+  padding: 12px 14px; font-size: 14px; line-height: 1.5;
+}
+.crashed .crash { display: block; }
+.crash strong { color: var(--accent); }
 .fine { font-size: 12px; color: #8a837c; line-height: 1.5; margin: 0; }
 </style>
 
@@ -119,7 +133,8 @@ dd { margin: 0; color: var(--muted); align-self: center; }
 
   <div class="notes">
     <h1>Zero<span>OS</span> simulator</h1>
-    <p class="lede">This is the real ZeroShell code from the cardputer-zero repo, compiled to WebAssembly and running at the Cardputer Zero's native 320 × 170. Sensors, battery, Wi-Fi and audio are simulated until the hardware arrives.</p>
+    <p class="lede">This is the real ZeroShell code from ZeroOS, compiled to WebAssembly and running at the Cardputer Zero's native 320 × 170. Sensors, battery, Wi-Fi and audio are simulated until the hardware arrives.</p>
+    <div class="crash" role="alert"><strong>The simulator crashed.</strong> That's a bug in ZeroOS. Report it below: the keys you pressed and the log are filled in for you. Reload the page to start again.</div>
     <section>
       <h2>Jump to an app</h2>
       <div class="apps" id="apps"></div>
@@ -135,7 +150,16 @@ dd { margin: 0; color: var(--muted); align-self: center; }
         <dt>R · L</dt><dd>Rescan Wi-Fi · learn an IR code</dd>
       </dl>
     </section>
-    <p class="fine">Notes, voice notes and IR codes you change live in this browser tab only and reset on reload. Build v0.1.0, Phase 0.</p>
+    <section>
+      <h2>Found a problem?</h2>
+      <div class="help">
+        <button type="button" class="primary" id="report">Report a problem</button>
+        <button type="button" id="copy-replay">Copy replay link</button>
+        <button type="button" id="copy-debug">Copy debug info</button>
+      </div>
+      <p class="fine" style="margin-top:8px">Report a problem opens a new GitHub issue with this build, the open app, your browser and the keys you pressed already filled in. The replay link opens this page and presses the same keys again, so whoever fixes it can watch it happen. Nothing is sent until you submit the issue.</p>
+    </section>
+    <p class="fine">Notes, voice notes and IR codes you change live in this browser tab only and reset on reload. <span id="build">Build __ZS_COMMIT__</span>.</p>
   </div>
 </div>
 
@@ -151,7 +175,25 @@ dd { margin: 0; color: var(--muted); align-self: center; }
   const status = document.getElementById("status");
   let mod = null;
 
-  function send(code) { if (mod) mod._zs_web_key(code >>> 0); }
+  const REPO = "hartj77-blip/CardPuter-OS.4ME-U";
+  const COMMIT = "__ZS_COMMIT__";
+  // Everything the user does, as replay tokens: a key code, "@<app id>" for a
+  // jump chip, "h0/h1" monitor, "p<n>" pose, "w" for each idle second (max 5).
+  const log = [];
+  let lastAct = performance.now(), replaying = false;
+  function note(tok) {
+    if (replaying) return;
+    const idle = Math.min(5, Math.floor((performance.now() - lastAct) / 1000));
+    for (let i = 0; i < idle && log.length; i++) log.push("w");
+    log.push(String(tok));
+    if (log.length > 400) log.splice(0, log.length - 400);
+    lastAct = performance.now();
+  }
+  const errors = [];
+  function err(line) { errors.push(String(line)); if (errors.length > 40) errors.shift(); }
+  window.addEventListener("error", (e) => err(e.message));
+  window.addEventListener("unhandledrejection", (e) => err(e.reason));
+  function send(code) { if (mod) { note(code >>> 0); mod._zs_web_key(code >>> 0); } }
   function typeText(s) { for (const ch of s) send(ch.codePointAt(0)); }
 
   // Screen refresh: copy the RGBA frame whenever LVGL flushed something.
@@ -169,7 +211,7 @@ dd { margin: 0; color: var(--muted); align-self: center; }
                 Enter: KEY.enter, Escape: KEY.esc, Backspace: KEY.bksp, Tab: KEY.tab, Delete: KEY.del };
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.target.closest && e.target.closest(".apps")) return;
+    if (e.target.closest && e.target.closest(".apps, .help")) return;
     let code = map[e.key];
     if (code === undefined && e.key.length === 1) code = e.key.codePointAt(0);
     if (code === undefined) return;
@@ -233,12 +275,12 @@ dd { margin: 0; color: var(--muted); align-self: center; }
   // Press-and-hold repeats, like a held key on the device.
   let holdTimer = null, repeatTimer = null;
   function stopHold() { clearTimeout(holdTimer); clearInterval(repeatTimer); holdTimer = repeatTimer = null;
-    document.querySelectorAll("button.k.down").forEach((b) => b.classList.remove("down")); }
+    document.querySelectorAll("button.k.held").forEach((b) => b.classList.remove("held")); }
   document.getElementById("device").addEventListener("pointerdown", (e) => {
     const b = e.target.closest("button.k");
     if (!b) return;
     e.preventDefault();
-    b.classList.add("down");
+    b.classList.add("held");
     let fire;
     if (b.dataset.key) { const c = +b.dataset.key; fire = () => send(c); fire(); }
     else if (pressSoft(b.dataset.k)) { const k = b.dataset.k; fire = () => pressSoft(k); }
@@ -253,19 +295,36 @@ dd { margin: 0; color: var(--muted); align-self: center; }
   });
 
   // Jump-to-app chips, in launcher order.
-  const apps = ["Terminal", "Remote", "Sync", "Files", "Notes", "Media", "Camera", "Car", "Wi-Fi", "Tether", "IR Remote", "GPS", "Mesh", "Compass", "Battery", "Clock", "Dock", "System", "Settings"];
+  // The list comes from the shell itself once it has booted, so it always
+  // matches this build (positions shift whenever an app is added).
   const appsEl = document.getElementById("apps");
-  const homeBtn = document.createElement("button");
-  homeBtn.type = "button"; homeBtn.textContent = "Home";
-  homeBtn.addEventListener("click", () => { if (mod) mod._zs_web_open(-1); canvas.focus({ preventScroll: true }); });
-  appsEl.appendChild(homeBtn);
-  apps.forEach((name, i) => {
+  const appIds = [];
+  function openApp(id) {
+    if (!mod) return;
+    const i = id ? appIds.indexOf(id) : -1;
+    if (id && i < 0) return;
+    note("@" + (id || "home"));
+    mod._zs_web_open(i);
+  }
+  function chip(label, id) {
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = name;
-    b.addEventListener("click", () => { if (mod) mod._zs_web_open(i); canvas.focus({ preventScroll: true }); });
-    appsEl.appendChild(b);
-  });
+    b.textContent = label;
+    b.addEventListener("click", () => { openApp(id); canvas.focus({ preventScroll: true }); });
+    return b;
+  }
+  const chipsEnd = document.createElement("span");
+  chipsEnd.hidden = true;
+  appsEl.appendChild(chip("Home", ""));
+  appsEl.appendChild(chipsEnd);
+  function listApps() {
+    const n = mod._zs_web_app_count();
+    for (let i = 0; i < n; i++) {
+      const id = mod.UTF8ToString(mod._zs_web_app_id(i));
+      appIds.push(id);
+      appsEl.insertBefore(chip(mod.UTF8ToString(mod._zs_web_app_name(i)), id), chipsEnd);
+    }
+  }
   // Pretend HDMI monitor: try Dock mode. Docked, the real keyboard types on the
   // monitor, so the device screen ignores keys until you unplug.
   let hdmi = false;
@@ -273,12 +332,16 @@ dd { margin: 0; color: var(--muted); align-self: center; }
   hdmiBtn.type = "button";
   hdmiBtn.textContent = "Plug in monitor";
   hdmiBtn.addEventListener("click", () => {
-    hdmi = !hdmi;
+    setHdmi(!hdmi);
+    canvas.focus({ preventScroll: true });
+  });
+  function setHdmi(on) {
+    hdmi = on;
+    note(hdmi ? "h1" : "h0");
     if (mod) mod._zs_web_hdmi(hdmi ? 1 : 0);
     hdmiBtn.textContent = hdmi ? "Unplug monitor" : "Plug in monitor";
     hdmiBtn.classList.toggle("on", hdmi);
-    canvas.focus({ preventScroll: true });
-  });
+  }
   appsEl.appendChild(hdmiBtn);
   // Pretend motion: how the Cardputer is lying (face down turns the screen
   // off; picking it up turns it back on).
@@ -288,22 +351,119 @@ dd { margin: 0; color: var(--muted); align-self: center; }
   poseBtn.type = "button";
   poseBtn.textContent = "Pose: " + poses[0];
   poseBtn.addEventListener("click", () => {
-    pose = (pose + 1) % poses.length;
-    if (mod) mod._zs_web_pose(pose);
-    poseBtn.textContent = "Pose: " + poses[pose];
+    setPose((pose + 1) % poses.length);
     canvas.focus({ preventScroll: true });
   });
+  function setPose(p) {
+    pose = p;
+    note("p" + pose);
+    if (mod) mod._zs_web_pose(pose);
+    poseBtn.textContent = "Pose: " + poses[pose];
+  }
   appsEl.appendChild(poseBtn);
 
   render();
   requestAnimationFrame(frame);
-  createZeroShell({ arguments: [] }).then((m) => {
+  // ---- Replay: #replay=10.17.@files.w.27 presses those keys after boot.
+  function replayTokens() {
+    const m = location.hash.match(/replay=([^&]*)/);
+    return m ? decodeURIComponent(m[1]).split(".").filter(Boolean) : [];
+  }
+  function replay(tokens) {
+    if (!tokens.length) return;
+    replaying = true;
+    let i = 0;
+    status.textContent = "replaying 0/" + tokens.length;
+    (function step() {
+      if (i >= tokens.length) {
+        replaying = false;
+        log.push(...tokens);
+        status.textContent = "replay done: your turn";
+        return;
+      }
+      const t = tokens[i++];
+      let wait = 120;
+      if (t === "w") wait = 1000;
+      else if (t[0] === "@") openApp(t === "@home" ? "" : t.slice(1));
+      else if (t[0] === "h") setHdmi(t === "h1");
+      else if (t[0] === "p") setPose(+t.slice(1) % poses.length);
+      else if (/^\d+$/.test(t)) send(+t);
+      status.textContent = "replaying " + i + "/" + tokens.length;
+      setTimeout(step, wait);
+    })();
+  }
+  function replayLink() {
+    const base = location.href.split("#")[0];
+    return base + "#replay=" + log.join(".");
+  }
+
+  // ---- Bug reports
+  function str(fn) { try { return mod ? mod.UTF8ToString(fn()) : ""; } catch (e) { return ""; } }
+  function debugInfo() {
+    const app = str(() => mod._zs_web_current_app()) || "home";
+    return [
+      "- Build: commit " + COMMIT,
+      "- Page: " + location.href.split("#")[0],
+      "- Open app: " + app,
+      "- Monitor: " + (hdmi ? "plugged in" : "not plugged in") + ", pose: " + poses[pose],
+      "- Browser: " + navigator.userAgent,
+      "- Screen: " + window.innerWidth + "x" + window.innerHeight + " @" + window.devicePixelRatio + "x",
+      "- Crashed: " + (document.body.classList.contains("crashed") ? "yes" : "no"),
+    ].join("\n");
+  }
+  function issueBody() {
+    const errs = errors.length ? errors.join("\n") : "(none)";
+    return [
+      "**What happened?**", "", "", "",
+      "**What did you expect?**", "", "", "",
+      "**Replay** (opens the simulator and presses the same keys)", replayLink(), "",
+      "**Debug info**", debugInfo(), "",
+      "<details><summary>Log (last lines)</summary>", "", "```", errs.slice(-1500), "```", "</details>", "",
+      "_Reported from the browser simulator._",
+    ].join("\n");
+  }
+  function report() {
+    const app = str(() => mod._zs_web_current_app()) || "home";
+    const title = "Simulator: " + (document.body.classList.contains("crashed") ? "crash in " : "") + app + ": ";
+    let url = "https://github.com/" + REPO + "/issues/new?labels=simulator&title=" +
+      encodeURIComponent(title) + "&body=" + encodeURIComponent(issueBody());
+    // GitHub rejects very long URLs: drop the oldest keys until it fits.
+    while (url.length > 7500 && log.length > 20) {
+      log.splice(0, 20);
+      url = "https://github.com/" + REPO + "/issues/new?labels=simulator&title=" +
+        encodeURIComponent(title) + "&body=" + encodeURIComponent(issueBody());
+    }
+    window.open(url, "_blank", "noopener");
+  }
+  async function copy(text, btn) {
+    const was = btn.textContent;
+    try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+    catch (e) { window.prompt("Copy this:", text); }
+    setTimeout(() => { btn.textContent = was; }, 1500);
+  }
+  document.getElementById("report").addEventListener("click", report);
+  document.getElementById("copy-replay").addEventListener("click", (e) => copy(replayLink(), e.currentTarget));
+  document.getElementById("copy-debug").addEventListener("click", (e) => copy(debugInfo() + "\nReplay: " + replayLink(), e.currentTarget));
+  document.getElementById("build").textContent = "Build " + COMMIT.slice(0, 7);
+
+  function crashed(what) {
+    err(what);
+    document.body.classList.add("crashed");
+    status.textContent = "crashed: see report";
+  }
+  createZeroShell({
+    arguments: [],
+    printErr: (line) => { err(line); console.warn(line); },
+    onAbort: (what) => crashed("abort: " + what),
+  }).then((m) => {
     mod = m;
+    listApps();
     document.getElementById("device").classList.add("ready");
     status.textContent = "keyboard: on";
-  }).catch((err) => {
-    status.textContent = "failed to start";
-    console.error(err);
+    replay(replayTokens());
+  }).catch((e) => {
+    crashed("failed to start: " + e);
+    console.error(e);
   });
 })();
 </script>

@@ -456,6 +456,18 @@ EMSCRIPTEN_KEEPALIVE void zs_web_open(int index) {
 // Pretend HDMI monitor for trying Dock mode in the browser.
 EMSCRIPTEN_KEEPALIVE void zs_web_hdmi(int connected) { mock_set_hdmi(connected != 0); }
 EMSCRIPTEN_KEEPALIVE void zs_web_pose(int pose) { mock_set_pose(pose); }
+// The launcher's apps, so the page's "Jump to an app" list matches this build.
+EMSCRIPTEN_KEEPALIVE int zs_web_app_count() { return int(app_registry().size()); }
+EMSCRIPTEN_KEEPALIVE const char* zs_web_app_id(int i) {
+    const auto& apps = app_registry();
+    return i >= 0 && i < int(apps.size()) ? apps[i].id.c_str() : "";
+}
+EMSCRIPTEN_KEEPALIVE const char* zs_web_app_name(int i) {
+    const auto& apps = app_registry();
+    return i >= 0 && i < int(apps.size()) ? apps[i].name.c_str() : "";
+}
+// For bug reports: which app is open ("" = home).
+EMSCRIPTEN_KEEPALIVE const char* zs_web_current_app() { return Shell::get().current_app().c_str(); }
 EMSCRIPTEN_KEEPALIVE int zs_web_take_dirty() {
     int d = g_dirty;
     g_dirty = 0;
