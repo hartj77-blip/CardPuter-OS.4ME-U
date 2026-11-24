@@ -347,9 +347,16 @@ make this order work, and the owner reports behind each one, are listed in
 
 ZeroShell is one C++17 program. Facts about it:
 
-- LVGL 9.2.2, pinned in `shell/CMakeLists.txt` and fetched at build time. 16-bit colour, and a
-  fixed 512 KB memory pool for all UI objects (`shell/lv_conf.h`), so the UI can't grow without
-  bound.
+- LVGL 9.2.2, pinned in `shell/CMakeLists.txt` and fetched at build time, 16-bit colour. UI
+  objects are allocated with the C library's `malloc` (`LV_USE_STDLIB_MALLOC` in
+  `shell/lv_conf.h`). Up to 0.4.0 LVGL used its own fixed 512 KB pool; building the Apps list
+  with M5Stack's ~180 apps used it all up and ZeroShell froze. Two changes fix that from both
+  sides: LVGL now draws on the system's memory, and lists only build the rows on screen
+  ([How long lists stay fast](#how-long-lists-stay-fast)), so the Apps list no longer needs much
+  memory in the first place.
+- A failed LVGL assertion calls `abort()` (`LV_ASSERT_HANDLER` in `shell/lv_conf.h`). It used to
+  spin forever (`while(1);`), which froze the screen and ignored systemd's stop signal. Now the
+  process ends and systemd starts it again.
 - About 22,000 lines of C++ in `shell/src/` (UI 5,000, hardware layer 5,100, apps that are still
   in this repository 10,800, screen and keyboard 900, IR library 700). The rest of the apps are in
   the apps repository.
@@ -503,7 +510,8 @@ Outside systemd (the PC simulator, the headless build, running `zeroshell` by ha
 there is no `NOTIFY_SOCKET`, and all of this does nothing.
 
 This works together with the other ways ZeroShell can stop: a crash, or a failed LVGL assertion
-that aborts, also ends the process, and the same `Restart=always` brings it back.
+(which now calls `abort()`), also ends the process, and the same `Restart=always` brings it back.
+The watchdog covers what those can't: a loop that is stuck without crashing.
 
 ### The hardware layer
 

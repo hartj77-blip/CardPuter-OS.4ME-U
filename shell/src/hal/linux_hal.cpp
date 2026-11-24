@@ -57,7 +57,9 @@
 #include "hal/meshtastic.h"
 #include "hal/play_clock.h"
 #include "hal/proc_stats.h"
+#include "hal/tailscale_up.h"
 #include "platform/watchdog.h"
+#include "ui/prefs.h"
 
 namespace zs {
 namespace {
@@ -879,9 +881,16 @@ private:
     void tailscale_start() override {
         // tailscaled's ZeroOS drop-in makes pi the operator, so "up" needs no
         // root. It waits for sign-in; the link shows up in status (AuthURL).
+        // The control server is Tailscale's or a Headscale server (Remote
+        // sets tailscale.server); an auth key, if given, is used once.
+        std::string server = tailscale_server_url(prefs::get_str("tailscale.server", ""));
+        std::string key = prefs::get_str("tailscale.authkey", "");
+        std::string flags = tailscale_up_flags(server, prefs::get_str("tailscale.server_used", ""), key);
+        prefs::set_str("tailscale.server_used", server);
+        if (!key.empty()) prefs::set_str("tailscale.authkey", "");
         run("systemctl start tailscaled.service");
-        run("mkdir -p \"$HOME/.cache/zeroos\"; setsid tailscale up --timeout=10m "
-            ">\"$HOME/.cache/zeroos/tailscale-up.log\" 2>&1 </dev/null &");
+        run("mkdir -p \"$HOME/.cache/zeroos\"; setsid tailscale up --timeout=10m" + flags +
+            " >\"$HOME/.cache/zeroos/tailscale-up.log\" 2>&1 </dev/null &");
         ts_at_ = 0;
     }
     void tailscale_stop() override {

@@ -60,7 +60,8 @@ Settings → **Tailscale**:
 | --- | --- |
 | `tailscale` package | From Tailscale's Debian repository. `tailscaled.service` is disabled at boot; ZeroShell starts it (polkit allows `pi` exactly this unit). Log uploads are off (`--no-logs-no-support`). |
 | `tailscaled.service.d/zeroos.conf` | Makes `pi` the Tailscale operator, so ZeroShell runs `tailscale up`, `status`, `file cp` without root. |
-| Sign-in | `tailscale up` in the background; ZeroShell reads the sign-in link from `tailscale status --json` and draws it as a QR code. |
+| Sign-in | `tailscale up --login-server=...` in the background; ZeroShell reads the sign-in link from `tailscale status --json` and draws it as a QR code. |
+| Headscale | `LinuxHal::tailscale_start()` reads `tailscale.server` (empty: Tailscale's own), `tailscale.authkey` (used once, then cleared) and `tailscale.server_used` from the settings, and builds the flags with `hal/tailscale_up.h`: `--login-server` always, `--force-reauth` when the server changed, `--authkey` when one was given. The Remote app sets them; see its README in the apps repository. |
 | `zeroos-taildrop.service` | `tailscale file get --loop` into `~/Downloads`, started with tailscaled. |
 | `zeroos-terminal.service` | A login session on tty3 running `/usr/lib/zeroos/terminal-session` (tmux, config in `/etc/zeroos/tmux.conf`). It switches the screen to tty3 and back to tty1 when tmux detaches or exits. ZeroShell stops drawing and ignores keys meanwhile, but still dims and wakes the screen. |
 | Console | Terminus 6x12 font. ZeroShell keeps tty1 in graphics mode with its keyboard off, so the console never draws over the UI. |
