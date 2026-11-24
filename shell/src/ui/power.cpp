@@ -25,6 +25,7 @@ constexpr float kPickupGyro = 60.0f;     // deg/s
 constexpr uint32_t kPickupGraceMs = 8000;      // no key after a pickup wake: off again
 constexpr uint32_t kFalseWakeWindowMs = 5 * 60 * 1000;
 constexpr uint32_t kPickupPauseMs = 15 * 60 * 1000;   // 3 false wakes (a bag, a pocket): pause
+constexpr uint32_t kLockPickupPauseMs = 5000;   // LOCK (Tab held): no pickup wake while still in hand
 }  // namespace
 
 Power& Power::get() {
@@ -200,6 +201,15 @@ bool Power::on_key(uint32_t now_ms) {
     }
     set_state(State::On, now_ms);
     return was_off || handoff_;   // the key that wakes the screen does nothing else
+}
+
+void Power::lock_now(uint32_t now_ms) {
+    if (docked_ || state_ == State::Off) return;
+    motion_woke_ = false;
+    face_down_off_ = false;
+    have_rest_ = false;
+    pickup_paused_until_ = (now_ms + kLockPickupPauseMs) | 1;   // 0 means "not paused"
+    set_state(State::Off, now_ms);
 }
 
 void Power::stay_awake(uint32_t now_ms) {

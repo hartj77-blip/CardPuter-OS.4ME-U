@@ -83,22 +83,25 @@ int main() {
                   k(kKeyVolumeUp) + k(kKeyBrightnessDown) + k(kKeyBrightnessUp));
         check("fn page and F keys", typed(t, taps({104, 109, 59, 68, 87, 88})),
               k(kKeyPageUp) + k(kKeyPageDown) + k(kKeyF1) + k(kKeyF1 + 9) + k(kKeyF1 + 10) + k(kKeyF1 + 11));
-        check("fn keys we don't use", typed(t, taps({110, 138, 99})), "");
+        // HELP, PRSC and INS on the stickers: Fn + H, J and B. A USB
+        // keyboard's PrintScreen sends SysRq too, or KEY_PRINT.
+        check("fn help prsc ins", typed(t, taps({138, 99, 110, 210})),
+              k(kKeyHelp) + k(kKeyPrintScreen) + k(kKeyInsert) + k(kKeyPrintScreen));
     }
     {
         // The Fn layer without Fn held (home screen): each letter gives what
         // M5's keymap2 puts on it, the same codes as Fn + that letter.
         KeyTranslator t;
-        const char* letters = "qweuiopasdfklzxcnm";
+        const char* letters = "qweuiopasdfhjklzxcbnm";
         const uint16_t fn_codes[] = {164, 165, 163, 224, 225, 87, 88, 113, 114, 115,
-                                     103, 102, 104, 105, 108, 106, 107, 109};
+                                     103, 138, 99, 102, 104, 105, 108, 106, 110, 107, 109};
         for (int i = 0; letters[i]; ++i) {
             std::string want = typed(t, taps({fn_codes[i]}));
             std::string got = "<" + std::to_string(fn_layer_key(uint32_t(letters[i]))) + ">";
             std::string what = std::string("fn layer ") + letters[i];
             check(what.c_str(), got, want);
         }
-        for (char ch : std::string("rtyghjvb1 A")) check("not on the fn layer", std::to_string(fn_layer_key(uint32_t(ch))), "0");
+        for (char ch : std::string("rtygv1 A")) check("not on the fn layer", std::to_string(fn_layer_key(uint32_t(ch))), "0");
     }
     {
         // Fast typing: the next key goes down before the last one is up.

@@ -1,6 +1,8 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
+#include <vector>
 
 #include "lvgl.h"
 
@@ -29,6 +31,11 @@ bool platform_ctrl_pending();
 // keyboards, so an idle fd costs nothing. In the other builds fn is called
 // once a second, so fd must be non-blocking. Used for inotify (ui/app_watch.cpp).
 void platform_watch_fd(int fd, void (*fn)(void*), void* arg);
+
+// What is on the screen now, as rows of 8-bit red, green, blue (ui/screenshot.h).
+// On the device: read back from the LCD's framebuffer, so it is whatever the
+// panel shows (ZeroShell, the Terminal, an M5Stack app). False if it can't.
+bool platform_capture(std::vector<uint8_t>& rgb, int& w, int& h);
 
 // Headless only: run a scripted session (see main.cpp). Returns exit code.
 int platform_run_script(const std::string& script);

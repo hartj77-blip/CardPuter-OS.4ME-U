@@ -14,7 +14,8 @@ enum : uint16_t {
     K_END = 107, K_DOWN = 108, K_DELETE = 111, K_NEXT = 0x197, K_PREVIOUS = 0x19c,
     K_F1 = 59, K_F10 = 68, K_F11 = 87, K_F12 = 88, K_PAGEUP = 104, K_PAGEDOWN = 109, K_MUTE = 113,
     K_VOLUMEDOWN = 114, K_VOLUMEUP = 115, K_NEXTSONG = 163, K_PLAYPAUSE = 164, K_PREVIOUSSONG = 165,
-    K_BRIGHTNESSDOWN = 224, K_BRIGHTNESSUP = 225,
+    K_BRIGHTNESSDOWN = 224, K_BRIGHTNESSUP = 225, K_SYSRQ = 99, K_INSERT = 110, K_HELP = 138,
+    K_PRINT = 210,
 };
 
 const char kRowQ[] = "qwertyuiop", kRowA[] = "asdfghjkl", kRowZ[] = "zxcvbnm";
@@ -66,6 +67,12 @@ uint32_t navigation(uint16_t code) {
         case K_VOLUMEUP: return kKeyVolumeUp;
         case K_BRIGHTNESSDOWN: return kKeyBrightnessDown;
         case K_BRIGHTNESSUP: return kKeyBrightnessUp;
+        // Fn + J (PRSC on the key) sends SysRq, as does a USB keyboard's
+        // PrintScreen key; some keyboards send KEY_PRINT instead.
+        case K_SYSRQ:
+        case K_PRINT: return kKeyPrintScreen;
+        case K_HELP: return kKeyHelp;
+        case K_INSERT: return kKeyInsert;
         case K_F11: return kKeyF1 + 10;
         case K_F12: return kKeyF1 + 11;
         default:
@@ -95,6 +102,9 @@ uint32_t fn_layer_key(uint32_t ch) {
         case 's': return kKeyVolumeDown;
         case 'd': return kKeyVolumeUp;
         case 'f': return kKeyUp;
+        case 'h': return kKeyHelp;
+        case 'j': return kKeyPrintScreen;
+        case 'b': return kKeyInsert;
         case 'k': return kKeyHome;
         case 'l': return kKeyPageUp;
         case 'z': return kKeyLeft;
