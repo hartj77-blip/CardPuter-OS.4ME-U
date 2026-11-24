@@ -57,6 +57,9 @@ void remove(const std::string& id);
 void upgrade_all();
 void add_source(const std::string& source);
 void remove_source(const std::string& source);
+// Move a source one place up (-1) or down (+1). Higher sources win when two
+// offer the same app.
+void move_source(const std::string& source, int dir);
 
 // How to show a source: "M5Stack's app store" for M5's, else as it is.
 std::string source_label(const std::string& source);

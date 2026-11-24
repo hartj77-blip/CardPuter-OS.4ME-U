@@ -154,7 +154,8 @@ void mock_tick() {
     s.action = g_job.action;
     s.app = g_job.app;
     s.message.clear();
-    if (g_job.action == "refresh" || g_job.action == "add-source" || g_job.action == "remove-source") {
+    if (g_job.action == "refresh" || g_job.action == "add-source" || g_job.action == "remove-source" ||
+        g_job.action == "move-source") {
         s.state = Status::Refreshing;
         if (ms > 1500) {
             s.state = Status::Done;
@@ -425,6 +426,19 @@ void remove_source(const std::string& source) {
         mock_start("remove-source", "");
     } else {
         start_job("remove-source:" + source);
+    }
+}
+
+void move_source(const std::string& source, int dir) {
+    if (g_mock) {
+        auto& v = g_mock_sources;
+        auto it = std::find(v.begin(), v.end(), source);
+        if (it == v.end()) return;
+        long i = it - v.begin(), j = i + (dir < 0 ? -1 : 1);
+        if (j >= 0 && j < long(v.size())) std::swap(v[size_t(i)], v[size_t(j)]);
+        mock_start("move-source", "");
+    } else {
+        start_job((dir < 0 ? "source-up:" : "source-down:") + source);
     }
 }
 
