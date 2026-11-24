@@ -1,5 +1,7 @@
 # ZeroOS for the Cardputer Zero
 
+IM CONSTANTLY WORKING ON THIS SO IF YOU HAVE A GOOD WORKING VERSION DONT UPDATE -IT COULD BE BETTER THO... README WILL BE UPDATED AS OFTEN AS I CAN. IF YOU USE IT - REPORT ISSUES - MAKE SUGGESTIONS - ILL SEE WHAT I CAN DO.
+
 ZeroOS is an operating system for the [M5Stack Cardputer Zero](https://shop.m5stack.com/pages/m5-cardputerzero),
 the pocket computer with a keyboard, a 320x170 screen and a Raspberry Pi CM0 inside.
 
