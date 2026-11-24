@@ -1,0 +1,51 @@
+#!/bin/sh
+# Mesh (docs/EXPANSION.md): get the Cap LoRa-1262 ready before
+# meshtasticd starts. Run as root by meshtasticd.service (ExecStartPre=+).
+#
+# meshtasticd's config only covers the SX1262 itself. The cap also needs:
+#   1. the expansion port's 5 V (ext_5v_out; M5's own LoRa app turns on the
+#      Grove 5 V with it), which powers the radio and the cap's IO expander;
+#   2. the antenna switch: P0 of the cap's PI4IOE5V6408 IO expander
+#      (I2C 0x43 on /dev/i2c-1) driven high. Without it the radio starts but
+#      its antenna isn't connected, so it hears nothing and nothing hears it.
+# Meshtastic's own config for this board (lora-cardputer-zero.yaml) says the
+# same; the register sequence is the one MeshZero (M5's app store) uses.
+#
+# The expander loses its settings whenever the 5 V goes off, so this runs
+# before every start. An older cap with no expander only gets the 5 V.
+set -u
+
+for led in ext_5v_out grove_5v_out; do
+    f=/sys/class/leds/$led/brightness
+    [ -w "$f" ] || continue
+    [ "$(cat "$f" 2>/dev/null || echo 0)" -gt 0 ] 2>/dev/null || echo 1 > "$f"
+done
+
+BUS=1
+ADDR=0x43
+P0=0x01
+
+# The expander needs a moment after the 5 V comes up (up to ~2 s here).
+i=0
+until id=$(i2cget -f -y "$BUS" "$ADDR" 0x01 2>/dev/null); do
+    i=$((i + 1))
+    if [ "$i" -ge 20 ]; then
+        echo "zeroos-mesh: no IO expander at $ADDR on /dev/i2c-$BUS (older Cap LoRa-1262, or no cap fitted); antenna switch not set" >&2
+        exit 0
+    fi
+    sleep 0.1
+done
+
+# PI4IOE5V6408 registers: 0x03 direction (1 = output), 0x05 output value,
+# 0x07 high impedance (1 = off), 0x0B pull-up/down enable.
+bit() {   # bit <reg> <1|0>: set or clear P0 in a register, leaving the rest
+    v=$(i2cget -f -y "$BUS" "$ADDR" "$1") || return 1
+    if [ "$2" = 1 ]; then n=$((v | P0)); else n=$((v & ~P0 & 0xFF)); fi
+    [ "$n" -eq $((v)) ] || i2cset -f -y "$BUS" "$ADDR" "$1" "$n"
+}
+if bit 0x05 1 && bit 0x0B 0 && bit 0x03 1 && bit 0x07 0; then
+    echo "zeroos-mesh: Cap LoRa-1262 antenna switch on (expander id $id)"
+else
+    echo "zeroos-mesh: couldn't set the Cap LoRa-1262 antenna switch (I2C write failed)" >&2
+fi
+exit 0
