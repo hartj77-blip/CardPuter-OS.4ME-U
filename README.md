@@ -596,7 +596,8 @@ binary instead.
   `shell/src/ui/app.h`, currently 4). The level goes up whenever a header that apps include
   changes in a way that breaks already-built modules. `zeroshell --app-abi` prints it. It went
   from 3 to 4 when `ListView` changed size ([How long lists stay fast](#how-long-lists-stay-fast));
-  the apps repository builds every app for both levels until the release with level 4 is out.
+  ZeroOS 0.6.0 is the first release with level 4, and the apps repository now builds every app
+  for level 4.
 - Modules are never unloaded, because an open app's code must stay mapped. When the Apps app
   upgrades a module you've already opened, ZeroShell restarts itself once (about a second) to
   run the new code. After the same upgrade from a terminal it shows a message asking for a
@@ -639,9 +640,9 @@ app build. An example:
 app=media
 name=Media
 summary=Music player, music and video from a Jellyfin server, voice notes
-version=1.4.0-abi3
-abi=3
-file=zeroos-app-media_1.4.0-abi3_arm64.deb
+version=1.4.0-abi4
+abi=4
+file=zeroos-app-media_1.4.0-abi4_arm64.deb
 sha256=<64 hex characters>
 size=<bytes>
 needs=sox
@@ -819,8 +820,8 @@ Three commits after it is `0.4.0+3.gabc1234`, which dpkg sorts as newer than 0.4
 than 0.4.1. Uncommitted changes add `.dirty`. The running version is in `/etc/zeroos-release`
 and in Settings > About this device.
 
-App packages carry the app level in their version: `1.2.0-abi3` is version 1.2.0 built for
-level 3.
+App packages carry the app level in their version: `1.2.0-abi4` is version 1.2.0 built for
+level 4.
 
 ## Security and what you are trusting
 
