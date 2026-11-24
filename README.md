@@ -139,7 +139,7 @@ keyboard the arrows are Fn + F, Z, X and C.
 | Ctrl + a letter | Run the menu item with that letter without opening the menu |
 | Fn + J (PRSC) | Screenshot of the screen, saved as a PNG in `~/Pictures/Screenshots` |
 | Fn + H (HELP) | Same as 0: the keys for the current screen |
-| Hold the top-right button | Screen off (LOCK); the next key only wakes it |
+| Hold the top-right button (Tab) | Lock: the screen goes off. The next key shows the lock screen (time, date, what's playing); Tab unlocks |
 | Letters | In a list, find a row: only the rows that match stay |
 | Tab, while typing | Finish the word: types the first suggestion shown in the top bar. See [Typing](#typing-word-suggestions) |
 
