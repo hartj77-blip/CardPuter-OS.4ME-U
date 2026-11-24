@@ -509,6 +509,12 @@ public:
     // 1.5 s. Blocks until it has gone (at most ~2 s). False if it isn't one
     // processes() lists or it couldn't be stopped.
     virtual bool process_stop(int pid) = 0;
+
+    // Music from a phone (docs/CAR.md): send a play/skip key to the phone
+    // whose music plays here over Bluetooth (its AVRCP player). False if no
+    // phone is connected, so the key is for the Cardputer's own player.
+    // Waits on busctl and bluetoothctl, well under a second.
+    virtual bool phone_media_key(MediaKey k) = 0;
 };
 
 // MockHal for the simulator and tests; LinuxHal for the device.

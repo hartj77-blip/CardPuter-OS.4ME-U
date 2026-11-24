@@ -52,6 +52,7 @@
 #include <mutex>
 #include <thread>
 
+#include "hal/bt_player.h"
 #include "hal/hal.h"
 #include "hal/lcd_fb.h"
 #include "hal/meshtastic.h"
@@ -1837,6 +1838,35 @@ private:
             }
         }
         return MediaKey::None;
+#endif
+    }
+
+    // A play/skip key for a phone whose music plays here (docs/CAR.md): its
+    // AVRCP player, which BlueZ shows while the phone is connected. Only a
+    // device that sends music counts: a car's or speaker's own player isn't
+    // what the keys are for.
+    bool phone_media_key(MediaKey k) override {
+#ifdef __EMSCRIPTEN__
+        (void)k;
+        return false;
+#else
+        if (k == MediaKey::None) return false;
+        for (const std::string& path : btplayer::player_paths(run("busctl --list tree org.bluez"))) {
+            std::string addr = btplayer::address_of(path);
+            if (!is_address(addr) || !btplayer::is_music_source(run("bluetoothctl info " + addr))) continue;
+            btplayer::Info info =
+                btplayer::parse_info(run("busctl get-property org.bluez " + path + " org.bluez.MediaPlayer1 Status"));
+            btplayer::Key key = k == MediaKey::PlayPause ? btplayer::Key::PlayPause
+                                : k == MediaKey::Play    ? btplayer::Key::Play
+                                : k == MediaKey::Pause   ? btplayer::Key::Pause
+                                : k == MediaKey::Stop    ? btplayer::Key::Stop
+                                : k == MediaKey::Next    ? btplayer::Key::Next
+                                                         : btplayer::Key::Previous;
+            // player_paths() only passes letters, digits, '_' and '/'.
+            run("busctl call org.bluez " + path + " org.bluez.MediaPlayer1 " + btplayer::method_for(key, info.playing()));
+            return true;
+        }
+        return false;
 #endif
     }
 
