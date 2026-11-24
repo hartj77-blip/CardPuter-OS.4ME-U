@@ -14,6 +14,7 @@
 #include <sstream>
 
 #include "lvgl.h"
+#include "platform/watchdog.h"
 #include "ui/app.h"
 
 namespace zs::store {
@@ -29,6 +30,7 @@ const char* const kM5Notes = "/var/lib/zeroos/apps/m5";   // m5-<x>: package=<it
 const char* const kM5Store = "https://cardputerzero.github.io/generated/registry.json";
 
 std::string run(const std::string& cmd) {
+    WatchdogGrace grace;   // a slow command is a wait, not a hang (platform/watchdog.h)
     std::string out;
     FILE* p = popen((cmd + " 2>/dev/null").c_str(), "r");
     if (!p) return out;

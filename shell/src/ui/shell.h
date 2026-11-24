@@ -106,5 +106,7 @@ private:
 std::unique_ptr<App> make_launcher();
 // An app was opened (not home): it goes to the front of Home's Recent.
 void home_opened(const std::string& id);
+// The app list was read again while home is open: redraw it (ui/app_watch.cpp).
+void home_apps_changed();
 
 }  // namespace zs

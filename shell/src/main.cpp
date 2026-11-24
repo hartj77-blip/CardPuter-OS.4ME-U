@@ -25,6 +25,8 @@
 #include "hal/hal.h"
 #include "lvgl.h"
 #include "platform/platform.h"
+#include "platform/watchdog.h"
+#include "ui/app_watch.h"
 #include "ui/shell.h"
 #include "ui/store.h"
 #include "ui/theme.h"
@@ -32,6 +34,8 @@
 using namespace zs;
 
 int main(int argc, char** argv) {
+    // First: so the programs ZeroShell starts never inherit systemd's socket.
+    watchdog_init();
     bool mock = std::strcmp(ZS_BACKEND_NAME, "device") != 0;
     int zoom = 3;
     std::string script;
@@ -59,6 +63,8 @@ int main(int argc, char** argv) {
 
     lv_indev_t* keypad = platform_init(theme::kScreenW, theme::kScreenH, zoom);
     Shell::get().start(keypad);
+    // New apps on home after a command-line install, without a restart.
+    app_watch_start();
 
     int rc = script.empty() ? platform_run() : platform_run_script(script);
     // Stopped (systemctl stop, an update, SIGTERM): close the open app so

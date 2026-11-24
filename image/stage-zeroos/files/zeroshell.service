@@ -32,6 +32,12 @@ ExecStartPre=-+/bin/sh -c 'loginctl enable-linger "$(id -nu 1000)"'
 ExecStart=/usr/bin/zeroshell
 Restart=always
 RestartSec=1
+# The watchdog: ZeroShell's main loop pings systemd every 2.5 s
+# (shell/src/platform/watchdog.cpp). If 10 s pass with no ping, the UI is
+# stuck: systemd kills it (SIGABRT) and Restart=always starts it again.
+# Slow shell commands on the UI thread raise the limit while they run.
+WatchdogSec=10
+NotifyAccess=main
 # Keep the UI responsive under memory pressure (512 MB RAM).
 OOMScoreAdjust=-500
 Nice=-5

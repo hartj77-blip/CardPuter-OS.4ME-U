@@ -133,6 +133,13 @@ void add(std::vector<AppInfo>& out, std::set<std::string>& taken, const std::str
 
 }  // namespace
 
+// Where M5 apps appear: the launcher entries, and zeroos-apps' notes on them.
+// ui/app_watch.cpp watches both.
+void m5_app_dirs(std::vector<std::string>& out) {
+    out.push_back(env_or("ZS_M5_APP_DIR", "/usr/share/APPLaunch/applications"));
+    out.push_back(env_or("ZS_M5_STATE_DIR", "/var/lib/zeroos/apps/m5"));
+}
+
 // Called by the app registry (apps/registry.cpp) on each scan.
 void m5_apps_add(std::vector<AppInfo>& out) {
     std::string dir = env_or("ZS_M5_APP_DIR", "/usr/share/APPLaunch/applications");

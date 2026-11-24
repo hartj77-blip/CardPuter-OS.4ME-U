@@ -29,6 +29,7 @@
 #include "hal/hal.h"
 #include "hal/lcd_fb.h"
 #include "platform/keys.h"
+#include "platform/watchdog.h"
 #include "hal/play_clock.h"
 #include "ui/shell.h"
 
@@ -307,19 +308,37 @@ void platform_set_low_power(bool on) {
     }
 }
 
+// Other files the main loop waits on with the keyboards (platform_watch_fd).
+struct Watched {
+    int fd;
+    void (*fn)(void*);
+    void* arg;
+};
+std::vector<Watched> g_watched;
+
+void platform_watch_fd(int fd, void (*fn)(void*), void* arg) { g_watched.push_back({fd, fn, arg}); }
+
 int platform_run() {
     while (!g_quit) {
+        // Each pass round the loop tells systemd the UI is alive
+        // (platform/watchdog.h). A stuck timer or event handler stops it.
+        watchdog_kick();
         uint32_t ms = lv_timer_handler();
         // Sleep until the next LVGL timer is due or a key arrives, instead of
         // waking every few ms. Awake, keys are also read on LVGL's own timer.
         uint32_t cap = g_low_power ? 500 : 33;   // 500: pickup wake reads the IMU while off
         if (ms == LV_NO_TIMER_READY || ms > cap) ms = cap;
-        if (!g_kbs.empty()) {
-            std::vector<pollfd> ps;
-            for (auto& k : g_kbs) ps.push_back({k.fd, POLLIN, 0});
+        std::vector<pollfd> ps;
+        for (auto& k : g_kbs) ps.push_back({k.fd, POLLIN, 0});
+        const size_t nkbs = ps.size();
+        for (auto& w : g_watched) ps.push_back({w.fd, POLLIN, 0});
+        if (!ps.empty()) {
             if (poll(ps.data(), ps.size(), int(ms)) > 0) {
+                // The watched files first: close_keyboard() below changes g_kbs.
+                for (size_t i = nkbs; i < ps.size(); ++i)
+                    if (ps[i].revents & POLLIN) g_watched[i - nkbs].fn(g_watched[i - nkbs].arg);
                 bool keys = false;
-                for (size_t i = ps.size(); i-- > 0;) {
+                for (size_t i = nkbs; i-- > 0;) {
                     if (ps[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
                         // Gone (driver unbound, Bluetooth disconnected):
                         // poll() would return at once forever. Another
@@ -621,6 +640,23 @@ void platform_set_low_power(bool) {}
 void platform_console_handoff(bool) {}
 bool platform_ctrl_pending() { return false; }
 
+#endif
+
+#if !ZS_BACKEND_DEVICE
+// Elsewhere (the simulator, the headless and web builds) there is no poll()
+// in the main loop to add the file to: look once a second instead. fn must
+// cope with nothing to read (the file is non-blocking).
+void platform_watch_fd(int fd, void (*fn)(void*), void* arg) {
+    struct Ctx {
+        void (*fn)(void*);
+        void* arg;
+    };
+    lv_timer_create([](lv_timer_t* t) {
+        auto* c = static_cast<Ctx*>(lv_timer_get_user_data(t));
+        c->fn(c->arg);
+    }, 1000, new Ctx{fn, arg});
+    (void)fd;
+}
 #endif
 
 }  // namespace zs

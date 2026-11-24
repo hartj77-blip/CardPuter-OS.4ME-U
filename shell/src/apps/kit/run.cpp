@@ -16,6 +16,7 @@
 #include <sstream>
 
 #include "hal/hal.h"
+#include "platform/watchdog.h"
 
 extern char** environ;
 
@@ -220,6 +221,7 @@ void Job::reset() {
 
 std::string capture(const std::vector<std::string>& argv, const std::string& cwd) {
     if (simulated() || argv.empty() || !on_path(argv[0])) return "";
+    WatchdogGrace grace;   // runs to the end: a wait, not a hang (platform/watchdog.h)
     RunOpts o;
     o.cwd = cwd;
     int fd = -1;

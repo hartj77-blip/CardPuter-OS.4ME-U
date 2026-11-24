@@ -24,6 +24,12 @@ void platform_console_handoff(bool away);
 // Ctrl was tapped and waits for the next key (status bar shows it).
 bool platform_ctrl_pending();
 
+// Call fn(arg) when fd has something to read, from the main loop (the UI
+// thread). On the device the loop's poll() waits on fd along with the
+// keyboards, so an idle fd costs nothing. In the other builds fn is called
+// once a second, so fd must be non-blocking. Used for inotify (ui/app_watch.cpp).
+void platform_watch_fd(int fd, void (*fn)(void*), void* arg);
+
 // Headless only: run a scripted session (see main.cpp). Returns exit code.
 int platform_run_script(const std::string& script);
 
