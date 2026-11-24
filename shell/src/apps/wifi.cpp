@@ -47,7 +47,8 @@ private:
         lv_obj_set_pos(hdr, 8, 4);
 
         list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 21);
-        list_.set_empty_text("No networks found. Tab > R rescans.");
+        list_.set_empty_text(st.wifi_enabled ? "No networks found. Tab > R rescans."
+                                             : "Wi-Fi is off. Tab > W turns it on.");
         for (size_t i = 0; i < nets_.size(); ++i) {
             auto& n = nets_[i];
             std::string value = fmt("%d%%", n.signal) + (n.secure ? "" : "  open");

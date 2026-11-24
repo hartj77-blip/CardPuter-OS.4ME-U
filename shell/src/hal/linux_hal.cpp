@@ -458,6 +458,9 @@ public:
         return s;
     }
     void set_wifi_enabled(bool on) override {
+        // A soft rfkill block (left by another tool or app) keeps the radio off
+        // even when NetworkManager says Wi-Fi is on, and scans find nothing.
+        if (on) run("rfkill unblock wifi");
         run(std::string("nmcli radio wifi ") + (on ? "on" : "off"));
         net_refresh_soon();
     }
