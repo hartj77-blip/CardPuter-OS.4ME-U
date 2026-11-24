@@ -32,6 +32,7 @@ list is more than 6 hours old. Type to find an app.
 | Key | |
 | --- | --- |
 | Enter | an app's page: **Install**, **Update**, **Open**, **Remove** (Remove asks first) |
+| Source row (top) | Left / Right shows only one source's apps (**All**, then each source, M5Stack's store as **M5Stack**); Tab > S does the same |
 | Tab > U | update every app that has a newer version |
 | Tab > R | look for new apps now |
 | Tab > P | sources: where apps come from, in order (the higher one wins). Tab > K / Tab > J moves the highlighted one up / down; Tab > D removes one (it asks first); **Add a GitHub repo** adds one |

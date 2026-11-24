@@ -1,7 +1,8 @@
 // Apps: install and remove apps (docs/APPS.md). ZeroOS itself keeps only a
 // few apps; everything else comes from here, downloaded from GitHub.
 //
-//   list     Enter: details. Tab: U update all, R look for new apps, P sources
+//   list     Enter: details. Tab: U update all, R look for new apps, P sources,
+//            S show one source's apps (or the Source row at the top: Left/Right)
 //   details  Enter: the highlighted button. Tab: I install, U update, O open, D remove
 //   sources  Enter on "Add a GitHub repo". Tab: N add one, K/J move the highlighted one
 //            up/down (the higher one wins), D remove it
@@ -13,6 +14,7 @@
 // zeroos-apps does the work as root; this screen starts it and shows how far
 // it has got. After an install or removal the home screen is rebuilt at
 // once; an upgraded app needs ZeroShell to restart, which this does.
+#include <algorithm>
 #include <csignal>
 
 #include "apps/common.h"
@@ -228,25 +230,82 @@ private:
 
     // ---- The list ----
 
+    // The sources that offer apps in the catalog, in the order of the
+    // sources list (the higher one wins), any others after them.
+    std::vector<std::string> catalog_sources() {
+        std::vector<std::string> out;
+        auto has = [&](const std::string& s) { return std::find(out.begin(), out.end(), s) != out.end(); };
+        for (auto& s : store::sources())
+            for (auto& e : cat_)
+                if (e.source == s && !has(s)) out.push_back(s);
+        for (auto& e : cat_)
+            if (!e.source.empty() && !has(e.source)) out.push_back(e.source);
+        return out;
+    }
+
+    // Short enough for the Source row: "M5Stack", the repo's name, or the host.
+    static std::string short_source(const std::string& s) {
+        std::string label = store::source_label(s);
+        if (label != s) return "M5Stack";
+        if (s.rfind("https://", 0) == 0) {
+            std::string host = s.substr(8);
+            return host.substr(0, host.find('/'));
+        }
+        size_t slash = s.find('/');
+        return slash == std::string::npos ? s : s.substr(slash + 1);
+    }
+
+    // Show only the apps from source n of shown_sources_ (0 = every source).
+    void show_source(int n) {
+        src_filter_ = n <= 0 || n > int(shown_sources_.size()) ? "" : shown_sources_[size_t(n - 1)];
+        focus_source_row_ = true;
+        defer(Page::List);   // not now: the list is still handling the key
+    }
+
+    void next_source() {
+        int n = 0;
+        for (size_t i = 0; i < shown_sources_.size(); ++i)
+            if (shown_sources_[i] == src_filter_) n = int(i) + 1;
+        show_source((n + 1) % int(shown_sources_.size() + 1));
+    }
+
     void show_list() {
         clear();
         page_ = Page::List;
         cat_ = store::catalog();
+        shown_sources_ = catalog_sources();
+        if (std::find(shown_sources_.begin(), shown_sources_.end(), src_filter_) == shown_sources_.end())
+            src_filter_.clear();   // that source is gone
+        bool by_source = shown_sources_.size() > 1;
         int updates = 0;
         for (auto& e : cat_) updates += e.update();
         shell_set_actions({
             {"Details", 0, "Enter", nullptr},
             {fmt("Update all (%d)", updates), 'u', nullptr, [this] { update_all(); }, updates > 0},
             {"Look for new apps", 'r', nullptr, [this] { start([] { store::refresh(); }); }},
+            {src_filter_.empty() ? "Show one source" : "Show next source", 's', nullptr, [this] { next_source(); },
+             by_source},
             {"Sources", 'p', nullptr, [this] { show_sources(); }},
         });
 
         list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 24);
         list_.set_empty_text(online() ? "No apps yet. Tab > R looks for them." : "No apps yet. Join Wi-Fi, then Tab > R.");
         int focus = -1;
+        if (by_source) {
+            std::vector<std::string> names = {"All"};
+            int at = 0;
+            for (size_t i = 0; i < shown_sources_.size(); ++i) {
+                names.push_back(short_source(shown_sources_[i]));
+                if (shown_sources_[i] == src_filter_) at = int(i) + 1;
+            }
+            int row = list_.add_choice(ZS_ICON_GLOBE, "Source", std::move(names), at, [this](int n) { show_source(n); });
+            if (focus_source_row_) focus = row;
+        }
+        focus_source_row_ = false;
         if (updates > 0) list_.add(LV_SYMBOL_REFRESH, "Update all", fmt("%d", updates), [this] { update_all(); });
         for (size_t i = 0; i < cat_.size(); ++i) {
             auto& e = cat_[i];
+            if (!src_filter_.empty() && e.source != src_filter_) continue;
             std::string right;
             uint32_t color = kMuted;
             if (e.update()) {
@@ -265,7 +324,7 @@ private:
                 show_details();
             });
             list_.set_value_color(list_.size() - 1, color);
-            if (!sel_id_.empty() && e.id == sel_id_) focus = list_.size() - 1;
+            if (focus < 0 && !sel_id_.empty() && e.id == sel_id_) focus = list_.size() - 1;
         }
         list_.finish();
         // Back on the list after a details page: keep the same app selected.
@@ -494,7 +553,10 @@ private:
     std::vector<store::Entry> cat_;
     std::vector<std::string> sources_;
     std::string sel_id_;
-    std::string sel_source_;   // the source just moved, to keep it highlighted
+    std::string sel_source_;
+    std::string src_filter_;                  // the list shows only this source's apps ("" = all)
+    std::vector<std::string> shown_sources_;  // the sources the Source row offers
+    bool focus_source_row_ = false;           // the filter just changed: keep the Source row focused   // the source just moved, to keep it highlighted
     ListView list_;
     store::Status st_;
     bool watching_ = false;
