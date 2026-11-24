@@ -11,6 +11,7 @@
 #include <ctime>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 
 #include "lvgl.h"
@@ -26,6 +27,9 @@ bool g_mock = false;
 const char* const kCatalog = "/var/lib/zeroos/apps/catalog";
 const char* const kStatus = "/run/zeroos/apps.status";
 const char* const kSources = "/etc/zeroos/apps.sources";
+// Apps a ZeroOS update took off (built for an older app ABI); zeroos-apps
+// upgrade puts them back. One id per line.
+const char* const kRestore = "/var/lib/zeroos/apps/restore";
 const char* const kM5Notes = "/var/lib/zeroos/apps/m5";   // m5-<x>: package=<its Debian package>
 const char* const kM5Store = "https://cardputerzero.github.io/generated/registry.json";
 
@@ -300,6 +304,15 @@ std::vector<Entry> real_catalog() {
             x.installed = it->second;
             inst.erase(it);
         }
+    }
+    // Taken off by a ZeroOS update and not back yet (it couldn't reach the
+    // sources then): Update all puts them back, so Apps counts them in it.
+    {
+        std::ifstream r(kRestore);
+        std::set<std::string> ids;
+        for (std::string id; r >> id;) ids.insert(id);
+        for (auto& x : out)
+            if (x.installed.empty() && ids.count(x.id)) x.restore = true;
     }
     // Installed, but no source offers it now: still list it, so it can be removed.
     for (auto& [id, ver] : inst) {

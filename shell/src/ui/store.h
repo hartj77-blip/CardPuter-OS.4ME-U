@@ -25,7 +25,9 @@ struct Entry {
     std::string warn;        // M5Stack's store: what to know first ("Runs in the background")
     bool m5 = false;         // from M5Stack's app store (made for M5's launcher)
     long size_kb = 0;        // download
+    bool restore = false;    // taken off by a ZeroOS update (new app ABI), not put back yet
     bool update() const;     // installed, and a newer version is on offer
+    bool to_restore() const { return restore && installed.empty() && !version.empty(); }
 };
 
 struct Status {
