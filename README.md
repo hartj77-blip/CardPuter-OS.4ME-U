@@ -153,7 +153,7 @@ On the home screen:
 | Tab | Open All apps (every app, A to Z). There, Tab on an app, P, then 1 to 7 pins it on that key |
 
 Ctrl, Shift, Fn and Sym are sticky: tap one and then press the next key. Apps show their own keys
-on screen. For example, in Media Space pauses and N skips, and in IR Remote L learns a button from
+on screen. For example, in Media Space pauses and M skips to the next track, and in IR Remote L learns a button from
 another remote. The full list is in [Keys](docs/KEYS.md), and the reasoning behind the layout is
 in [UX](docs/UX.md).
 
@@ -231,6 +231,11 @@ sleep mode, so ZeroOS is set up for that:
 - Unused memory is compressed (zram), so bigger apps still fit. If memory does run out, the
   biggest app is closed instead of the whole device locking up. The home screen, SSH, networking
   and audio are never the ones closed.
+- Settings > Running programs (or type "kill" on home) lists what is running as you, biggest
+  first, with its memory and CPU: programs started from Terminal, M5Stack apps that keep going in
+  the background, a player. Enter stops one (it gets 1.5 seconds to save and quit, then it is
+  killed); Ctrl + K stops them all. The home screen and the services it needs aren't listed, and
+  system services can't be stopped from there.
 - Services a pocket computer doesn't need are off, and the HDMI desktop uses no memory until you
   open Dock or plug in a monitor.
 
@@ -248,7 +253,7 @@ update and install apps. Bluetooth is also built in, but lives inside Settings.
 | App | What it does |
 | --- | --- |
 | Apps | Browse, install, update and remove apps ([guide](docs/APPS.md)) |
-| Settings | Wi-Fi, Bluetooth, brightness, volume, power saving, restart, shut down |
+| Settings | Wi-Fi, Bluetooth, brightness, volume, power saving, running programs, restart, shut down |
 | Update | Install a newer ZeroOS over the network ([guide](docs/UPDATE.md)) |
 | Wi-Fi | Find and join networks |
 
@@ -268,7 +273,7 @@ separate package with its own version, so updating one app never touches another
 | Compass | Compass and spirit level |
 | Battery | Time left, power draw and power profiles ([guide](docs/PERFORMANCE.md)) |
 | System | CPU, memory, storage and temperature |
-| Media | Music and video from the SD card, USB drives and server shares, in a classic MP3-player look |
+| Media | Music from the SD card, USB drives and server shares, in a classic MP3-player look, with other looks to switch to (T) |
 | Jellyfin | Music, movies and shows from your Jellyfin server ([guide](docs/JELLYFIN.md)) |
 | Recorder | Voice notes: record, play back, rename, delete |
 | Camera | Photos, a gallery, and a QR reader that can join Wi-Fi. Needs a model with a camera ([guide](docs/CAMERA.md)) |
@@ -314,12 +319,11 @@ Imager, and change the password after the first login.
 
 Apps are missing after updating from 0.4.x to 0.5.0. That update takes the old apps off and puts
 the new builds back; if Wi-Fi was down at that moment, they stay off. Run
-`sudo zeroos-apps upgrade` from the Terminal or SSH, which puts them back. From the release after
-0.5.1, **Update all** in Apps counts them too and does the same.
+`sudo zeroos-apps upgrade` from the Terminal or SSH, which puts them back. From 0.6.0, **Update all** in Apps counts them too and does the same.
 
 The Wi-Fi list says "No networks found" and nothing connects. Wi-Fi may be off: with **Wi-Fi off
 with screen** on (Settings), a restart while the screen was off used to leave it off. Press
-**Tab > W** in the Wi-Fi list (from the release after 0.5.1 the list says when Wi-Fi is off, and
+**Tab > W** in the Wi-Fi list (from 0.6.0 the list says when Wi-Fi is off, and
 it comes back on by itself after a restart). Over SSH, `nmcli radio wifi on` does the same.
 
 The screen stays black. ZeroShell logs why it couldn't start. Over SSH:
@@ -692,7 +696,8 @@ binary instead.
   `shell/src/ui/app.h`, currently 4). The level goes up whenever a header that apps include
   changes in a way that breaks already-built modules. `zeroshell --app-abi` prints it. It went
   from 3 to 4 when `ListView` changed size ([How long lists stay fast](#how-long-lists-stay-fast));
-  the apps repository builds every app for both levels until the release with level 4 is out.
+  ZeroOS 0.6.0 is the first release with level 4, and the apps repository now builds every app
+  for level 4.
 - Modules are never unloaded, because an open app's code must stay mapped. When the Apps app
   upgrades a module you've already opened, ZeroShell restarts itself once (about a second) to
   run the new code. After the same upgrade from a terminal it shows a message asking for a
@@ -735,9 +740,9 @@ app build. An example:
 app=media
 name=Media
 summary=Music player, music and video from a Jellyfin server, voice notes
-version=1.4.0-abi3
-abi=3
-file=zeroos-app-media_1.4.0-abi3_arm64.deb
+version=1.4.0-abi4
+abi=4
+file=zeroos-app-media_1.4.0-abi4_arm64.deb
 sha256=<64 hex characters>
 size=<bytes>
 needs=sox
@@ -916,8 +921,8 @@ Three commits after it is `0.4.0+3.gabc1234`, which dpkg sorts as newer than 0.4
 than 0.4.1. Uncommitted changes add `.dirty`. The running version is in `/etc/zeroos-release`
 and in Settings > About this device.
 
-App packages carry the app level in their version: `1.2.0-abi3` is version 1.2.0 built for
-level 3.
+App packages carry the app level in their version: `1.2.0-abi4` is version 1.2.0 built for
+level 4.
 
 ## Security and what you are trusting
 
