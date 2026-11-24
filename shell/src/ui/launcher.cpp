@@ -216,9 +216,32 @@ std::vector<Result> search(const std::string& q) {
 
 // ---- Home -------------------------------------------------------------------
 
+class Launcher;
+Launcher* g_home = nullptr;   // the home screen, while it is open
+
 class Launcher : public App {
 public:
-    ~Launcher() override { lv_async_call_cancel(all_apps_cb, this); }
+    Launcher() { g_home = this; }
+    ~Launcher() override {
+        lv_async_call_cancel(all_apps_cb, this);
+        if (g_home == this) g_home = nullptr;
+    }
+
+    // The app list was read again (ui/app_watch.cpp): draw it anew, on the
+    // same page. All apps keeps what was typed and the app in focus.
+    void apps_changed() {
+        if (!all_apps_) {
+            refresh();
+            return;
+        }
+        int i = all_.focused();
+        std::string id = i >= 0 ? all_ids_[size_t(i)] : "";
+        std::string typed = all_.filter();
+        show_all_apps();
+        for (char ch : typed) all_.key(uint32_t((unsigned char)ch));
+        auto it = std::find(all_ids_.begin(), all_ids_.end(), id);
+        if (it != all_ids_.end()) all_.focus(int(it - all_ids_.begin()));
+    }
 
     void build(lv_obj_t* root) override {
         root_ = root;
@@ -625,6 +648,10 @@ private:
 }  // namespace
 
 std::unique_ptr<App> make_launcher() { return std::make_unique<Launcher>(); }
+
+void home_apps_changed() {
+    if (g_home) g_home->apps_changed();
+}
 
 // An app was opened: it goes to the front of Recent.
 void home_opened(const std::string& id) {

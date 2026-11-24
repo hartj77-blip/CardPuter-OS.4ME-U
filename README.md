@@ -31,9 +31,12 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
    - [What happens at boot](#what-happens-at-boot)
    - [ZeroShell, the home screen](#zeroshell-the-home-screen)
    - [How a key press travels](#how-a-key-press-travels)
+   - [How long lists stay fast](#how-long-lists-stay-fast)
+   - [The watchdog: a frozen screen restarts itself](#the-watchdog-a-frozen-screen-restarts-itself)
    - [The hardware layer](#the-hardware-layer)
    - [How apps are loaded](#how-apps-are-loaded)
    - [How apps are installed](#how-apps-are-installed)
+   - [How new apps reach the home screen](#how-new-apps-reach-the-home-screen)
    - [How ZeroOS updates itself](#how-zeroos-updates-itself)
    - [How the SD card image is built](#how-the-sd-card-image-is-built)
    - [Memory, CPU and battery](#memory-cpu-and-battery)
@@ -61,6 +64,7 @@ stand.
 | Update logic: find, download, verify, install, roll back | Yes, in CI, with stand-ins for `dpkg` and `systemctl` |
 | SD card image builds | Yes, for every release, on GitHub's arm64 runner |
 | Boots and runs on a real Cardputer Zero | Partly. Owners have run it; most apps have not been checked on the device yet |
+| Watchdog restart and new apps on home after a terminal install | In CI on a PC (`shell/tests/watch_test.py`). Not yet seen on the device |
 | Battery life, boot time, memory use on the device | Not measured yet. Numbers in this README marked "estimate" are estimates |
 
 In short: the software is checked heavily by machines, but a lot of it has not been touched by a
@@ -262,6 +266,17 @@ Slow boot. After a restart, run this to see what's taking the time:
 systemd-analyze; systemd-analyze critical-chain zeroshell.service | head -12
 ```
 
+The screen froze, then the home screen came back on its own a few seconds later. That is the
+[watchdog](#the-watchdog-a-frozen-screen-restarts-itself) restarting a stuck ZeroShell. It is a
+bug worth reporting: the journal says what was open (`zeroshell: open <app>`) just before
+systemd's `Watchdog timeout` line. Send the output of
+`journalctl -u zeroshell -b | grep -B20 -i watchdog`.
+
+An app installed from a terminal isn't on the home screen. It should appear within about two
+seconds on the home screen, or the next time you go home from another app
+([how](#how-new-apps-reach-the-home-screen)). If it doesn't, check it's really there
+(`zeroos-apps list`) and look for `apps changed` in `journalctl -u zeroshell -b`.
+
 A key does nothing. ZeroShell can log every raw key it receives. Run
 `sudo systemctl edit zeroshell`, add `[Service]` and `Environment=ZS_KEYLOG=1`, restart it, press
 the key, then read `journalctl -u zeroshell -b | grep 'zeroshell: key'`. Undo it with
@@ -334,9 +349,16 @@ make this order work, and the owner reports behind each one, are listed in
 
 ZeroShell is one C++17 program. Facts about it:
 
-- LVGL 9.2.2, pinned in `shell/CMakeLists.txt` and fetched at build time. 16-bit colour, and a
-  fixed 512 KB memory pool for all UI objects (`shell/lv_conf.h`), so the UI can't grow without
-  bound.
+- LVGL 9.2.2, pinned in `shell/CMakeLists.txt` and fetched at build time, 16-bit colour. UI
+  objects are allocated with the C library's `malloc` (`LV_USE_STDLIB_MALLOC` in
+  `shell/lv_conf.h`). Up to 0.4.0 LVGL used its own fixed 512 KB pool; building the Apps list
+  with M5Stack's ~180 apps used it all up and ZeroShell froze. Two changes fix that from both
+  sides: LVGL now draws on the system's memory, and lists only build the rows on screen
+  ([How long lists stay fast](#how-long-lists-stay-fast)), so the Apps list no longer needs much
+  memory in the first place.
+- A failed LVGL assertion calls `abort()` (`LV_ASSERT_HANDLER` in `shell/lv_conf.h`). It used to
+  spin forever (`while(1);`), which froze the screen and ignored systemd's stop signal. Now the
+  process ends and systemd starts it again.
 - About 22,000 lines of C++ in `shell/src/` (UI 5,000, hardware layer 5,100, apps that are still
   in this repository 10,800, screen and keyboard 900, IR library 700). The rest of the apps are in
   the apps repository.
@@ -407,6 +429,92 @@ gives up the keyboard), starts the program, and takes the screen back when the p
    pick a row, Tab for the menu). Only then does it reach the LVGL widget in focus. That order is
    what lets an app use plain letters as shortcuts while text boxes still type normally.
 
+### How long lists stay fast
+
+The list screens (Apps, All apps, search results, Settings, Wi-Fi, Bluetooth, and the tool lists
+in Net Tools and RF Tools) all use one class, `ListView` (`shell/src/ui/list_view.h` and
+`list_view.cpp`). With M5Stack's store added, the Apps list has around 200 rows, and it keeps
+growing.
+
+Until version 0.4.0 every row was a set of LVGL widgets: the row, its number badge and the
+badge's digit, an icon, the name and the value on the right. Six objects per row, so about 1,200
+for the Apps list, all made when the list opened, all measured for layout, and all kept in
+memory while it was open. On the Cardputer's CPU that was a visible pause, and it got slower with
+every app M5 added.
+
+Now a row is only data: its icon, text, value, colour and what Enter does. `add()` stores that
+and nothing else. When the list is built it makes one set of widgets, a slot, for each line that
+fits on the screen (five whole lines and part of a sixth on the Apps screen), and that is all it
+ever makes. Moving down past the last line doesn't scroll anything: the slots stay where they are
+and the next rows' text is written into them (`bind()`). So:
+
+- Opening a 200-row list costs the same as opening a 6-row one: about 36 LVGL objects instead of
+  about 1,200. `add()` for 200 rows is 200 small copies of strings.
+- A key press rewrites at most six slots' labels. Typing to filter walks the stored rows' text,
+  which is plain string matching, then rewrites the same six slots.
+- The last, partly visible line is drawn but can't take the focus, as before, so there is still a
+  hint that more rows are below. A thin bar on the right shows where you are in a long list.
+
+What stays the same for the person using it: 1 to 9 still open the first nine rows the filter
+leaves, wherever the list is scrolled; Up and Down still go round from the last row to the first
+when the list is the only thing on the screen; Page Up and Page Down (Fn + L and Fn + M) move
+five rows at a time; and Home and End (Fn + K and Fn + N) now go to the first and last row.
+
+The list handles Up, Down, Page Up, Page Down, Home and End itself instead of leaving them to
+LVGL's focus group, because the group only holds the slots, not the rows. At the first or last
+row of a screen that has other widgets too (a text box), it hands the key back to the shell,
+which moves the focus to that widget as before.
+
+For app code almost nothing changed. The functions are the same, except that `add()` and
+`add_choice()` now return the row's index instead of its widget, since a row no longer has a
+widget of its own (no app used that return value). The class's size did change, so the app
+level went from 3 to 4 (see [How apps are loaded](#how-apps-are-loaded)).
+
+### The watchdog: a frozen screen restarts itself
+
+If a bug ever makes ZeroShell's main loop stop (an endless loop, a deadlock, a call that never
+returns), the screen would stay frozen until the battery ran out, because nothing else draws on
+it. The watchdog makes systemd notice and restart it.
+
+How it works:
+
+1. `zeroshell.service` has `WatchdogSec=10` and `NotifyAccess=main`. systemd then passes
+   ZeroShell two environment variables: `NOTIFY_SOCKET`, a socket to report to, and
+   `WATCHDOG_USEC`, the limit (10,000,000 microseconds).
+2. The first thing `main()` does is `watchdog_init()` (`shell/src/platform/watchdog.cpp`): it
+   reads both, opens the socket, sends the first `WATCHDOG=1`, and removes the variables from its
+   environment so that no program ZeroShell starts (an M5 app, the terminal) can ping on its
+   behalf and hide a frozen UI.
+3. Every pass of the main loop (`platform_run()` in `shell/src/platform/platform.cpp`) calls
+   `watchdog_kick()`. That sends `WATCHDOG=1` again if a quarter of the limit (2.5 seconds) has
+   passed since the last one, and otherwise returns at once. The loop comes round at least every
+   33 ms while the screen is on and every 500 ms while it's off, so a healthy ZeroShell pings
+   every 2.5 seconds whatever it's doing.
+4. If 10 seconds pass with no ping, systemd logs `Watchdog timeout`, kills ZeroShell with SIGABRT
+   and, because of `Restart=always` and `RestartSec=1`, starts it again a second later. You are
+   back on the home screen. Any note open at that moment loses what wasn't saved, which is the
+   price of not staying frozen.
+
+The protocol is a single datagram of text on a Unix socket, the same thing `sd_notify()` in
+libsystemd sends, so ZeroShell needs no extra library for it. The cost is one small `sendto()`
+every 2.5 seconds.
+
+Some waits on the UI thread are slow on purpose, not stuck: pairing a Bluetooth device runs
+`bluetoothctl --timeout 25 pair`, and a Jellyfin request may take up to 8 seconds. The functions
+that run a command and wait for it (`run()` in `shell/src/hal/linux_hal.cpp` and
+`shell/src/ui/store.cpp`, `capture()` in `shell/src/apps/kit/run.cpp`, `http()` in
+`shell/src/hal/jellyfin.cpp`) create a `WatchdogGrace` for as long as they run. It tells systemd
+to raise the limit to 90 seconds (`WATCHDOG_USEC=90000000`, which systemd accepts while the
+service runs) and puts it back to 10 when the command returns. Grace is only given on the UI
+thread: a worker thread waiting doesn't stop the loop, so it doesn't need any.
+
+Outside systemd (the PC simulator, the headless build, running `zeroshell` by hand over SSH)
+there is no `NOTIFY_SOCKET`, and all of this does nothing.
+
+This works together with the other ways ZeroShell can stop: a crash, or a failed LVGL assertion
+(which now calls `abort()`), also ends the process, and the same `Restart=always` brings it back.
+The watchdog covers what those can't: a loop that is stuck without crashing.
+
 ### The hardware layer
 
 `zs::Hal` in `shell/src/hal/hal.h` is the only way the UI reaches hardware. It has two
@@ -466,11 +574,14 @@ binary instead.
 - `shell/src/apps/registry.cpp` loads each module with `dlopen(RTLD_NOW)`, so a module missing a
   symbol fails at load time with a message in the journal, not with a crash when you open it.
 - A module is only accepted if it was built for the same app level (`ZS_APP_ABI` in
-  `shell/src/ui/app.h`, currently 3). The level goes up whenever a header that apps include
-  changes in a way that breaks already-built modules. `zeroshell --app-abi` prints it.
+  `shell/src/ui/app.h`, currently 4). The level goes up whenever a header that apps include
+  changes in a way that breaks already-built modules. `zeroshell --app-abi` prints it. It went
+  from 3 to 4 when `ListView` changed size ([How long lists stay fast](#how-long-lists-stay-fast));
+  the apps repository builds every app for both levels until the release with level 4 is out.
 - Modules are never unloaded, because an open app's code must stay mapped. When the Apps app
   upgrades a module you've already opened, ZeroShell restarts itself once (about a second) to
-  run the new code.
+  run the new code. After the same upgrade from a terminal it shows a message asking for a
+  restart instead, since it won't restart under an app you may be using.
 - A built-in app always wins over a module with the same id.
 
 ### How apps are installed
@@ -527,6 +638,45 @@ apt sees it.
 Apps that need a Debian repository of their own (Tailscale for Remote, Meshtastic for Mesh) carry
 that repository's list file and signing key in their package. Meshtastic's key is checked against
 a pinned fingerprint at build time (`MESHTASTIC_KEY_FPR` in `image/build.sh`).
+
+### How new apps reach the home screen
+
+The home screen's list of apps (`shell/src/apps/registry.cpp`) is read from three folders:
+
+| Folder | What's in it |
+| --- | --- |
+| `/usr/lib/zeroos/apps` | App modules, `<id>.so` |
+| `/usr/share/APPLaunch/applications` | Launcher entries (`.desktop` files) of apps made for M5Stack's launcher |
+| `/var/lib/zeroos/apps/m5` | `zeroos-apps`' notes on the M5 apps it installed, which give them the same ids the store uses |
+
+The Apps app reads the list again after each of its own jobs. Up to 0.4.0 that was the only time
+it was read, so an app installed from a terminal (`sudo zeroos-apps install`, `apt install`,
+`dpkg -i`) only appeared after a restart. Now ZeroShell watches the three folders itself
+(`shell/src/ui/app_watch.cpp`):
+
+1. At start it opens an inotify file and asks the kernel to report, for each folder, any file
+   created, deleted, moved in or out, or finished being written. dpkg writes `x.so.dpkg-new` and
+   renames it into place, which is a "moved in"; `cp` ends with "finished being written".
+2. A folder that doesn't exist yet is watched through its nearest parent that does, for that
+   folder's creation only. That matters for the M5 folder, which the first M5 app creates and dpkg
+   deletes again with the last. When it appears the watches are set again on the folder itself.
+3. On the device the inotify file is waited on by the main loop's `poll()` along with the
+   keyboards (`platform_watch_fd()` in `shell/src/platform/platform.cpp`). With nothing being
+   installed it costs no CPU: there is no timer and nothing is checked on a schedule. The PC builds
+   have no such `poll()`, so there it is checked once a second instead.
+4. One apt run changes files many times over several seconds, so ZeroShell waits until 1.5
+   seconds pass with no change before doing anything.
+5. If the home screen is open, it reads the list again and redraws home on the page it was on: a
+   search keeps what was typed, All apps keeps its filter and the app in focus. If a Tab menu, a
+   question or the taskbar panel is open over home, it waits for that to close first.
+6. If any other app is open, it only notes that the list changed. Reading the list replaces every
+   entry in it, and the open app may still be using one, so the list is read on the way back home
+   instead, just before home is drawn.
+7. If a module that was already loaded was replaced (an upgrade from a terminal), the old code
+   stays in use until ZeroShell restarts, because a loaded library can't be swapped. Home says so
+   once: "An app was updated: restart to use the new version".
+
+Each reload is logged: `journalctl -u zeroshell | grep "apps changed"`.
 
 ### How ZeroOS updates itself
 
@@ -627,6 +777,9 @@ with each setting's file:
 | earlyoom at 4% RAM and 8% swap left (`files/earlyoom`) | Closes the biggest app before the system stalls. Never ZeroShell, SSH, systemd, networking, Tailscale or audio; browsers and media players first |
 | Logs on the card, capped at 24 MB (`files/journald.conf`) | Few card writes, but a failed boot can still be read |
 | Dock, Chromium and the HDMI desktop start only when asked | They cost nothing until used |
+| Lists make widgets only for the lines on screen (`shell/src/ui/list_view.cpp`) | The 200-row Apps list costs about 36 UI objects instead of about 1,200, and opens as fast as a short one |
+| New apps found with inotify in the main loop's `poll()` (`shell/src/ui/app_watch.cpp`) | No polling timer: nothing runs until a file in an app folder changes |
+| Watchdog ping at most every 2.5 s (`shell/src/platform/watchdog.cpp`) | One small `sendto()`, from the loop that runs anyway |
 | CPU profiles Saver, Balanced, Performance (`shell/src/ui/power.cpp`) | Saver is on-demand capped near 70% speed; the screen-off state drops to the lowest speed |
 | Wi-Fi power save (`files/nm-wifi-powersave.conf`), Bluetooth off after 10 minutes with nothing connected | Radios cost a lot on a small battery |
 
@@ -719,6 +872,7 @@ anything merges.
 | CI job | What it does | What it catches |
 | --- | --- | --- |
 | Simulator build and screenshots | Builds the SDL and headless versions, runs the unit tests, then drives the headless build through every screen of every app and saves a screenshot of each | Code that doesn't compile, failing tests, an app that crashes when opened |
+| Watchdog and new apps (`shell/tests/watch_test.py`, in the same job) | Starts the headless build with a socket standing in for systemd's and checks the first `WATCHDOG=1` arrives; writes an M5 launcher entry into a folder that didn't exist at start, once with home open and once with Settings open, and checks the app list is read again at the right moment | A watchdog that never pings, a folder watch that misses new apps or reloads under an open app |
 | Apps as modules | Builds every app as a module, starts ZeroShell with none installed, then loads and opens each one | A module that won't load (missing symbol, wrong app level) or crashes |
 | Device build with a fake screen and keyboard | Builds the real device version for the CI machine, runs it with a file standing in for the LCD and a pipe standing in for the keyboard, sends the exact key codes M5's driver sends, and checks the screen and what was typed into Notes | Broken key translation, typing that drops letters, a device build that won't start |
 | Open every app with the keyboard | The same, opening every app from the home screen, once with simulated hardware and once with the real hardware layer on a machine with no Cardputer hardware | An app that hangs or crashes when its hardware or tools are missing |
@@ -825,6 +979,8 @@ cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/he
 | `ZS_KEYMAP` | `us` or `cardputer`: how to read a keyboard |
 | `ZS_KEYLOG=1` | Log every raw key to the journal |
 | `ZS_APP_DIR` | Load app modules from this folder instead of `/usr/lib/zeroos/apps` |
+| `ZS_M5_APP_DIR`, `ZS_M5_STATE_DIR` | Read M5 launcher entries and `zeroos-apps`' notes on them from these folders instead of `/usr/share/APPLaunch/applications` and `/var/lib/zeroos/apps/m5` |
+| `NOTIFY_SOCKET`, `WATCHDOG_USEC` | Set by systemd, not by hand: where and how often to send the watchdog ping |
 | `ZS_GAMES_DIR`, `ZS_GAMES_CORES` | Where the Games app looks for games and libretro cores |
 | `ZEROOS_IR_DB` | Use another IR code database |
 

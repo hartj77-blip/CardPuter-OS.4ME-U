@@ -39,8 +39,11 @@ list is more than 6 hours old. Type to find an app.
 Ctrl and the letter does the same without opening the menu (Ctrl + U updates every app).
 
 Installing needs a connection (Wi-Fi, Ethernet or a tethered phone). A new app appears on the home
-screen as soon as it's installed. After an update to an app you already opened, the screen
-restarts once (about a second) to run the new version.
+screen as soon as it's installed, whether it was installed from Apps or from a terminal (see
+[How the home screen finds new apps](#how-the-home-screen-finds-new-apps)). After an update to an
+app you already opened from Apps, the screen restarts once (about a second) to run the new
+version. After the same update from a terminal, home says "An app was updated: restart to use the
+new version" instead, because ZeroShell won't restart itself under an app you may be using.
 
 From a terminal:
 
@@ -160,6 +163,31 @@ Apps app (ZeroShell)  --systemctl start-->  zeroos-apps@install:media.service  (
   through `zeroos-apps@<job>.service` (polkit lets the UI user start those). It writes the merged
   catalog to `/var/lib/zeroos/apps/catalog` and progress to `/run/zeroos/apps.status`.
 
+### How the home screen finds new apps
+
+The home screen's app list is read from three folders: app modules in `/usr/lib/zeroos/apps`,
+M5Stack launcher entries in `/usr/share/APPLaunch/applications`, and `zeroos-apps`' notes on M5
+apps in `/var/lib/zeroos/apps/m5`. The Apps app reads them again after each of its own jobs. An
+install from a terminal (`sudo zeroos-apps install`, `apt`, `dpkg -i`) doesn't go through Apps, so
+ZeroShell also watches those folders itself (`shell/src/ui/app_watch.cpp`):
+
+1. At start it asks the kernel, through inotify, to report files created, deleted, renamed into
+   or out of, or finished being written in each folder. A folder that doesn't exist yet (the M5
+   one is created by the first M5 app, and dpkg removes it again with the last) is watched through
+   its nearest parent that does, for its creation only.
+2. On the device the inotify file sits in the main loop's `poll()` next to the keyboards, so while
+   nothing is installed it costs no CPU at all: no timer, no polling.
+3. One apt run changes files many times, so ZeroShell waits until nothing has changed for 1.5
+   seconds.
+4. If home is open, it reads the app list again and redraws home on the page it was on (a search
+   keeps its text; All apps keeps its filter and the app in focus). If another app is open, it
+   only notes the change and reads the list on the way back home, because an open app may still
+   be using entries from the old list.
+5. If a module that was already loaded has been replaced (an upgrade), its old code stays in use
+   until ZeroShell restarts, as with any shared library. Home shows that once as a message.
+
+The journal shows each reload: `journalctl -u zeroshell | grep "apps changed"`.
+
 ## Making an app
 
 Apps are made in the apps repository,
@@ -185,6 +213,12 @@ Don't change an app in both places: change it in the apps repository.
 Raise `ZS_APP_ABI` in the same pull request as any change that breaks already-built modules: a
 header an app includes (`ui/`, `hal/`, `apps/common.h`), LVGL or `lv_conf.h`. ZeroShell skips
 modules built for another level and the store doesn't offer them.
+
+The level is 4 since `ListView` (`shell/src/ui/list_view.h`) started building only the rows that
+fit on the screen. Its private members changed, so its size changed, and an app that keeps a
+`ListView` inside its own class (Net Tools and RF Tools, through `apps/kit/suite.h` in the apps
+repository) must be rebuilt against the new header. Its public functions are the same, so the
+apps' code doesn't change, only their build.
 
 The apps repository watches this one. It builds every app for the level of the newest ZeroOS
 release, and for the level on `main` when that is different, so the apps for the next ZeroOS are

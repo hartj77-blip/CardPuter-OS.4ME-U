@@ -58,6 +58,7 @@
 #include "hal/play_clock.h"
 #include "hal/proc_stats.h"
 #include "hal/tailscale_up.h"
+#include "platform/watchdog.h"
 #include "ui/prefs.h"
 
 namespace zs {
@@ -90,6 +91,9 @@ bool write_str(const std::string& path, const std::string& v) {
 }
 
 std::string run(const std::string& cmd) {
+    // The command may take a while (bluetoothctl pair: up to 25 s). On the
+    // UI thread that is a wait, not a hang: give the watchdog room.
+    WatchdogGrace grace;
     std::string out;
     FILE* p = popen((cmd + " 2>/dev/null").c_str(), "r");
     if (!p) return out;

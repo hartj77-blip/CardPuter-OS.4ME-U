@@ -12,6 +12,8 @@
 #include <cstring>
 #include <utility>
 
+#include "platform/watchdog.h"
+
 namespace zs::jf {
 namespace {
 
@@ -248,6 +250,9 @@ Reply http(const std::string& url, const std::string& auth, const std::string* b
     Reply r;
     std::string cmd, tmp;
     if (!curl_command(auth, body, cmd, tmp)) return r;
+    // Up to kTimeoutS on the UI thread, and a screen may make a few calls in
+    // a row: a wait, not a hang (platform/watchdog.h).
+    WatchdogGrace grace;
     cmd += " -w '\\n%{http_code}' " + shell_quote(url) + " 2>/dev/null";
     if (FILE* p = popen(cmd.c_str(), "r")) {
         char buf[4096];

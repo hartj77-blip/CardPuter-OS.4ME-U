@@ -9,6 +9,7 @@
 #include "platform/keys.h"
 #include "platform/platform.h"
 #include "ui/actions.h"
+#include "ui/app_watch.h"
 #include "ui/numkeys.h"
 #include "ui/player.h"
 #include "ui/power.h"
@@ -486,6 +487,12 @@ void Shell::apply_pending() {
     std::fprintf(stderr, "zeroshell: open %s\n", id.c_str());
     if (id == "home") {
         app_id_ = "home";
+        // Apps installed or removed from the command line while another app
+        // was open (ui/app_watch.cpp): read the list again before home shows it.
+        if (app_watch_take_changed()) {
+            std::fprintf(stderr, "zeroshell: apps changed on disk while away, reading them again\n");
+            app_registry_reload();
+        }
         switch_to(make_launcher(), "");
         return;
     }

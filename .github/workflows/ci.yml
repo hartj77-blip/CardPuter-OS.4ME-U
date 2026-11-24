@@ -20,6 +20,8 @@ jobs:
         run: cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/headless -j"$(nproc)"
       - name: Unit tests
         run: ctest --test-dir build/headless --output-on-failure
+      - name: Watchdog ping and new apps on home without a restart
+        run: python3 shell/tests/watch_test.py build/headless/zeroshell
       - name: Render every screen (fails if any app crashes)
         run: shell/tools/screenshots.sh build/headless/zeroshell build/screenshots
       - name: Apps as installable modules (fails if one won't load or crashes)

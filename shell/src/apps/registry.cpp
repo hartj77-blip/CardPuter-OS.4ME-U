@@ -25,6 +25,7 @@ namespace zs {
 void zs_builtin_apps(std::vector<AppInfo>& out);
 // Apps made for M5Stack's launcher (ui/m5_apps.cpp).
 void m5_apps_add(std::vector<AppInfo>& out);
+void m5_app_dirs(std::vector<std::string>& out);
 
 namespace {
 
@@ -136,6 +137,13 @@ const std::vector<AppInfo>& app_registry() {
 }
 
 void app_registry_reload() { scan(); }
+
+// Every folder a scan reads, for ui/app_watch.cpp.
+std::vector<std::string> app_registry_dirs() {
+    std::vector<std::string> v{module_dir()};
+    m5_app_dirs(v);
+    return v;
+}
 
 const AppInfo* app_find(const std::string& id) {
     for (auto& a : app_registry())

@@ -256,8 +256,9 @@ built from these:
 | `SearchProvider` | Adds results to home search |
 | `Recent` | Tell home what to reopen: `recent_push(title, detail, arg)` |
 
-The kit is part of what apps compile against. `ZS_APP_ABI` goes from 3 to 4 when the first app in
+The kit is part of what apps compile against. `ZS_APP_ABI` goes up by one when the first app in
 CardPuter-Apps.4ME-U uses it (see How it gets built); the Apps store offers only builds that match.
+(It is already 4: `ListView` changed size when it started building only the visible rows.)
 
 ## Every app, before and after
 
@@ -296,7 +297,7 @@ letter, and Ctrl + the letter runs it straight away.
 | Phase | Work | Where |
 | --- | --- | --- |
 | 0 | This spec and the mockups | here |
-| 1 | The kit: Screen, Action, ListView, Menu, soft-key bar, Tabs, ValueRow, Confirm, Prompt. `ZS_APP_ABI` 4 | `shell/src/ui/kit/` |
+| 1 | The kit: Screen, Action, ListView, Menu, soft-key bar, Tabs, ValueRow, Confirm, Prompt. `ZS_APP_ABI` up by one | `shell/src/ui/kit/` |
 | 2 | Shell keys: hold Esc, Ctrl + Space, Tab menu, 1-9, 0 help, Ctrl + letter, Fn always Fn | `ui/shell.cpp`, `ui/numkeys.cpp`, `platform/keys.*` |
 | 3 | Home: search, providers, pinned, recent, All apps | replaces `ui/launcher.cpp` |
 | 4 | Settings tree; fold in Wi-Fi, Battery, Clock, Update | `apps/settings.cpp` and friends |
@@ -308,7 +309,7 @@ actions (`shell_set_actions()` in `ui/app.h`) and is then laid out `kBodyH` high
 ported has no bar and keeps its full height, so nothing moves until it's ported.
 
 The kit needs no app-level (`ZS_APP_ABI`) bump on its own: it only adds to the headers, and
-already-built modules never call it. The level goes to 4 in the first change that moves an
+already-built modules never call it. The level goes up in the first change that moves an
 installable app (CardPuter-Apps.4ME-U) onto the kit, since that app can't run on an older ZeroOS.
 
 Done so far:
