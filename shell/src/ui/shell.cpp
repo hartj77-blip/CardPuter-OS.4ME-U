@@ -20,6 +20,9 @@
 #include "ui/theme.h"
 #include "ui/tracker.h"
 
+// lv_theme_t is opaque in the public API; a child theme needs its size.
+#include "src/themes/lv_theme_private.h"
+
 namespace zs {
 
 using namespace theme;
@@ -148,10 +151,37 @@ void Shell::start(lv_indev_t* keypad) {
         lv_indev_set_read_cb(keypad_, keypad_hook);
     }
 
-    // Dark theme with Ubuntu orange for focus, sliders, cursors.
+    // Dark theme, white for focus, sliders, cursors. LVGL's default theme
+    // puts white text on a focused button; ours is lit white, so a small
+    // child theme turns that text black, adds the focus gradient and squares
+    // the corners.
     lv_display_t* disp = lv_display_get_default();
     lv_theme_t* th = lv_theme_default_init(disp, c(kAccent), c(kAccent), true, &zs_font_12);
-    lv_display_set_theme(disp, th);
+    static lv_theme_t mono;
+    static lv_style_t lit, square;
+    static bool made = false;
+    if (!made) {
+        made = true;
+        lv_style_init(&lit);
+        lv_style_set_bg_color(&lit, c(kFocus));
+        lv_style_set_bg_grad_color(&lit, c(kFocusLow));
+        lv_style_set_bg_grad_dir(&lit, LV_GRAD_DIR_VER);
+        lv_style_set_bg_opa(&lit, LV_OPA_COVER);
+        lv_style_set_text_color(&lit, c(kOnFocus));
+        lv_style_init(&square);
+        lv_style_set_radius(&square, 0);
+        lv_style_set_shadow_width(&square, 0);
+        mono = *th;
+        lv_theme_set_parent(&mono, th);
+        lv_theme_set_apply_cb(&mono, [](lv_theme_t*, lv_obj_t* o) {
+            if (lv_obj_check_type(o, &lv_button_class) || lv_obj_check_type(o, &lv_list_button_class)) {
+                lv_obj_add_style(o, &square, 0);
+                lv_obj_add_style(o, &lit, LV_STATE_FOCUS_KEY);
+                lv_obj_add_style(o, &lit, LV_STATE_FOCUSED);
+            }
+        });
+    }
+    lv_display_set_theme(disp, &mono);
 
     screen_ = lv_screen_active();
     lv_obj_set_style_bg_color(screen_, c(kBg), 0);
@@ -168,14 +198,10 @@ void Shell::start(lv_indev_t* keypad) {
     lv_obj_remove_flag(content_, LV_OBJ_FLAG_SCROLLABLE);
 
     toast_ = lv_label_create(screen_);
-    // Notifications drop from under the clock, as on Ubuntu.
-    lv_obj_set_style_bg_color(toast_, c(kSurface2), 0);
-    lv_obj_set_style_bg_opa(toast_, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(toast_, 11, 0);
+    // Notifications drop from under the clock, a small lifted sheet.
+    style_raised(toast_);
     lv_obj_set_style_pad_hor(toast_, 10, 0);
     lv_obj_set_style_pad_ver(toast_, 4, 0);
-    lv_obj_set_style_border_color(toast_, c(0x5a5a5a), 0);
-    lv_obj_set_style_border_width(toast_, 1, 0);
     lv_obj_set_style_max_width(toast_, kScreenW - 16, 0);
     lv_obj_align(toast_, LV_ALIGN_TOP_MID, 0, kStatusH + 4);
     lv_obj_add_flag(toast_, LV_OBJ_FLAG_HIDDEN);
@@ -242,7 +268,7 @@ void Shell::build_statusbar() {
     style_plain(sb_ctrl_);
     lv_obj_set_size(sb_ctrl_, LV_SIZE_CONTENT, 14);
     lv_obj_set_style_pad_hor(sb_ctrl_, 4, 0);
-    lv_obj_set_style_radius(sb_ctrl_, 3, 0);
+    lv_obj_set_style_radius(sb_ctrl_, 0, 0);
     lv_obj_set_style_bg_color(sb_ctrl_, c(kAccent), 0);
     lv_obj_set_style_bg_opa(sb_ctrl_, LV_OPA_COVER, 0);
     lv_obj_remove_flag(sb_ctrl_, LV_OBJ_FLAG_SCROLLABLE);

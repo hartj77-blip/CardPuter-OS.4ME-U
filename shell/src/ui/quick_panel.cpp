@@ -80,11 +80,7 @@ void quick_panel_build(lv_obj_t* screen) {
     style_plain(g_panel);
     lv_obj_set_size(g_panel, kScreenW, kPanelH);
     lv_obj_set_pos(g_panel, 0, kStatusH);
-    lv_obj_set_style_bg_color(g_panel, c(kSurface), 0);
-    lv_obj_set_style_bg_opa(g_panel, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_side(g_panel, LV_BORDER_SIDE_BOTTOM, 0);
-    lv_obj_set_style_border_color(g_panel, c(kAccent), 0);
-    lv_obj_set_style_border_width(g_panel, 1, 0);
+    style_raised(g_panel);
     lv_obj_remove_flag(g_panel, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(g_panel, LV_OBJ_FLAG_HIDDEN);
 
@@ -93,7 +89,7 @@ void quick_panel_build(lv_obj_t* screen) {
         style_plain(tile);
         lv_obj_set_size(tile, kTileW - 2, kPanelH - 6);
         lv_obj_set_pos(tile, 1 + t * kTileW + (kScreenW - kTiles * kTileW) / 2, 2);
-        lv_obj_set_style_radius(tile, 6, 0);
+        lv_obj_set_style_radius(tile, 0, 0);
         lv_obj_set_style_bg_color(tile, c(kSurface2), LV_STATE_USER_1);
         lv_obj_set_style_bg_opa(tile, LV_OPA_COVER, LV_STATE_USER_1);
         lv_obj_set_style_border_color(tile, c(kAccent), LV_STATE_USER_1);

@@ -13,7 +13,6 @@ using namespace theme;
 
 namespace {
 
-constexpr uint32_t kBarBg = 0x101010, kMenuBg = 0x262626, kMenuBorder = 0x4a4a4a, kDisabled = 0x6a6a6a;
 constexpr int kMenuW = 168, kRowH = 18, kMaxRows = 6;
 
 std::vector<Action> g_actions;
@@ -45,9 +44,9 @@ void bar_item(const char* key, const std::string& text) {
     style_plain(chip);
     lv_obj_set_size(chip, LV_SIZE_CONTENT, 12);
     lv_obj_set_style_pad_hor(chip, 3, 0);
-    lv_obj_set_style_radius(chip, 3, 0);
-    lv_obj_set_style_bg_color(chip, c(kSurface2), 0);
-    lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(chip, 1, 0);   // a keycap: outlined, not filled
+    lv_obj_set_style_border_color(chip, c(kGrey5), 0);
+    lv_obj_set_style_border_width(chip, 1, 0);
     lv_obj_remove_flag(chip, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_center(label(chip, key, &zs_font_12, kText));
     label(item, text.c_str(), &zs_font_12, kMuted);
@@ -156,8 +155,13 @@ void actions_build(lv_obj_t* screen) {
     style_plain(g_bar);
     lv_obj_set_size(g_bar, kScreenW, kSoftkeyH);
     lv_obj_set_pos(g_bar, 0, kScreenH - kSoftkeyH);
-    lv_obj_set_style_bg_color(g_bar, c(kBarBg), 0);
+    lv_obj_set_style_bg_color(g_bar, c(0x161616), 0);
+    lv_obj_set_style_bg_grad_color(g_bar, c(kGrey0), 0);
+    lv_obj_set_style_bg_grad_dir(g_bar, LV_GRAD_DIR_VER, 0);
     lv_obj_set_style_bg_opa(g_bar, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_side(g_bar, LV_BORDER_SIDE_TOP, 0);
+    lv_obj_set_style_border_color(g_bar, c(kHairline), 0);
+    lv_obj_set_style_border_width(g_bar, 1, 0);
     lv_obj_set_style_pad_hor(g_bar, 4, 0);
     lv_obj_set_flex_flow(g_bar, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(g_bar, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -207,11 +211,7 @@ void actions_menu_open(lv_obj_t* focused, const std::string& title) {
     style_plain(g_menu);
     lv_obj_set_width(g_menu, kMenuW);
     lv_obj_set_height(g_menu, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(g_menu, c(kMenuBg), 0);
-    lv_obj_set_style_bg_opa(g_menu, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(g_menu, c(kMenuBorder), 0);
-    lv_obj_set_style_border_width(g_menu, 1, 0);
-    lv_obj_set_style_radius(g_menu, 6, 0);
+    style_raised(g_menu);
     lv_obj_set_style_pad_all(g_menu, 3, 0);
     lv_obj_set_flex_flow(g_menu, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_style_pad_row(g_menu, 0, 0);
@@ -245,20 +245,19 @@ void actions_menu_open(lv_obj_t* focused, const std::string& title) {
             lv_obj_set_size(line, kMenuW - 20, 1);
             lv_obj_set_style_margin_ver(line, 2, 0);
             lv_obj_set_style_margin_left(line, 4, 0);
-            lv_obj_set_style_bg_color(line, c(0x3c3c3c), 0);
+            lv_obj_set_style_bg_color(line, c(kBorder), 0);
             lv_obj_set_style_bg_opa(line, LV_OPA_COVER, 0);
         }
         lv_obj_t* row = lv_obj_create(g_rows);
         style_plain(row);
         lv_obj_set_size(row, kMenuW - 8, kRowH);
-        lv_obj_set_style_radius(row, 3, 0);
+        lv_obj_set_style_radius(row, 0, 0);
         lv_obj_set_style_pad_hor(row, 5, 0);
-        lv_obj_set_style_bg_color(row, c(kAccent), LV_STATE_USER_1);
-        lv_obj_set_style_bg_opa(row, LV_OPA_COVER, LV_STATE_USER_1);
+        style_focus_fill(row, LV_STATE_USER_1);
         lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
         uint32_t text = !a.enabled ? kDisabled : a.danger ? kBad : kText;
         char letter[2] = {char(std::toupper(int(a.letter))), 0};
-        lv_obj_t* l = label(row, letter, &zs_font_12, a.enabled ? (a.danger ? kBad : kAccent) : kDisabled);
+        lv_obj_t* l = label(row, letter, &zs_font_12, a.enabled ? (a.danger ? kBad : kMuted) : kDisabled);
         lv_obj_set_style_text_color(l, c(kOnAccent), LV_STATE_USER_1);
         lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
         lv_obj_t* t = label(row, a.label.c_str(), &zs_font_12, text);
@@ -345,9 +344,9 @@ void sheet_item(lv_obj_t* grid, const std::string& key, const std::string& text)
     lv_obj_set_size(chip, LV_SIZE_CONTENT, 13);
     lv_obj_set_style_min_width(chip, 22, 0);
     lv_obj_set_style_pad_hor(chip, 3, 0);
-    lv_obj_set_style_radius(chip, 3, 0);
-    lv_obj_set_style_bg_color(chip, c(kSurface2), 0);
-    lv_obj_set_style_bg_opa(chip, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(chip, 1, 0);   // a keycap: outlined, not filled
+    lv_obj_set_style_border_color(chip, c(kGrey5), 0);
+    lv_obj_set_style_border_width(chip, 1, 0);
     lv_obj_remove_flag(chip, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_center(label(chip, key.c_str(), &zs_font_12, kText));
     lv_obj_t* t = label(item, text.c_str(), &zs_font_12, kText);
@@ -418,11 +417,7 @@ void actions_confirm(const std::string& question, const std::string& detail, con
     g_confirm = lv_obj_create(lv_layer_top());
     style_plain(g_confirm);
     lv_obj_set_size(g_confirm, 240, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_color(g_confirm, c(0x2a2a2a), 0);
-    lv_obj_set_style_bg_opa(g_confirm, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_color(g_confirm, c(kMenuBorder), 0);
-    lv_obj_set_style_border_width(g_confirm, 1, 0);
-    lv_obj_set_style_radius(g_confirm, 7, 0);
+    style_raised(g_confirm);
     lv_obj_set_style_pad_all(g_confirm, 9, 0);
     lv_obj_set_style_pad_row(g_confirm, 4, 0);
     lv_obj_set_flex_flow(g_confirm, LV_FLEX_FLOW_COLUMN);
@@ -445,8 +440,12 @@ void actions_confirm(const std::string& question, const std::string& detail, con
         lv_obj_t* btn = lv_obj_create(row);
         style_plain(btn);
         lv_obj_set_size(btn, 106, 20);
-        lv_obj_set_style_radius(btn, 4, 0);
-        lv_obj_set_style_bg_color(btn, c(b ? kBad : kSurface2), 0);
+        lv_obj_set_style_radius(btn, 0, 0);
+        lv_obj_set_style_bg_color(btn, c(b ? 0xf0656a : 0x2a2a2a), 0);
+        lv_obj_set_style_bg_grad_color(btn, c(b ? 0xc9363b : 0x141414), 0);
+        lv_obj_set_style_bg_grad_dir(btn, LV_GRAD_DIR_VER, 0);
+        lv_obj_set_style_border_color(btn, c(b ? 0xb02a2f : 0x484848), 0);
+        lv_obj_set_style_border_width(btn, 1, 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_remove_flag(btn, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_align(btn, b ? LV_ALIGN_RIGHT_MID : LV_ALIGN_LEFT_MID, 0, 0);

@@ -31,10 +31,9 @@ the IR Remote app and the hardware layer share, with no LVGL in it so it is unit
   `shell_open_app(id, arg)`, never by calling into another app's code, since that app may not be installed. Switching apps is deferred until the current key handler returns, so an app
   can safely open another app from its own handler.
 
-- **Look.** Ubuntu's desktop at 320x170: a black top bar (app name, date and time, status icons), a
-  home screen with a dock of five favourites and a paged app grid on the aubergine wallpaper, Yaru
-  dark colours with the orange accent in apps, notifications under the clock. Colours and fonts
-  live in `ui/theme.h`. The Terminal app's console uses Ubuntu's terminal colours.
+- **Look.** "Monochrome" ([UX.md](UX.md#look-monochrome-ui-3)): black, white and greys, the item
+  in focus lit white, menus and dialogs as lifted sheets with a soft gradient, square corners;
+  colour only for state and for app icons. Colours and fonts live in `ui/theme.h`. The Terminal app's console uses Ubuntu's terminal colours.
 
 ## Hardware layer
 

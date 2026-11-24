@@ -98,7 +98,7 @@ lv_obj_t* app_icon(lv_obj_t* parent, const AppInfo& info, int size) {
 // Translucent white behind the item in focus, as in GNOME.
 void style_item(lv_obj_t* o, int radius) {
     style_plain(o);
-    lv_obj_set_style_radius(o, radius, 0);
+    lv_obj_set_style_radius(o, 0, 0);
     lv_obj_set_style_bg_color(o, c(0xffffff), 0);
     lv_obj_set_style_bg_opa(o, LV_OPA_30, LV_STATE_FOCUSED);
     lv_obj_set_style_outline_width(o, 0, LV_STATE_FOCUS_KEY);
@@ -287,7 +287,7 @@ public:
 
     void build(lv_obj_t* root) override {
         root_ = root;
-        // Wallpaper: aubergine fading up from the left, like Ubuntu's.
+        // Wallpaper: black fading to dark grey, until the photographs land.
         lv_obj_set_style_bg_color(root, c(kAubergine), 0);
         lv_obj_set_style_bg_grad_color(root, c(kAubergineLight), 0);
         lv_obj_set_style_bg_grad_dir(root, LV_GRAD_DIR_HOR, 0);
@@ -376,7 +376,7 @@ private:
         style_plain(box_);
         lv_obj_set_size(box_, kScreenW - 8, kSearchH);
         lv_obj_set_pos(box_, 4, 3);
-        lv_obj_set_style_radius(box_, 5, 0);
+        lv_obj_set_style_radius(box_, 0, 0);
         lv_obj_set_style_bg_color(box_, c(0x000000), 0);
         lv_obj_set_style_bg_opa(box_, LV_OPA_40, 0);
         lv_obj_remove_flag(box_, LV_OBJ_FLAG_SCROLLABLE);
@@ -384,7 +384,7 @@ private:
         lv_obj_align(p, LV_ALIGN_LEFT_MID, 7, 0);
         bool empty = query_.empty();
         lv_obj_t* t = label(box_, empty ? "Type to search apps, settings, actions" : (query_ + "_").c_str(),
-                            empty ? &zs_font_12 : &zs_font_14, empty ? 0x9a8a96 : kText);
+                            empty ? &zs_font_12 : &zs_font_14, empty ? kGrey5 : kText);
         lv_obj_set_width(t, kScreenW - 40);
         lv_label_set_long_mode(t, LV_LABEL_LONG_DOT);
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 22, 0);
@@ -420,7 +420,7 @@ private:
             lv_obj_t* badge = lv_obj_create(cell);
             style_plain(badge);
             lv_obj_set_size(badge, 11, 11);
-            lv_obj_set_style_radius(badge, 3, 0);
+            lv_obj_set_style_radius(badge, 0, 0);
             lv_obj_set_style_bg_color(badge, c(0x000000), 0);
             lv_obj_set_style_bg_opa(badge, LV_OPA_60, 0);
             lv_obj_remove_flag(badge, LV_OBJ_FLAG_CLICKABLE);
@@ -431,7 +431,7 @@ private:
             pin_objs_.push_back(cell);
         }
 
-        lv_obj_t* head = label(root_, "RECENT", &zs_font_12, 0xb8a8b4);
+        lv_obj_t* head = label(root_, "RECENT", &zs_font_12, kMuted);
         lv_obj_set_pos(head, 9, kRecentY);
 
         rows_box_ = lv_obj_create(root_);
@@ -450,7 +450,7 @@ private:
             ++shown;
         }
         if (shown == 0) {
-            lv_obj_t* tip = label(rows_box_, "Apps you open show up here", &zs_font_12, 0xb8a8b4);
+            lv_obj_t* tip = label(rows_box_, "Apps you open show up here", &zs_font_12, kMuted);
             lv_obj_set_style_pad_left(tip, 5, 0);
         }
         add_row(ZS_ICON_GRID, 0x5e6c7b, "All apps", "",
@@ -491,7 +491,7 @@ private:
         lv_obj_t* t = label(row, text.c_str(), &zs_font_14, 0xffffff);
         lv_obj_align(t, LV_ALIGN_LEFT_MID, 26, 0);
         if (!value.empty()) {
-            lv_obj_t* v = label(row, value.c_str(), &zs_font_12, 0xb8a8b4);
+            lv_obj_t* v = label(row, value.c_str(), &zs_font_12, kMuted);
             lv_obj_align(v, LV_ALIGN_RIGHT_MID, -6, 0);
         }
         row_runs_[row] = std::move(run);
@@ -675,7 +675,7 @@ private:
         for (const AppInfo& a : app_registry()) apps.push_back(&a);
         std::sort(apps.begin(), apps.end(), [](const AppInfo* x, const AppInfo* y) { return norm(x->name) < norm(y->name); });
         pin_pending_.clear();
-        all_head_ = label(root_, fmt_count(int(apps.size())).c_str(), &zs_font_12, 0xb8a8b4);
+        all_head_ = label(root_, fmt_count(int(apps.size())).c_str(), &zs_font_12, kMuted);
         lv_obj_set_pos(all_head_, 9, 3);
         all_.build(root_, 2, 18, kScreenW - 4, kBodyH - 19);
         all_ids_.clear();

@@ -80,7 +80,7 @@ void ListView::build(lv_obj_t* parent, int x, int y, int w, int h) {
     style_plain(chip_);
     lv_obj_set_size(chip_, LV_SIZE_CONTENT, 16);
     lv_obj_set_style_pad_hor(chip_, 5, 0);
-    lv_obj_set_style_radius(chip_, 4, 0);
+    lv_obj_set_style_radius(chip_, 0, 0);
     lv_obj_set_style_bg_color(chip_, c(kSurface2), 0);
     lv_obj_set_style_bg_opa(chip_, LV_OPA_COVER, 0);
     lv_obj_set_style_border_color(chip_, c(kAccent), 0);
@@ -97,10 +97,10 @@ void ListView::make_slot(int i, bool focusable) {
     style_plain(row);
     lv_obj_set_pos(row, 0, i * kPitch);
     lv_obj_set_size(row, width_, kRowH);
-    lv_obj_set_style_radius(row, 4, 0);
+    lv_obj_set_style_radius(row, 0, 0);
     lv_obj_set_style_bg_color(row, c(kSurface), 0);
     lv_obj_set_style_bg_opa(row, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(row, c(kAccent), LV_STATE_FOCUSED);
+    style_focus_fill(row, LV_STATE_FOCUSED);
     lv_obj_set_style_outline_width(row, 0, LV_STATE_FOCUS_KEY);
     lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_user_data(row, (void*)(intptr_t)i);
@@ -118,7 +118,7 @@ void ListView::make_slot(int i, bool focusable) {
     s.badge = lv_obj_create(row);
     style_plain(s.badge);
     lv_obj_set_size(s.badge, 12, 12);
-    lv_obj_set_style_radius(s.badge, 3, 0);
+    lv_obj_set_style_radius(s.badge, 0, 0);
     lv_obj_set_style_bg_color(s.badge, c(kSurface2), 0);
     lv_obj_remove_flag(s.badge, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(s.badge, LV_OBJ_FLAG_CLICKABLE);
@@ -135,8 +135,8 @@ void ListView::make_slot(int i, bool focusable) {
     s.text = label(row, "", &zs_font_14, kText);
     lv_label_set_long_mode(s.text, LV_LABEL_LONG_DOT);
 
-    // Focused: the text and value turn white on the accent.
-    for (lv_obj_t* o : {s.text, s.value}) lv_obj_set_style_text_color(o, c(kOnAccent), LV_STATE_FOCUSED);
+    // Focused: the text and value turn black on the lit row.
+    for (lv_obj_t* o : {s.text, s.value}) lv_obj_set_style_text_color(o, c(kOnFocus), LV_STATE_FOCUSED);
     slots_.push_back(s);
 }
 

@@ -237,16 +237,45 @@ The screen is 320 x 170.
 
 | Part | Height | Notes |
 | --- | --- | --- |
-| Status bar | 18 | Time left, then the app's title; icons right |
-| Content | 138 | |
-| Soft-key bar | 14 | `zs_font_12`, muted text, key glyphs in a raised chip |
+| Status bar | 20 | Time left, then the app's title; icons right |
+| Content | 136 | |
+| Soft-key bar | 14 | `zs_font_12`, muted text, key glyphs in an outlined keycap |
 
 Rows in a list are 22 px (6 on screen), `zs_font_14` for the title, `zs_font_12` for the value on
-the right. The focused row is the accent colour, full width, 4 px radius. A two-line row
+the right. The focused row is lit white with black text, full width, square. A two-line row
 (title and detail) is 32 px. Margins are 4 px; nothing touches the screen edge but the bars.
 
-Colours stay Yaru dark (`ui/theme.h`): one accent (orange) for focus and nothing else, red for
-destructive actions, green for on/connected. The aubergine wallpaper stays on home only.
+## Look: Monochrome (UI 3)
+
+UI 3 is a new skin on the UI 2 keys above; nothing about navigation changes. Mockups at real
+size are in [ux/ui3/mockups.html](ux/ui3/mockups.html), and
+[ux/ui3/phase1-before-after.png](ux/ui3/phase1-before-after.png) shows the first step on the
+simulator.
+
+- **Greys.** Black, white and a ramp of greys (`kGrey0` to `kGrey8` in `ui/theme.h`). Screens use
+  the role names (`kBg`, `kSurface`, `kText`, `kMuted`, `kBorder`), not hex values.
+- **Focus** is lit white: a short white-to-light-grey gradient with black text
+  (`style_focus_fill`). `kAccent` is now that white, and text on it (`kOnAccent`) is black.
+- **Depth, BlackBerry-style.** Menus, dialogs, the taskbar panel and toasts are lifted sheets: a
+  soft grey gradient, a 1 px border and a drop shadow (`style_raised`). The soft-key bar fades to
+  black. Shadows only on the one overlay that's open, so lists stay fast.
+- **Square** system chrome: no rounded corners on rows, menus, dialogs or buttons.
+- **Colour is a message.** Green on/connected/installed (`kGood`), orange update/low (`kWarn`),
+  blue in progress (`kInfo`), red destructive (`kBad`). Nothing else in the chrome is coloured.
+- **App icons belong to their authors.** Home and the app lists draw each app's icon as the app
+  ships it; the shell only adds the focus.
+- **Photography** on home and the lock screen only: public-domain Ansel Adams prints from the
+  National Park Service Mural Project (1941-42, National Archives series 79-AA), converted to
+  greyscale at build time. Built in; there are no custom wallpapers.
+
+| Step | Work | State |
+| --- | --- | --- |
+| 1 | Theme values and roles in `ui/theme.h`; lit focus, lifted menu/confirm/panel/toast, square chrome; UI 2 names kept as aliases | Done |
+| 2 | Wallpaper: `tools/wallpaper.py` makes greyscale 320 x 170 images at build time; home and lock use them | |
+| 3 | Home pins and Recent, lock screen, status bar over the photo | |
+| 4 | Inter typeface; outline glyphs for system icons (not app icons) | |
+| 5 | Replace hex values in apps (both repositories) with roles; a CI check; drop the aliases | |
+| 6 | Mockups, emulator, release | |
 
 ## The kit
 

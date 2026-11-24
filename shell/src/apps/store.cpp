@@ -177,7 +177,7 @@ private:
         }
         color = s == store::Status::Refreshing || s == store::Status::Downloading || s == store::Status::Installing ||
                         s == store::Status::Removing
-                    ? kAccent
+                    ? kInfo
                     : color;
         lv_label_set_text(status_, text.c_str());
         lv_obj_set_style_text_color(status_, c(color), 0);
@@ -311,7 +311,7 @@ private:
             uint32_t color = kMuted;
             if (e.update() || e.to_restore()) {
                 right = "Update";
-                color = kAccent;
+                color = kWarn;
             } else if (!e.installed.empty()) {
                 right = LV_SYMBOL_OK " Installed";
                 color = kGood;
@@ -371,7 +371,7 @@ private:
         if (e->update()) meta += ", " + e->version + " ready";
         if (e->installed.empty() && !e->version.empty()) meta = "Version " + e->version;
         if (e->size_kb > 0) meta += "   " + size_text(e->size_kb);
-        lv_obj_t* m = label(root_, meta.c_str(), &zs_font_12, e->update() ? kAccent : kMuted);
+        lv_obj_t* m = label(root_, meta.c_str(), &zs_font_12, e->update() ? kWarn : kMuted);
         lv_obj_set_pos(m, 50, 24);
 
         lv_obj_t* sum = label(root_, e->summary.c_str(), &zs_font_12, kText);
@@ -396,7 +396,7 @@ private:
             lv_obj_set_style_border_color(b, c(kText), LV_STATE_FOCUSED);
             lv_obj_set_style_border_width(b, 2, LV_STATE_FOCUSED);
             lv_obj_set_style_shadow_width(b, 0, 0);
-            lv_obj_t* l = label(b, text, &zs_font_12, kText);
+            lv_obj_t* l = label(b, text, &zs_font_12, accent ? kOnAccent : kText);
             lv_obj_center(l);
             lv_obj_set_pos(b, x, 90);   // above the progress line (kBodyH)
             lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, this);
