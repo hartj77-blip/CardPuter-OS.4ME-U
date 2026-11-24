@@ -41,6 +41,9 @@ These work on every screen, in every app, including in a text box.
 | **Esc** (or \`) | Back one step. At an app's first screen, back to home. On home, clear the search |
 | **Hold Esc** (0.6 s) | Home, from anywhere |
 | **Tab** | The menu: every action for the item in focus and the screen |
+| **Hold Tab** (0.6 s) | Lock: screen off now (LOCK on the key). The next key only wakes it |
+| **Fn + J** (PRSC) | Screenshot to ~/Pictures/Screenshots, from anywhere, even the Terminal |
+| **Fn + H** (HELP) | The key help sheet, the same as 0 |
 | **Ctrl + Space** | The taskbar panel (Wi-Fi, Bluetooth, volume, brightness, battery, clock) |
 | **Up / Down** (Fn + F / X) | Move focus |
 | **Left / Right** (Fn + Z / C) | Switch tab, or change the value in a row that has one (volume, a timer) |
