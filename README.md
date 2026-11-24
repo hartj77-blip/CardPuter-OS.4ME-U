@@ -253,11 +253,21 @@ install the newest version, then open Apps and choose Update all.
 On older versions see [Updates](docs/UPDATE.md#it-says-the-package-system-needs-repair-first).
 
 The home screen never starts, and every login asks for a new password, after setting a username
-in Raspberry Pi Imager. Versions up to 0.4.0 only work with the user `pi`; this is fixed in the
-next release. To fix a card that's already like this, log in over SSH with your username
+in Raspberry Pi Imager. Versions up to 0.4.0 only work with the user `pi`; this is fixed from
+0.5.0. To fix a card that's already like this, log in over SSH with your username
 (`ssh yourname@cardputer.local`; if it asks for a new password, choose one), run
 `sudo zeroos-update install`, then restart. Or write the card again without setting a username in
 Imager, and change the password after the first login.
+
+Apps are missing after updating from 0.4.x to 0.5.0. That update takes the old apps off and puts
+the new builds back; if Wi-Fi was down at that moment, they stay off. Run
+`sudo zeroos-apps upgrade` from the Terminal or SSH, which puts them back. From the release after
+0.5.1, **Update all** in Apps counts them too and does the same.
+
+The Wi-Fi list says "No networks found" and nothing connects. Wi-Fi may be off: with **Wi-Fi off
+with screen** on (Settings), a restart while the screen was off used to leave it off. Press
+**Tab > W** in the Wi-Fi list (from the release after 0.5.1 the list says when Wi-Fi is off, and
+it comes back on by itself after a restart). Over SSH, `nmcli radio wifi on` does the same.
 
 The screen stays black. ZeroShell logs why it couldn't start. Over SSH:
 
