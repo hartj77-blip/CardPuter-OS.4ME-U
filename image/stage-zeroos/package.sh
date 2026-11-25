@@ -145,6 +145,18 @@ if [ -x "$ROOT/usr/lib/zeroos/bluetooth-conf" ]; then
     bt_changed=$("$ROOT/usr/lib/zeroos/bluetooth-conf" "$ROOT/etc/bluetooth/main.conf" 2>/dev/null || true)
 fi
 [ -n "$bt_changed" ] && changed="$changed /etc/bluetooth/main.conf"
+# The LCD as fb0 from the next boot (same line as 01-run.sh): the firmware's
+# boot framebuffer (simplefb) otherwise takes fb0 and is removed when vc4
+# starts, leaving no /sys/class/graphics/fb0, which M5Stack's apps read.
+CMDLINE=$ROOT/boot/firmware/cmdline.txt
+if [ -f "$CMDLINE" ] && ! grep -q 'simplefb_driver_init' "$CMDLINE"; then
+    if grep -q 'initcall_blacklist=' "$CMDLINE"; then
+        sed -i '1 s/initcall_blacklist=\([^ ]*\)/initcall_blacklist=\1,simplefb_driver_init/' "$CMDLINE"
+    else
+        sed -i '1 s/$/ initcall_blacklist=simplefb_driver_init/' "$CMDLINE"
+    fi
+    changed="$changed /boot/firmware/cmdline.txt"
+fi
 if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true
