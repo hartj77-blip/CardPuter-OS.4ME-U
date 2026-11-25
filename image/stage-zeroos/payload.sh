@@ -25,6 +25,9 @@ install -m 0644 "$F/90-zeroos-memory.conf"     "$D/etc/sysctl.d/90-zeroos-memory
 install -D -m 0644 "$F/zeroos-memory.tmpfiles" "$D/etc/tmpfiles.d/zeroos-memory.conf"
 install -m 0644 "$F/journald.conf"             "$D/etc/systemd/journald.conf.d/90-zeroos.conf"
 install -m 0644 "$F/zeroos-cloud-init-once.service" "$D/etc/systemd/system/"
+install -m 0644 "$F/zeroos-mic-gain.service"   "$D/etc/systemd/system/"
+install -d "$D/etc/systemd/system/sound.target.wants"
+ln -sf ../zeroos-mic-gain.service "$D/etc/systemd/system/sound.target.wants/zeroos-mic-gain.service"
 install -m 0755 "$F/zeroos-measure"            "$D/usr/bin/zeroos-measure"
 install -m 0755 "$F/zeroos-power-perms"        "$D/usr/lib/zeroos/power-perms"
 # BlueZ options for Bluetooth LE gamepads; the postinst applies them.

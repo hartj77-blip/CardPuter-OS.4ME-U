@@ -1,0 +1,22 @@
+# ZeroOS: usable microphone level.
+# The ES8389 starts with the mic preamp at +24 dB and the ADC at 0 dB, which
+# records speech near the noise floor (a tone from the built-in speaker peaked
+# at -39 dBFS). The mic is the analog one (ADC MUX AMIC, differential input).
+# Preamp 14 (+42 dB, the maximum) and ADC 215 (+12 dB) bring that tone to
+# -12 dBFS; the signal-to-noise ratio stays the same (about 30 dB).
+# Runs after alsa-restore so a mixer state saved by an older version doesn't
+# put the old level back at boot.
+[Unit]
+Description=Set the microphone level
+After=alsa-restore.service
+ConditionPathExists=/proc/asound/ES8389Audio
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/amixer -q -c ES8389Audio sset 'ADCL PGA' 14
+ExecStart=/usr/bin/amixer -q -c ES8389Audio sset 'ADCR PGA' 14
+ExecStart=/usr/bin/amixer -q -c ES8389Audio sset 'ADCL' 215
+ExecStart=/usr/bin/amixer -q -c ES8389Audio sset 'ADCR' 215
+
+[Install]
+WantedBy=sound.target
