@@ -67,7 +67,7 @@ music to the Cardputer over Bluetooth, and the Cardputer plays it out of the
 headphone jack into a car's aux. Calls stay on the phone. The app's guide
 has the steps.
 
-ZeroOS's part: while the Cardputer plays nothing itself (no track loaded in
+ZeroOS's part (0.8.0 and newer): while the Cardputer plays nothing itself (no track loaded in
 Media or Jellyfin, no video), Fn + Q, W, E and a Bluetooth car's or
 headset's buttons go to the connected phone's player instead of starting
 `~/Music` (`phone_media_key` in `hal/linux_hal.cpp`, parsing in
