@@ -60,6 +60,20 @@ Bluetooth is on. **Settings > Bluetooth auto-off** turns Bluetooth off after
 a while with nothing connected, so set it to **Never** if the Cardputer lives
 in the car.
 
+## Music from your phone
+
+Car 1.2 (in the apps repository) adds **Add a phone**: a phone sends its
+music to the Cardputer over Bluetooth, and the Cardputer plays it out of the
+headphone jack into a car's aux. Calls stay on the phone. The app's guide
+has the steps.
+
+ZeroOS's part: while the Cardputer plays nothing itself (no track loaded in
+Media or Jellyfin, no video), Fn + Q, W, E and a Bluetooth car's or
+headset's buttons go to the connected phone's player instead of starting
+`~/Music` (`phone_media_key` in `hal/linux_hal.cpp`, parsing in
+`hal/bt_player.h`). A device counts as a phone when it sends music (an
+Audio Source in `bluetoothctl info`).
+
 ## Power
 
 A car's USB socket often gives only 0.5 A (2.5 W), about what the Cardputer

@@ -66,6 +66,10 @@ void player_media_key(MediaKey k) {
         }
         return;
     }
+    // Nothing of our own loaded and a phone's music plays here (Car's
+    // "Music from your phone"): the keys are the phone's. Starting ~/Music
+    // would play over it.
+    if (hal().playback().path.empty() && hal().phone_media_key(k)) return;
     // Play pressed in the car with nothing queued: queue everything in ~/Music.
     if (g_queue.empty() && k != MediaKey::Pause && k != MediaKey::Stop)
         for (auto& t : hal().music_library()) g_queue.push_back({t.path, t.title, t.artist, t.duration_s, ""});
