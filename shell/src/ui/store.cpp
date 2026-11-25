@@ -34,7 +34,8 @@ const char* const kSources = "/etc/zeroos/apps.sources";
 // upgrade puts them back. One id per line.
 const char* const kRestore = "/var/lib/zeroos/apps/restore";
 const char* const kM5Notes = "/var/lib/zeroos/apps/m5";   // m5-<x>: package=<its Debian package>
-const char* const kM5Store = "https://cardputerzero.github.io/generated/registry.json";
+const char* const kM5Store = "https://cardputer.cc/generated/registry.json";
+const char* const kM5StoreOld = "https://cardputerzero.github.io/generated/registry.json";   // before 2026-11
 
 std::string run(const std::string& cmd) { return run_command(cmd); }
 std::string quote(const std::string& s) { return shell_quote(s); }
@@ -463,7 +464,7 @@ void move_source(const std::string& source, int dir) {
 }
 
 std::string source_label(const std::string& source) {
-    if (source == "m5stack" || source == kM5Store) return "M5Stack's app store";
+    if (source == "m5stack" || source == kM5Store || source == kM5StoreOld) return "M5Stack's app store";
     return source;
 }
 

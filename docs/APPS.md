@@ -122,7 +122,8 @@ are ordinary Debian packages, so ZeroOS installs them too and opens them its own
   has no way out of its own (as on M5's launcher); ZeroShell then stops it and everything it
   started, and goes home. Apps marked to run in a terminal open in the Terminal instead.
 - **Install, update and remove** work as for any app, Update all included. `zeroos-apps` reads
-  M5's `registry.json` (`https://cardputerzero.github.io/generated/registry.json`), checks each
+  M5's `registry.json` (`https://cardputer.cc/generated/registry.json`; a sources line with the old
+  `cardputerzero.github.io` address is read as the new one, since that one now redirects to plain http), checks each
   download against its SHA-256 and installs it with apt, which brings the Debian packages it
   depends on.
 
@@ -145,6 +146,8 @@ What's different from ZeroOS's own apps:
   talks to that launcher, expects its services, or draws somewhere other than the LCD's
   framebuffer won't work here. Most apps (Python with pygame or Pillow, LVGL, SDL) only need the
   screen and keyboard, which ZeroOS hands over.
+  The [compatibility checklist](M5-APPS.md) goes through all of them: two can't install (they
+  need M5's launcher), and a few more need a closer look.
 - **No real icons yet**: on the home screen each shows its first letter.
 - **Background apps keep running** after you leave them, as on M5's system (an app with a
   service, such as a battery saver). One that runs as you shows in Settings > Running programs,
@@ -282,5 +285,6 @@ text screen still gets it whenever no suggestion is showing.
   Dock mode reachable through Settings' "On HDMI" option.
 - The store shows an app's real icon only once it's installed (until then, a grid). Apps from
   M5Stack's store show a letter, not their icon.
-- Apps from M5Stack's store haven't been tried on a Cardputer running ZeroOS yet.
+- Apps from M5Stack's store haven't been tried on a Cardputer running ZeroOS yet. The
+  [compatibility checklist](M5-APPS.md) is where results go.
 - An app's page doesn't show screenshots.

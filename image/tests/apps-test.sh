@@ -428,6 +428,15 @@ grep -qx 'package=hello-zero' "$T/state/m5/m5-hello-zero" && ok "m5 install-file
     bad "m5 install-file: note"
 grep -qx m5stack "$ROOT/image/stage-zeroos/files/apps/apps.sources" && ok "m5 store: a source out of the box" ||
     bad "m5 store: not in apps.sources"
+# M5 moved its list to cardputer.cc; the old address redirects to plain http,
+# which curl refuses, so it must be read as the new one.
+(
+    eval "$(sed -n -e '/^M5_STORE=/p' -e '/^M5_STORE_OLD=/p' -e '/^source_url() {/,/^}/p' "$ROOT/image/stage-zeroos/files/apps/zeroos-apps")"
+    new=https://cardputer.cc/generated/registry.json
+    [ "$(source_url m5stack)" = "$new" ] &&
+        [ "$(source_url https://cardputerzero.github.io/generated/registry.json)" = "$new" ] &&
+        [ "$(source_url https://cardputerzero.github.io/generated/registry.json/)" = "$new" ]
+) && ok "m5 store: m5stack and the old address both read as cardputer.cc" || bad "m5 store: address"
 
 # M5Stack's catalog isn't ours: it can't replace what's already on the device.
 echo "openssh-server 1:10.0" >> "$T/installed"

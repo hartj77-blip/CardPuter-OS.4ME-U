@@ -42,7 +42,11 @@ INDEX=zeroos-apps.index
 VERIFY=${ZEROOS_VERIFY:-/usr/lib/zeroos/verify}
 ROOTDIR=${ZEROOS_APPS_ROOT:-}   # tests only: where apt source files go
 M5_REGISTRY=${ZEROOS_APPS_M5_REGISTRY:-/usr/lib/zeroos/m5-registry}
-M5_STORE=https://cardputerzero.github.io/generated/registry.json
+# M5 moved the list to cardputer.cc in November 2026. The old address now
+# redirects to plain http, which curl --proto-redir =https refuses, so a
+# sources line with the old address is read as the new one.
+M5_STORE=https://cardputer.cc/generated/registry.json
+M5_STORE_OLD=https://cardputerzero.github.io/generated/registry.json
 M5_DIR=$STATE_DIR/m5            # m5-<package>: what ZeroShell reads to list it
 M5_DESKTOP=/usr/share/APPLaunch/applications
 
@@ -100,7 +104,7 @@ app_abi() {
 # A source line -> the address its files are under, or nothing if it's no source.
 source_url() {
     local s=$1
-    [ "$s" = m5stack ] && s=$M5_STORE
+    [ "$s" = m5stack ] || [ "${s%/}" = "$M5_STORE_OLD" ] && s=$M5_STORE
     if [[ $s =~ ^https://[^[:space:]\'\"\\]+$ ]]; then
         echo "${s%/}"
     elif [ "${ZEROOS_APPS_ALLOW_FILE:-0}" = 1 ] && [[ $s =~ ^file:///[^[:space:]\'\"\\]+$ ]]; then

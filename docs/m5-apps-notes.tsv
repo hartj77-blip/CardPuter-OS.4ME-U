@@ -1,0 +1,43 @@
+# Kept by hand. tools/m5-apps.py render reads this to write docs/M5-APPS.md.
+# One app per line, tab-separated:
+#   package  verdict  installs  opens  keys  leaves  zeroos  date  note
+# verdict: no-install, launcher, check, likely or none; empty keeps the scan's.
+# installs/opens/keys/leaves: yes, no, part, n/a; empty = not tried yet.
+# zeroos and date: the ZeroOS version and day it was tried on a device.
+# note: replaces the scan's remarks about M5's launcher and desktops.
+aptool	likely							Install script tries to restart M5's launcher; harmless here
+cardputer-player	likely							Wayland code is an option; its launcher entry uses --framebuffer
+cardputer-remote	check							Phone remote. Its go-home action restarts M5's launcher, which ZeroOS doesn't have
+cardputer-zero-iptv	likely							
+cardputer-zero-radio	likely							Tk code is only its desktop preview
+cardputerzero-xiaozhi	likely							Only its installer's message names M5's launcher
+cz-battery-saver	check							Saves power by pausing M5's launcher; here only its other savings apply, and they overlap ZeroOS's own power saving
+cz-desk-mode	launcher							Swaps M5's launcher for a desktop on HDMI. ZeroOS's Dock app does this instead
+czcam	likely							Install script tries to restart M5's launcher; harmless here. ZeroOS's Camera app does the same job
+czmail	likely							Tk code is only its desktop preview
+czproxy	likely							Shares a lock file name with M5's launcher; harmless here
+czweather	likely							Install script tries to restart M5's launcher; harmless here
+doom-zero-dev0	check							Runs the game in its own X display and copies it to the LCD; heavy
+dx-zero	likely							Install script tries to restart M5's launcher; harmless here
+five	likely							Tk code is only its desktop preview
+flint	check							Adds boot services that take over the text console (fbcon) before login
+flipper-one-remote	likely							Shares a lock file name with M5's launcher; harmless here
+herdr-zero	likely							Ties itself to M5's launcher only when that is running
+icomzero	likely							Tk code is only its desktop preview
+lan-proxy	no-install							
+loki	likely							Install script tries to restart M5's launcher; harmless here
+meshtandem	likely							Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
+meshterm	likely							Tk code is only its desktop emulator
+meshzero	likely							Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
+nook-cardputerzero	check							Wants to be started by M5's launcher; without it, runs in its standalone mode
+raspyjack	check							Big install: web UI, Caddy, turns Apache off, and its scripts swap out M5's launcher (nothing to swap here)
+rfid	likely							
+seesay	likely							Qt and Tk are only inside bundled Python wheels
+tailzero	likely							Tailscale, like ZeroOS's Remote app: use one or the other
+talktome	likely							Wayland is only used for the clipboard
+vibeoffice	check							Runs in its own desktop (cage + WebKitGTK) mirrored to the LCD; heavy
+voice-input	no-install							Plugs into M5's launcher, so useless without it
+xiang	likely							Tk code is only its desktop preview
+zero-browser	check							Runs in its own desktop (labwc + QtWebKit) mirrored to the LCD; heavy
+zero-usbimager	check							Runs a GTK app in its own desktop (labwc) mirrored to the LCD
+zeropower	check							Power daemon that watches M5's launcher; overlaps ZeroOS's own power saving
