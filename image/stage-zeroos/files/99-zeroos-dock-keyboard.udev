@@ -1,0 +1,4 @@
+# Dock mode: the Cardputer's keyboard on the desktop's seat (seat0) while
+# /run/zeroos/dock-keyboard exists (dock-keyboard on|off). After M5's
+# 99-ignore-i2c-key.rules, which puts it on seat1 the rest of the time.
+ACTION!="remove", SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_PATH}=="platform-3f804000.i2c", TEST=="/run/zeroos/dock-keyboard", ENV{ID_SEAT}="seat0"

@@ -26,7 +26,11 @@ UtmpMode=user
 # whichever VT is in front. Not chvt: with ZeroShell's tty1 in graphics mode
 # the kernel ignores chvt and it waits forever (vt-switch explains).
 ExecStartPre=+/usr/lib/zeroos/vt-switch 2
+# The Cardputer's own keyboard on the desktop's seat, before the desktop starts
+# so it finds it (dock-keyboard explains); back to ZeroShell after.
+ExecStartPre=+/usr/lib/zeroos/dock-keyboard on
 ExecStart=/usr/lib/zeroos/dock-session
+ExecStopPost=+/usr/lib/zeroos/dock-keyboard off
 # Back to ZeroShell's tty1, unless something else (the Terminal app) has
 # already taken the front since.
 ExecStopPost=+/bin/sh -c '[ "$(cat /sys/class/tty/tty0/active)" != tty2 ] || /usr/lib/zeroos/vt-switch 1'

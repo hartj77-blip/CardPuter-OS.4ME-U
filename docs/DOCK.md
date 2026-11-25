@@ -12,9 +12,8 @@ own keyboard.
 2. Press **Start Dock mode**. The desktop appears on the monitor after a few
    seconds.
 3. The built-in screen shows "Docked" and turns itself off after a minute.
-   Use a USB keyboard and mouse: the Cardputer's own keyboard doesn't reach the
-   desktop yet (M5's image puts it on its own seat, `seat1`, so the desktop
-   never opens it).
+   The Cardputer's keys now type on the monitor (a USB keyboard and mouse
+   work too).
 4. To leave, open the Raspberry Pi menu (top left) > **Log out** > **Exit to
    command line**, or just unplug the monitor. The built-in screen comes back.
    (Shutdown and Reboot there turn off or restart the whole Cardputer.) On
@@ -54,6 +53,7 @@ battery.
 | `zeroos-dock.service` | Runs as `pi` in its own login session on tty2, so it gets the monitor and input devices from logind. It switches to tty2 first (logind only hands them to the session in front) and back to tty1 when it stops. Started and stopped by ZeroShell (polkit allows `pi` exactly this unit). |
 | `/usr/lib/zeroos/dock-session` | Finds the DRM card that has the HDMI connector (the vc4 GPU) and starts labwc on it only. The built-in LCD is a separate DRM card that ZeroShell keeps drawing to. |
 | The desktop | The stock Raspberry Pi desktop when it's installed (the SD card image has it): `labwc-pi` with Raspberry Pi's labwc config, `wf-panel-pi`, `pcmanfm-pi`, the PiXflat theme. It's installed without its login screen, boot splash and background services (lightdm, plymouth, PackageKit, NFS, accountsservice are masked), so ZeroShell stays the UI. Otherwise ZeroOS's own light desktop: labwc with `/etc/zeroos/dock/`, waybar, swaybg, fuzzel, foot. |
+| `/usr/lib/zeroos/dock-keyboard` | M5's image puts the Cardputer's keyboard on its own seat (`seat1`, `99-ignore-i2c-key.rules`) so desktops ignore it. While docked, `99-zeroos-dock-keyboard.rules` moves it to the desktop's `seat0` (`dock-keyboard on`, before the desktop starts); `off` gives it back to ZeroShell when Dock stops. |
 | `/usr/lib/zeroos/dock-resolution` | Sets the monitor to the Dock app's **Size** (720p by default) when the stock desktop starts. |
 | `/usr/lib/zeroos/vt-switch` | Brings tty2 to the front (and tty1 back). Not `chvt`: ZeroShell keeps tty1 in graphics mode, and then the kernel ignores `chvt` and it waits forever. vt-switch answers the switch itself (VT_PROCESS) so nothing is drawn on the LCD. |
 | `zeroos-browser` | Chromium for 512 MB: low-end device mode, at most 2 page processes, 32 MB cache in RAM, a 192 MB JavaScript heap limit. |
