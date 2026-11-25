@@ -72,4 +72,12 @@ int search_score(const std::string& name, const std::string& keywords, const std
     return 20;
 }
 
+bool search_keyword_starts(const std::string& keywords, const std::string& query) {
+    std::vector<std::string> q = words(query);
+    if (q.size() != 1) return false;
+    for (const auto& k : words(keywords))
+        if (starts_with(k, q[0])) return true;
+    return false;
+}
+
 }  // namespace zs
