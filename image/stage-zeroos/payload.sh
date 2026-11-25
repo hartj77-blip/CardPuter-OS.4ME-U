@@ -60,6 +60,7 @@ install -d "$D/usr/lib/zeroos/apps"
 # Signatures on updates and app lists (docs/UPDATE.md, "Signatures"): the
 # checker, which key signs what, and the public keys (none until one is made
 # with tools/signing-key.sh; until then lists are taken unsigned, as before).
+# The release key is keys/zeroos-release.pem.
 install -m 0755 "$F/keys/zeroos-verify"        "$D/usr/lib/zeroos/verify"
 install -D -m 0644 "$F/keys/signers"           "$D/usr/share/zeroos/keys/signers"
 for k in "$F"/keys/*.pem; do
