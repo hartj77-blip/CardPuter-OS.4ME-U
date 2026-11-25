@@ -518,7 +518,7 @@ private:
             ++shown;
         }
         if (shown == 0) {
-            lv_obj_t* tip = label(rows_box_, "Apps you open show up here", &zs_font_12, kMuted);
+            lv_obj_t* tip = label(rows_box_, "Opened apps show here", &zs_font_12, kMuted);
             lv_obj_set_style_pad_left(tip, 5, 0);
         }
         add_row(ZS_ICON_GRID, 0x5e6c7b, "All apps", "",

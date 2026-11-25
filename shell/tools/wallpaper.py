@@ -2,7 +2,7 @@
 """Regenerate shell/src/ui/wallpaper_data.cpp: the photographs behind home
 and the lock screen.
 
-    python3 shell/tools/wallpaper.py [--preview out.png]
+    python3 shell/tools/wallpaper.py [--preview out.png] [--src photo.jpg --home-y F --lock-y F]
 
 Needs Pillow. The output is committed (like the fonts), so a build needs
 nothing but a compiler. Steps:
@@ -10,8 +10,8 @@ nothing but a compiler. Steps:
 1. Crop the source photograph (shell/tools/wallpapers/) for each target and
    scale it to the whole screen, 320 x 170, in greyscale.
 2. Bake in the scrim: darker where text sits on it (the status bar, home's
-   search box, the lock screen's clock) and, on home, fading to black where
-   the Recent list starts. Nothing is blended on the device.
+   search box and pins' names, Recent on the left and the clock on the right,
+   the lock screen's clock). Nothing is blended on the device.
 3. Dither to 32 neutral greys with a 4 x 4 ordered dither. RGB565 has 5 bits
    of red and blue but 6 of green, so finer greys would tint green or
    magenta; 32 levels with the same value in every channel stay neutral and
@@ -24,29 +24,42 @@ import os
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SRC = os.path.join(HERE, "wallpapers", "tetons-snake-river.jpg")
 OUT = os.path.join(HERE, "..", "src", "ui", "wallpaper_data.cpp")
 W, H = 320, 170          # the whole screen: the status bar sits on the photo
 BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]]
 
 
+# Home's shading down the screen: (y, how much of the photo shows), joined
+# by straight lines. Smooth, so no band shows where one area meets the next.
+HOME_RAMP = [(0, 0.4), (20, 0.45), (46, 0.72), (66, 0.72), (96, 0.52), (170, 0.46)]
+
+
+def ramp(points, v):
+    for (a, ka), (b, kb) in zip(points, points[1:]):
+        if v <= b:
+            return ka + (kb - ka) * (v - a) / (b - a)
+    return points[-1][1]
+
+
 def home_scrim(x, y):
-    """Home: how much of the photo shows at (x, y), 1 = all, 0 = black."""
-    keep = 0.78                                  # overall, for white labels
-    if y < 20:                                   # the status bar
-        keep *= 0.5
-    elif y < 46:                                 # the search box
-        keep *= 0.5 + 0.5 * (y - 20) / 26
-    fade_from, fade_to = 78, 116                 # pins' names -> Recent
-    if y > fade_from:
-        t = min(1.0, (y - fade_from) / (fade_to - fade_from))
-        keep *= (1 - t) ** 1.6
+    """Home: how much of the photo shows at (x, y), 1 = all, 0 = black.
+
+    The layout (ui/launcher.cpp): status bar 0-20, search box 23-45, pins
+    47-83, then Recent on the left (to x 154) and the time and date on the
+    right. White text everywhere, so the photo is dimmed throughout, a little
+    more under the status bar, the search box and Recent, and never black.
+    """
+    keep = ramp(HOME_RAMP, y)
+    if y > 80:                                   # Recent's names, on the left
+        t = min(1.0, (y - 80) / 20) * max(0.0, min(1.0, (170 - x) / 60))
+        keep *= 1 - 0.18 * t
     return keep
 
 
 def lock_scrim(x, y):
-    """Lock: darker on the left (the clock) and along the bottom (the hint)."""
-    keep = 0.4 + 0.6 * min(1.0, x / 180)
+    """Lock: darker on the left (the clock, the date, what is playing) and
+    along the bottom (the hint)."""
+    keep = 0.36 + 0.5 * min(1.0, x / 260)
     if y > 110:
         keep *= 1 - 0.7 * (y - 110) / 60
     if y < 20:
@@ -54,15 +67,27 @@ def lock_scrim(x, y):
     return keep
 
 
-# name, crop box in the 1280 px wide source, scrim
-TARGETS = [
-    ("home", (0, 40, 1280, 40 + 680), home_scrim),
-    ("lock", (380, 0, 1280, 478), lock_scrim),
-]
+# The photograph, and where each target is cut from it: home takes the whole
+# width, the lock screen the right 70 % (the clock sits on the left). The
+# y values are where the cut starts, as a fraction of the height left over.
+SRC_NAME = "firehole-river.jpg"
+HOME_Y, LOCK_Y = 0.0, 0.3   # home: the top, so the river runs under the pins
 
 
-def build(box, scrim):
-    img = Image.open(SRC).convert("L").crop(box).resize((W, H), Image.LANCZOS)
+def crop_box(img, x0, width, y_frac):
+    """A box `width` of the image wide from `x0` (fractions), screen-shaped."""
+    w, h = img.size
+    m = round(w * 0.015)                 # scans have a border: trim it
+    w, h = w - 2 * m, h - 2 * m
+    cw = int(w * width)
+    ch = min(h, round(cw * H / W))
+    left = m + int(w * x0)
+    top = m + round((h - ch) * y_frac)
+    return (left, top, left + cw, top + ch)
+
+
+def build(img, box, scrim):
+    img = img.convert("L").crop(box).resize((W, H), Image.LANCZOS)
     px = img.load()
     out = []
     for y in range(H):
@@ -78,7 +103,7 @@ def rgb565(v5):
     return (v5 << 11) | (g6 << 5) | v5
 
 
-def write_cpp(images):
+def write_cpp(images, credit):
     parts = []
     for name, levels in images:
         data = bytearray()
@@ -97,11 +122,9 @@ def write_cpp(images):
     body = "\n\n".join(parts)
     with open(OUT, "w") as f:
         f.write(f"""// Generated by shell/tools/wallpaper.py from
-// shell/tools/wallpapers/tetons-snake-river.jpg. Do not edit.
+// shell/tools/wallpapers/{SRC_NAME}. Do not edit.
 //
-// Ansel Adams, "The Tetons and the Snake River", Grand Teton National Park,
-// 1942. U.S. National Archives, Records of the National Park Service,
-// 79-AA-G01. Public domain (a work of the U.S. government).
+{credit}
 #include "ui/wallpaper.h"
 
 namespace zs {{
@@ -137,12 +160,27 @@ def preview(images, path):
     sheet.save(path)
 
 
+# For the generated file's header (and the README's credits).
+CREDIT = """// Ansel Adams, "Firehole River, Yellowstone National Park", Wyoming,
+// ca. 1941-1942. U.S. National Archives, Records of the National Park
+// Service, 79-AA-T14. Public domain (a work of the U.S. government)."""
+
+
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--preview", help="also save a 2x PNG of the results")
+    ap.add_argument("--src", help="try another photograph (writes the .cpp only with --write)")
+    ap.add_argument("--write", action="store_true")
+    ap.add_argument("--home-y", type=float, default=HOME_Y)
+    ap.add_argument("--lock-y", type=float, default=LOCK_Y)
     a = ap.parse_args()
-    images = [(name, build(box, scrim)) for name, box, scrim in TARGETS]
-    write_cpp(images)
+    img = Image.open(a.src or os.path.join(HERE, "wallpapers", SRC_NAME))
+    images = [
+        ("home", build(img, crop_box(img, 0, 1, a.home_y), home_scrim)),
+        ("lock", build(img, crop_box(img, 0.3, 0.7, a.lock_y), lock_scrim)),
+    ]
+    if not a.src or a.write:
+        write_cpp(images, CREDIT)
+        print("wrote", os.path.relpath(OUT))
     if a.preview:
         preview(images, a.preview)
-    print("wrote", os.path.relpath(OUT))
