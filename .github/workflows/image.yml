@@ -115,7 +115,7 @@ jobs:
           sudo tail -40 build/image/pi-gen/deploy/build.log || true
           # Optional parts report themselves in the log; show how they went.
           sudo grep -h "zeroos: " build/image/pi-gen/deploy/build.log build/image/pi-gen/work/*/build.log 2>/dev/null | sort -u || true
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:
           name: zeroos-image
