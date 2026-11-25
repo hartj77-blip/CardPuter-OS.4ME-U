@@ -216,7 +216,11 @@ std::vector<Result> search(const std::string& q) {
     // Apps.
     for (const AppInfo& a : app_registry()) {
         auto w = kAppWords.find(a.id);
-        int sc = search_score(a.name, a.id + " " + (w == kAppWords.end() ? "" : w->second), q);
+        std::string kw = a.id + " " + (w == kAppWords.end() ? "" : w->second);
+        int sc = search_score(a.name, kw, q);
+        // "dev" finds Code ahead of "Bluetooth devices": an app's own word
+        // beats the same letters inside a setting's name.
+        if (sc && sc < 70 && search_keyword_starts(kw, q)) sc = 70;
         if (sc) {
             std::string id = a.id;
             out.push_back({a.symbol, a.name, "App", [id] { shell_open_app(id); }});

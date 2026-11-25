@@ -54,6 +54,13 @@ int main() {
 
     expect(search_norm("Wi-Fi Net") == "wifi net", "norm");
 
+    // An app's own word: Home search ranks it above a setting's name.
+    expect(search_keyword_starts("code programming dev", "dev"), "keyword start");
+    expect(search_keyword_starts("bluetooth bt pair", "bt"), "short keyword");
+    expect(!search_keyword_starts("code programming dev", "ev"), "inside a keyword isn't a start");
+    expect(!search_keyword_starts("code programming dev", "dev code"), "only one word");
+    expect(!search_keyword_starts("", "dev"), "no keywords");
+
     if (g_failed) {
         std::printf("%d failed\n", g_failed);
         return 1;

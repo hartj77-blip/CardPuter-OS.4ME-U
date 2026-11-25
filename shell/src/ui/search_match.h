@@ -22,4 +22,9 @@ std::string search_norm(const std::string& s);
 // Every typed word has to be found, in any order. An empty query finds nothing.
 int search_score(const std::string& name, const std::string& keywords, const std::string& query);
 
+// True when `query` is one word and a word of `keywords` starts with it
+// ("dev" in "dev python", "bt" in "bt pair"). Home search ranks an app found
+// this way above a row that only has the word inside its name (ui/launcher.cpp).
+bool search_keyword_starts(const std::string& keywords, const std::string& query);
+
 }  // namespace zs
