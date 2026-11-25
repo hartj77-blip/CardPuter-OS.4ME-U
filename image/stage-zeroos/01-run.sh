@@ -67,6 +67,12 @@ grep -q '^enable_uart=' "$CONFIG_TXT" && sed -i 's/^enable_uart=.*/enable_uart=1
 # Boot at full CPU speed. ZeroShell sets the governor for the chosen power
 # profile as soon as it starts (ui/power.cpp), so this only lasts the boot.
 sed -i -e 's/ *cpufreq.default_governor=[^ ]*//' -e '1 s/$/ cpufreq.default_governor=performance/' "$CMDLINE_TXT"
+# The LCD as fb0, as on M5's system. The firmware's boot framebuffer
+# (simplefb, 720x480, nothing shows it) otherwise takes fb0, the LCD gets fb1,
+# and vc4 removes fb0 again: M5Stack's apps that read
+# /sys/class/graphics/fb0 then stop at launch. The package's postinst adds
+# the same for updated devices.
+grep -q 'simplefb_driver_init' "$CMDLINE_TXT" || sed -i '1 s/$/ initcall_blacklist=simplefb_driver_init/' "$CMDLINE_TXT"
 
 # Keyboard symbol layer system-wide, not only under M5's launcher (owner report).
 KMAP=/usr/share/keymaps/tca8418_keypad_m5stack_keymap.map
