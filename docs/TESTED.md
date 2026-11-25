@@ -105,8 +105,10 @@ The other ~170 are untested.
 1. **Recorder audio is near silent.** Peak level was −54 dB, and only −44 dB with a loud
    tone playing on the speaker. The cause is the mic gain left at the chip's default; fixed in
    #79.
-2. **Camera ignores a short Esc press.** A tap does nothing and a 1.3 s hold doesn't leave.
-   Only a hold of 1.5 s or more goes home.
+2. **Camera viewfinder ignores a short Esc press.** This is by design: the viewfinder is
+   M5Stack's `camera_app`, which ZeroShell hands the screen to. You leave it with hold 4
+   (as its help says) or a long Esc hold, like other external programs (shell.cpp
+   `kExternalQuitMs`), so a stray tap doesn't drop you out.
 3. **Time zone defaults to UTC**, so Clock and the status bar show UTC.
 4. **System app IP row** shows the Ethernet address when both Ethernet and Wi-Fi are up.
 5. **Apps search can rank an M5 app above ours.** For example, typing "desktop" and pressing
