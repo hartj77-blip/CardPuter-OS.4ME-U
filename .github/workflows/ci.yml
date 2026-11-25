@@ -16,7 +16,7 @@ jobs:
     name: Simulator build + screenshots
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake g++ libsdl2-dev python3-pil
       - name: Build SDL simulator (compile check)
@@ -45,7 +45,7 @@ jobs:
     name: Device build, run with a fake screen and keyboard
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Install dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake g++ python3-pil
       - name: Key translation tests
@@ -81,7 +81,7 @@ jobs:
         run: |
           apt-get update -qq
           apt-get install -y -qq git ca-certificates curl gpg cmake g++ dpkg-dev python3 file >/dev/null
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0   # image/version.sh counts commits since the last tag
       - name: Add Raspberry Pi's repository (as on the device)
@@ -106,7 +106,7 @@ jobs:
     name: Browser simulator (WebAssembly)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: mymindstorm/setup-emsdk@6ab9eb1bda2574c4ddb79809fc9247783eaf9021  # v14
         with:
           version: 3.1.74
@@ -121,7 +121,7 @@ jobs:
     name: Device build (arm64)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 0   # image/version.sh counts commits since the last tag
       - name: Install cross compiler
