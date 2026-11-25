@@ -15,9 +15,9 @@ the IR Remote app and the hardware layer share, with no LVGL in it so it is unit
 
 ## ZeroShell
 
-- **LVGL 9.2** (pinned), 16-bit color, the Ubuntu typeface (`shell/src/fonts/`, made by `shell/tools/fonts.sh`). One binary, three backends chosen at
+- **LVGL 9.2** (pinned), 16-bit color, the Ubuntu typeface (`shell/src/fonts/`, made by `shell/tools/fonts.sh`). One binary, four backends chosen at
   build time: `sim` (SDL2 window), `device` (the LCD's framebuffer, found via `/dev/fb_lcd` + evdev keyboard), `headless` (renders to
-  files, drives CI screenshots and smoke tests).
+  files, drives CI screenshots and smoke tests), `web` (WebAssembly in a browser, for the demo).
 - **Key routing.** The shell wraps the keypad driver, so every key press goes first to the current
   app's `on_key()`, then to shell keys (Esc = back, Up/Down = move focus, the Fn layer's volume,
   brightness and media keys, and away from a text box the number keys of [KEYS.md](KEYS.md)), and
@@ -56,7 +56,7 @@ The `Hal` interface stays the same.
 2. removes M5's launcher and demo apps;
 3. stops after stage 2 (no desktop, 512 MB RAM);
 4. adds `stage2/06-zeroos` (`image/stage-zeroos/`): ZeroShell as a systemd service, polkit and udev
-   rules so it runs as `pi`, memory tuning (zram + SD writeback, earlyoom, logs in RAM; see PERFORMANCE.md), and the fixes from early owner reports (see HARDWARE.md).
+   rules so it runs as `pi`, memory tuning (zram + SD writeback, earlyoom, logs on the SD card capped at 24 MB; see PERFORMANCE.md), and the fixes from early owner reports (see HARDWARE.md).
 
 Everything ZeroOS owns goes onto the image as one Debian package, `zeroos` (`image/stage-zeroos/payload.sh`
 lists the files). The same package is what an update installs later, over Wi-Fi or Ethernet, so a

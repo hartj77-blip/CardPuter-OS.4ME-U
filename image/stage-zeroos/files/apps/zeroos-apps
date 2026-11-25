@@ -165,7 +165,7 @@ refresh() {
         [ -n "$url" ] || { log "skipping $src: not owner/repo or https://"; continue; }
         n=$((n + 1))
         if is_m5_store "$url"; then
-            if ! text=$(curl -fsSL --connect-timeout 10 --max-time 60 --retry 2 "$url"); then
+            if ! text=$(curl -fsSL --proto-redir =https --connect-timeout 10 --max-time 60 --retry 2 "$url"); then
                 log "no app list from $src"
                 continue
             fi
@@ -176,7 +176,7 @@ refresh() {
             continue
         fi
         idx=$(mktemp "$STATE_DIR/index.XXXXXX")
-        if ! curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 -o "$idx" "$url/$INDEX"; then
+        if ! curl -fsSL --proto-redir =https --connect-timeout 10 --max-time 40 --retry 2 -o "$idx" "$url/$INDEX"; then
             log "no $INDEX from $src"
             rm -f -- "$idx"
             continue
@@ -186,7 +186,7 @@ refresh() {
         # which holds every package's SHA-256. Others are taken as they are.
         rc=3
         if [ -x "$VERIFY" ]; then
-            curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 -o "$idx.sig" "$url/$INDEX.sig" ||
+            curl -fsSL --proto-redir =https --connect-timeout 10 --max-time 40 --retry 2 -o "$idx.sig" "$url/$INDEX.sig" ||
                 rm -f -- "$idx.sig"
             rc=0
             "$VERIFY" "$src" "$idx" "$idx.sig" || rc=$?
@@ -370,7 +370,7 @@ download() {
     free=$(df -Pk "$CACHE" | awk 'NR==2 {print $4}')
     [ "$((size * 3 / 1024))" -lt "${free:-0}" ] || fail "Not enough free space"
     rm -f -- "${out:?}"
-    curl -fsSL --connect-timeout 10 --speed-limit 1000 --speed-time 60 \
+    curl -fsSL --proto-redir =https --connect-timeout 10 --speed-limit 1000 --speed-time 60 \
         --retry 3 --retry-delay 2 -o "$out" "$url" &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do

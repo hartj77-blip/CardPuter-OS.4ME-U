@@ -435,9 +435,9 @@ ZeroShell is one C++17 program. Facts about it:
 - A failed LVGL assertion calls `abort()` (`LV_ASSERT_HANDLER` in `shell/lv_conf.h`). It used to
   spin forever (`while(1);`), which froze the screen and ignored systemd's stop signal. Now the
   process ends and systemd starts it again.
-- About 22,000 lines of C++ in `shell/src/` (UI 5,000, hardware layer 5,100, apps that are still
-  in this repository 10,800, screen and keyboard 900, IR library 700). The rest of the apps are in
-  the apps repository.
+- About 26,000 lines of C++ in `shell/src/`, not counting the generated fonts and wallpaper (UI
+  6,900, hardware layer 6,000, apps that are still in this repository 11,100, screen and keyboard
+  1,200, IR library 700). The rest of the apps are in the apps repository.
 - One binary, four ways to build it, chosen with `-DZS_BACKEND`:
 
   | Backend | Screen | Keyboard | Hardware | Used for |

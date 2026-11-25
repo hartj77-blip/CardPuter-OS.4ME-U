@@ -136,12 +136,12 @@ setup() {
 fetch_manifest() {
     local text mf rc=0
     mf=$(mktemp "$STATE_DIR/manifest.XXXXXX") || return 1
-    if ! curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 -o "$mf" "$UPDATE_URL/zeroos-update.manifest"; then
+    if ! curl -fsSL --proto-redir =https --connect-timeout 10 --max-time 40 --retry 2 -o "$mf" "$UPDATE_URL/zeroos-update.manifest"; then
         rm -f -- "$mf"
         return 1
     fi
     if [ -x "$VERIFY" ]; then
-        curl -fsSL --connect-timeout 10 --max-time 40 --retry 2 -o "$mf.sig" "$UPDATE_URL/zeroos-update.manifest.sig" ||
+        curl -fsSL --proto-redir =https --connect-timeout 10 --max-time 40 --retry 2 -o "$mf.sig" "$UPDATE_URL/zeroos-update.manifest.sig" ||
             rm -f -- "$mf.sig"
         "$VERIFY" update "$mf" "$mf.sig" || rc=$?
         case $rc in
@@ -191,7 +191,7 @@ download() {
     rm -f "$out"
     # A stalled connection (Wi-Fi gone) gives up after a minute under 1 kB/s
     # instead of sitting at "downloading" until the service times out.
-    curl -fsSL --connect-timeout 10 --speed-limit 1000 --speed-time 60 \
+    curl -fsSL --proto-redir =https --connect-timeout 10 --speed-limit 1000 --speed-time 60 \
         --retry 3 --retry-delay 2 -o "$out" "$UPDATE_URL/$m_file" &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do

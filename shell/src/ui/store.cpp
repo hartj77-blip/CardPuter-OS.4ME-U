@@ -17,6 +17,7 @@
 #include <sstream>
 
 #include "lvgl.h"
+#include "platform/shell_cmd.h"
 #include "platform/watchdog.h"
 #include "ui/app.h"
 
@@ -35,22 +36,8 @@ const char* const kRestore = "/var/lib/zeroos/apps/restore";
 const char* const kM5Notes = "/var/lib/zeroos/apps/m5";   // m5-<x>: package=<its Debian package>
 const char* const kM5Store = "https://cardputerzero.github.io/generated/registry.json";
 
-std::string run(const std::string& cmd) {
-    WatchdogGrace grace;   // a slow command is a wait, not a hang (platform/watchdog.h)
-    std::string out;
-    FILE* p = popen((cmd + " 2>/dev/null").c_str(), "r");
-    if (!p) return out;
-    char buf[512];
-    while (fgets(buf, sizeof buf, p)) out += buf;
-    pclose(p);
-    return out;
-}
-
-std::string quote(const std::string& s) {
-    std::string r = "'";
-    for (char c : s) r += c == '\'' ? std::string("'\\''") : std::string(1, c);
-    return r + "'";
-}
+std::string run(const std::string& cmd) { return run_command(cmd); }
+std::string quote(const std::string& s) { return shell_quote(s); }
 
 // systemd-escape: the job's words become the instance of zeroos-apps@.service.
 std::string unit_escape(const std::string& s) {
