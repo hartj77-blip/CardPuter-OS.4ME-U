@@ -160,11 +160,16 @@ void Shell::start(lv_indev_t* keypad) {
     // Dark theme, white for focus, sliders, cursors. LVGL's default theme
     // puts white text on a focused button; ours is lit white, so a small
     // child theme turns that text black, adds the focus gradient and squares
-    // the corners.
+    // the corners. It also gives text boxes a fixed padding: the default
+    // theme scales padding with the screen's DPI, and the device's
+    // framebuffer reports about 190 dpi (130 in the simulator), which left a
+    // fixed-height one-line box shorter inside than a line of text. LVGL then
+    // scrolled it down and back up on every key, and the text bounced. 8 is
+    // what the theme gives at 130 dpi, so the simulator looks the same.
     lv_display_t* disp = lv_display_get_default();
     lv_theme_t* th = lv_theme_default_init(disp, c(kAccent), c(kAccent), true, &zs_font_12);
     static lv_theme_t mono;
-    static lv_style_t lit, square;
+    static lv_style_t lit, square, field;
     static bool made = false;
     if (!made) {
         made = true;
@@ -177,6 +182,8 @@ void Shell::start(lv_indev_t* keypad) {
         lv_style_init(&square);
         lv_style_set_radius(&square, 0);
         lv_style_set_shadow_width(&square, 0);
+        lv_style_init(&field);
+        lv_style_set_pad_all(&field, 8);
         mono = *th;
         lv_theme_set_parent(&mono, th);
         lv_theme_set_apply_cb(&mono, [](lv_theme_t*, lv_obj_t* o) {
@@ -184,6 +191,8 @@ void Shell::start(lv_indev_t* keypad) {
                 lv_obj_add_style(o, &square, 0);
                 lv_obj_add_style(o, &lit, LV_STATE_FOCUS_KEY);
                 lv_obj_add_style(o, &lit, LV_STATE_FOCUSED);
+            } else if (lv_obj_check_type(o, &lv_textarea_class)) {
+                lv_obj_add_style(o, &field, 0);
             }
         });
     }
