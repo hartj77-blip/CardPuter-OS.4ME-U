@@ -515,6 +515,9 @@ public:
     // phone is connected, so the key is for the Cardputer's own player.
     // Waits on busctl and bluetoothctl, well under a second.
     virtual bool phone_media_key(MediaKey k) = 0;
+    // True while a connected phone's music plays here (its player says
+    // "playing"). Waits on busctl and bluetoothctl, well under a second.
+    virtual bool phone_playing() = 0;
 };
 
 // MockHal for the simulator and tests; LinuxHal for the device.

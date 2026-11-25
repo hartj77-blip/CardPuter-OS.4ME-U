@@ -13,10 +13,56 @@ int g_at = -1;
 std::chrono::steady_clock::time_point g_started;
 int g_quick_ends = 0;   // tracks in a row that ended almost at once
 
+// A phone's music (Car's "Music from your phone") and our own never play at
+// once: whichever started last plays, the other pauses.
+bool g_ours_was_playing = false;
+std::chrono::steady_clock::time_point g_phone_check, g_phone_paused;
+
+void one_player_at_a_time() {
+    auto now = std::chrono::steady_clock::now();
+    if (now - g_phone_check < std::chrono::seconds(2)) return;
+    g_phone_check = now;
+    PlaybackState pb = hal().playback();
+    VideoState v = hal().video();
+    bool ours = (!pb.path.empty() && !pb.paused) || (v.open && !v.paused);
+    if (!ours) {   // nothing of ours playing: nothing to ask the phone
+        g_ours_was_playing = false;
+        return;
+    }
+    // No Bluetooth device connected (a cached count): no phone to ask, and
+    // no busctl on the UI thread while our music plays.
+    if (hal().net().bt_connected == 0) {
+        g_ours_was_playing = true;
+        return;
+    }
+    if (!g_ours_was_playing) {   // ours has just started or carried on: the phone pauses
+        g_ours_was_playing = true;
+        if (hal().phone_playing()) {
+            hal().phone_media_key(MediaKey::Pause);
+            g_phone_paused = now;
+        }
+        return;
+    }
+    // The phone takes a moment to say it paused; don't take that for a new start.
+    if (now - g_phone_paused < std::chrono::seconds(5)) return;
+    if (hal().phone_playing()) {   // the phone started while ours played: ours pauses
+        if (v.open) hal().video_pause(true);
+        else hal().set_paused(true);
+        g_ours_was_playing = false;
+        shell_toast("Paused: your phone is playing");
+    }
+}
+
 bool start(int i) {
     const QueueItem& q = g_queue[i];
     bool stream = q.path.rfind("http://", 0) == 0 || q.path.rfind("https://", 0) == 0;
+    // Our music starts: a phone playing here pauses (one_player_at_a_time).
+    if (!g_ours_was_playing && hal().net().bt_connected > 0 && hal().phone_playing()) {
+        hal().phone_media_key(MediaKey::Pause);
+        g_phone_paused = std::chrono::steady_clock::now();
+    }
     bool ok = stream ? hal().play_stream(q.path, q.auth, q.duration_s) : hal().play(q.path);
+    if (ok) g_ours_was_playing = true;
     g_at = ok ? i : -1;
     g_started = std::chrono::steady_clock::now();
     return ok;
@@ -97,6 +143,7 @@ void player_media_key(MediaKey k) {
 }
 
 void player_tick() {
+    one_player_at_a_time();
     for (int i = 0; i < 4; ++i) {
         MediaKey k = hal().media_key();
         if (k == MediaKey::None) break;

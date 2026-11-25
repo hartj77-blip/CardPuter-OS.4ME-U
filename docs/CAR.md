@@ -74,6 +74,13 @@ headset's buttons go to the connected phone's player instead of starting
 `hal/bt_player.h`). A device counts as a phone when it sends music (an
 Audio Source in `bluetoothctl info`).
 
+The phone's music and the Cardputer's own (Media, Jellyfin, a video)
+never play at once: whichever started last plays and the other pauses
+(`one_player_at_a_time` in `ui/player.cpp`, `phone_playing` in the HAL).
+Starting music here pauses the phone; pressing play on the phone pauses
+ours, with a "Paused: your phone is playing" toast. It only asks the phone
+while our music plays and a Bluetooth device is connected.
+
 BlueALSA, a second Bluetooth audio stack in the base image, is off
 (`bluealsa`, `bluealsa-aplay`): it took a phone's music before PipeWire
 could and then couldn't play it, so nothing came out. The image leaves it
