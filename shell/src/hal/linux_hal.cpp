@@ -1834,11 +1834,9 @@ private:
         return false;
 #else
         if (k == MediaKey::None) return false;
-        for (const std::string& path : btplayer::player_paths(run("busctl --list tree org.bluez"))) {
-            std::string addr = btplayer::address_of(path);
-            if (!is_address(addr) || !btplayer::is_music_source(run("bluetoothctl info " + addr))) continue;
-            btplayer::Info info =
-                btplayer::parse_info(run("busctl get-property org.bluez " + path + " org.bluez.MediaPlayer1 Status"));
+        btplayer::Info info;
+        std::string path = phone_player(info);
+        if (!path.empty()) {
             btplayer::Key key = k == MediaKey::PlayPause ? btplayer::Key::PlayPause
                                 : k == MediaKey::Play    ? btplayer::Key::Play
                                 : k == MediaKey::Pause   ? btplayer::Key::Pause
@@ -1852,6 +1850,26 @@ private:
         return false;
 #endif
     }
+    bool phone_playing() override {
+#ifdef __EMSCRIPTEN__
+        return false;
+#else
+        btplayer::Info info;
+        return !phone_player(info).empty() && info.playing();
+#endif
+    }
+#ifndef __EMSCRIPTEN__
+    // The first connected phone's player and what it says it's doing, or "".
+    std::string phone_player(btplayer::Info& info) {
+        for (const std::string& path : btplayer::player_paths(run("busctl --list tree org.bluez"))) {
+            std::string addr = btplayer::address_of(path);
+            if (!is_address(addr) || !btplayer::is_music_source(run("bluetoothctl info " + addr))) continue;
+            info = btplayer::parse_info(run("busctl get-property org.bluez " + path + " org.bluez.MediaPlayer1 Status"));
+            return path;
+        }
+        return "";
+    }
+#endif
 
     // --- USB stick mode: zeroos-usb-stick.service does the work as root and
     // reports through a state file.

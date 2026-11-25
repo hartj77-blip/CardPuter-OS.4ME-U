@@ -63,7 +63,7 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
 
 ## Status: what is tested and what isn't
 
-ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.8.3. It is
+ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.8.4. It is
 being written faster than it can be tried on hardware, so this section says plainly where things
 stand.
 

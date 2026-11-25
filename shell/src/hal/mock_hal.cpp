@@ -793,6 +793,7 @@ public:
     void bt_set_visible(int) override {}
     MediaKey media_key() override { return MediaKey::None; }
     bool phone_media_key(MediaKey) override { return false; }
+    bool phone_playing() override { return false; }
 
     // The copy takes a few seconds, then the "car" takes the stick.
     UsbStickStatus usb_stick() override {
