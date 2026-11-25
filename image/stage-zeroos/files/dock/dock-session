@@ -14,4 +14,10 @@ export WLR_DRM_DEVICES="$card"
 export XDG_CURRENT_DESKTOP=labwc:wlroots
 export XDG_SESSION_TYPE=wayland
 export MOZ_ENABLE_WAYLAND=1
+# The stock Raspberry Pi desktop when it's installed (the image has it:
+# 01-run.sh), at the Dock app's resolution. Otherwise ZeroOS's own light
+# desktop (/etc/zeroos/dock), which sets the resolution in its autostart.
+if [ -x /usr/bin/labwc-pi ]; then
+    exec /usr/bin/labwc-pi -s /usr/lib/zeroos/dock-resolution
+fi
 exec labwc -C /etc/zeroos/dock
