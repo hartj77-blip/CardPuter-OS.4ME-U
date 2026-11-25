@@ -15,12 +15,12 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# LVGL is pinned. Set FETCHCONTENT_SOURCE_DIR_LVGL to use a local checkout.
+# LVGL is pinned to the commit of tag v9.2.2 (a tag can be moved; a commit
+# can't). Set FETCHCONTENT_SOURCE_DIR_LVGL to use a local checkout.
 include(FetchContent)
 FetchContent_Declare(lvgl
   GIT_REPOSITORY https://github.com/lvgl/lvgl.git
-  GIT_TAG v9.2.2
-  GIT_SHALLOW TRUE)
+  GIT_TAG 7f07a129e8d77f4984fff8e623fd5be18ff42e74)  # v9.2.2
 
 set(LV_CONF_PATH ${CMAKE_CURRENT_SOURCE_DIR}/lv_conf.h CACHE STRING "" FORCE)
 set(LV_CONF_BUILD_DISABLE_EXAMPLES ON CACHE BOOL "" FORCE)
@@ -101,7 +101,7 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(ir_test PRIVATE src)
   target_compile_options(ir_test PRIVATE -Wall -Wextra)
   add_test(NAME ir_test COMMAND ir_test)
-  add_executable(jellyfin_test tests/jellyfin_test.cpp src/hal/jellyfin.cpp src/platform/watchdog.cpp)
+  add_executable(jellyfin_test tests/jellyfin_test.cpp src/hal/jellyfin.cpp src/platform/shell_cmd.cpp src/platform/watchdog.cpp)
   target_include_directories(jellyfin_test PRIVATE src)
   target_compile_options(jellyfin_test PRIVATE -Wall -Wextra)
   add_test(NAME jellyfin_test COMMAND jellyfin_test)

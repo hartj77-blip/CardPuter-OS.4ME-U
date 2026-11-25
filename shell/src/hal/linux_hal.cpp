@@ -59,6 +59,7 @@
 #include "hal/play_clock.h"
 #include "hal/proc_stats.h"
 #include "hal/tailscale_up.h"
+#include "platform/shell_cmd.h"
 #include "platform/watchdog.h"
 #include "ui/prefs.h"
 
@@ -91,18 +92,9 @@ bool write_str(const std::string& path, const std::string& v) {
     return bool(f);
 }
 
-std::string run(const std::string& cmd) {
-    // The command may take a while (bluetoothctl pair: up to 25 s). On the
-    // UI thread that is a wait, not a hang: give the watchdog room.
-    WatchdogGrace grace;
-    std::string out;
-    FILE* p = popen((cmd + " 2>/dev/null").c_str(), "r");
-    if (!p) return out;
-    char buf[512];
-    while (fgets(buf, sizeof buf, p)) out += buf;
-    pclose(p);
-    return out;
-}
+// The command may take a while (bluetoothctl pair: up to 25 s); run_command
+// gives the watchdog room for it.
+std::string run(const std::string& cmd) { return run_command(cmd); }
 
 // "ZeroOS 1.2.3 (built 2026-11-20)" -> "1.2.3"; "" if there is no release file.
 std::string os_release_version() {
@@ -110,15 +102,6 @@ std::string os_release_version() {
     std::string name, version;
     line >> name >> version;
     return version;
-}
-
-std::string shell_quote(const std::string& s) {
-    std::string r = "'";
-    for (char c : s) {
-        if (c == '\'') r += "'\\''";
-        else r += c;
-    }
-    return r + "'";
 }
 
 // A private (0600) temporary file holding data, for a tool to read a secret

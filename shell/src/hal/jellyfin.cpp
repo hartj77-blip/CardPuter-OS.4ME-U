@@ -12,6 +12,7 @@
 #include <cstring>
 #include <utility>
 
+#include "platform/shell_cmd.h"
 #include "platform/watchdog.h"
 
 namespace zs::jf {
@@ -196,15 +197,6 @@ std::string url_encode(const std::string& s) {
         else { char b[4]; std::snprintf(b, sizeof b, "%%%02X", ch); o += b; }
     }
     return o;
-}
-
-std::string shell_quote(const std::string& s) {
-    std::string r = "'";
-    for (char ch : s) {
-        if (ch == '\'') r += "'\\''";
-        else r += ch;
-    }
-    return r + "'";
 }
 
 // Jellyfin ids are hex, with or without dashes. Anything else never goes
