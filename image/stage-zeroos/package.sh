@@ -163,6 +163,23 @@ if [ -d /run/systemd/system ]; then
     case $changed in *etc/bluetooth/main.conf*) systemctl try-restart bluetooth.service || true ;; esac
     # Open SSH sessions stay; new ones get the setting.
     case $changed in *sshd_config.d*) systemctl try-reload-or-restart ssh.service || true ;; esac
+    # BlueALSA (from the base image) takes a phone's music before PipeWire
+    # can and then can't play it (image/stage-zeroos/01-run.sh). Once: turn
+    # it off, and restart the UI user's WirePlumber so PipeWire offers to
+    # take the music. Someone who turns BlueALSA on again keeps it.
+    if [ ! -e /var/lib/zeroos/.bluealsa-off ]; then
+        for u in bluealsa-aplay.service bluealsa.service; do
+            if systemctl cat "$u" >/dev/null 2>&1; then
+                systemctl disable --now "$u" 2>/dev/null || true
+                echo "zeroos: turned off $u (PipeWire does Bluetooth audio)"
+            fi
+        done
+        if user=$(id -nu 1000 2>/dev/null); then
+            systemctl --user -M "$user@" try-restart wireplumber.service 2>/dev/null || true
+        fi
+        mkdir -p /var/lib/zeroos
+        touch /var/lib/zeroos/.bluealsa-off
+    fi
 fi
 POSTINST
 chmod 0755 "$STAGE/DEBIAN/postinst"

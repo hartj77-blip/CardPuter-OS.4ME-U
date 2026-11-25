@@ -129,11 +129,16 @@ disable_if_present() {
 #   systemd-networkd-wait-online: NetworkManager runs the network, not networkd
 #   rpcbind: only old NFS (v3) needs it, and its socket still starts it then
 #   raspi-config: only resets the CPU governor at boot; ZeroShell sets it
+#   bluealsa, bluealsa-aplay: a second Bluetooth audio stack (BlueALSA, from
+#     the base image). It takes a phone's music before PipeWire can, then
+#     can't play it (bluealsa-aplay runs as root and can't reach the user's
+#     PipeWire: "Host is down"), so the music is lost. PipeWire does
+#     Bluetooth audio here (docs/CAR.md).
 disable_if_present apt-daily.timer apt-daily-upgrade.timer man-db.timer e2scrub_all.timer \
     e2scrub_reap.service NetworkManager-wait-online.service rpi-eeprom-update.service \
     ModemManager.service triggerhappy.service triggerhappy.socket rsyslog.service \
     dphys-swapfile.service systemd-networkd-wait-online.service \
-    rpcbind.service raspi-config.service
+    rpcbind.service raspi-config.service bluealsa.service bluealsa-aplay.service
 systemctl --global disable rpi-connect.service rpi-connect-wayvnc.service 2>/dev/null || true
 # adbd (in M5's package list) is enabled by its package: at every boot it sets
 # up a USB gadget and offers a root shell to whatever the USB port is plugged
