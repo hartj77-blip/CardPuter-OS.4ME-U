@@ -1,0 +1,9 @@
+#!/bin/sh
+# Dock mode's monitor resolution, from the Dock app's Size setting:
+# 720p by default (lighter on the GPU's memory: Chromium's GPU process ran out
+# of it at 1080p), 1080p, or auto (the monitor's preferred mode).
+res=$(sed -n 's/^dock.resolution=//p' "$HOME/.config/zeroos/settings.conf" 2>/dev/null)
+case "${res:-720p}" in
+    720p)  wlr-randr --output HDMI-A-1 --mode 1280x720 >/dev/null 2>&1 ;;
+    1080p) wlr-randr --output HDMI-A-1 --mode 1920x1080 >/dev/null 2>&1 ;;
+esac

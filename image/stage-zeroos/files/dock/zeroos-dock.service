@@ -23,12 +23,13 @@ UtmpMode=user
 # the keyboard and mouse) while its VT is the one in front. Without this the
 # desktop ran on tty2 in the background and the monitor stayed blank. Switch
 # first, so the session starts active; ZeroShell keeps drawing on the LCD
-# whichever VT is in front.
-ExecStartPre=+/bin/chvt 2
+# whichever VT is in front. Not chvt: with ZeroShell's tty1 in graphics mode
+# the kernel ignores chvt and it waits forever (vt-switch explains).
+ExecStartPre=+/usr/lib/zeroos/vt-switch 2
 ExecStart=/usr/lib/zeroos/dock-session
 # Back to ZeroShell's tty1, unless something else (the Terminal app) has
 # already taken the front since.
-ExecStopPost=+/bin/sh -c '[ "$(cat /sys/class/tty/tty0/active)" != tty2 ] || chvt 1'
+ExecStopPost=+/bin/sh -c '[ "$(cat /sys/class/tty/tty0/active)" != tty2 ] || /usr/lib/zeroos/vt-switch 1'
 Restart=no
 # The desktop is what earlyoom should sacrifice first, never ZeroShell.
 OOMScoreAdjust=200

@@ -12,10 +12,13 @@ own keyboard.
 2. Press **Start Dock mode**. The desktop appears on the monitor after a few
    seconds.
 3. The built-in screen shows "Docked" and turns itself off after a minute.
-   The Cardputer's keys now type on the monitor.
-4. To leave, click **Leave dock** in the top bar, choose it from the desktop
-   menu (right-click the background), press Ctrl+Alt+Del, or just unplug the
-   monitor. The built-in screen comes back.
+   Use a USB keyboard and mouse: the Cardputer's own keyboard doesn't reach the
+   desktop yet (M5's image puts it on its own seat, `seat1`, so the desktop
+   never opens it).
+4. To leave, open the Raspberry Pi menu (top left) > **Log out** > **Exit to
+   command line**, or just unplug the monitor. The built-in screen comes back.
+   (Shutdown and Reboot there turn off or restart the whole Cardputer.) On
+   ZeroOS's own light desktop: **Leave dock** in the top bar, or Ctrl+Alt+Del.
 
 In the Dock app:
 
@@ -50,8 +53,9 @@ battery.
 | --- | --- |
 | `zeroos-dock.service` | Runs as `pi` in its own login session on tty2, so it gets the monitor and input devices from logind. It switches to tty2 first (logind only hands them to the session in front) and back to tty1 when it stops. Started and stopped by ZeroShell (polkit allows `pi` exactly this unit). |
 | `/usr/lib/zeroos/dock-session` | Finds the DRM card that has the HDMI connector (the vc4 GPU) and starts labwc on it only. The built-in LCD is a separate DRM card that ZeroShell keeps drawing to. |
-| labwc | Small Wayland compositor (also what Raspberry Pi OS uses). Config in `/etc/zeroos/dock/`. |
-| waybar, swaybg, fuzzel, foot | Top bar, background, app search, terminal. |
+| The desktop | The stock Raspberry Pi desktop when it's installed (the SD card image has it): `labwc-pi` with Raspberry Pi's labwc config, `wf-panel-pi`, `pcmanfm-pi`, the PiXflat theme. It's installed without its login screen, boot splash and background services (lightdm, plymouth, PackageKit, NFS, accountsservice are masked), so ZeroShell stays the UI. Otherwise ZeroOS's own light desktop: labwc with `/etc/zeroos/dock/`, waybar, swaybg, fuzzel, foot. |
+| `/usr/lib/zeroos/dock-resolution` | Sets the monitor to the Dock app's **Size** (720p by default) when the stock desktop starts. |
+| `/usr/lib/zeroos/vt-switch` | Brings tty2 to the front (and tty1 back). Not `chvt`: ZeroShell keeps tty1 in graphics mode, and then the kernel ignores `chvt` and it waits forever. vt-switch answers the switch itself (VT_PROCESS) so nothing is drawn on the LCD. |
 | `zeroos-browser` | Chromium for 512 MB: low-end device mode, at most 2 page processes, 32 MB cache in RAM, a 192 MB JavaScript heap limit. |
 | `zeroos-video` | mpv with hardware H.264 decoding (V4L2 M2M), a 32 MB stream cache; picks from ~/Videos with fuzzel. Plays videos the Jellyfin app sends to the monitor (M), with the sign-in header from `~/.config/zeroos/jellyfin-mpv.conf`. |
 | `zeroos-dock` | `start`, `stop`, `status`, `open terminal\|browser\|files\|video FILE`. Works over ssh too. |
@@ -63,8 +67,10 @@ desktop session itself is next (`OOMScoreAdjust=200`), never ZeroShell.
 
 ## Limits and things to measure
 
-- **Memory.** The desktop itself (labwc, bar, terminal) should take about
-  40-60 MB **(measure)**. Chromium is the big one: expect 150-250 MB with one
+- **Memory.** Measured on a Cardputer Zero (2026-11-25): with ZeroOS's own
+  desktop and a terminal, about 200 MB stays available; with the stock
+  Raspberry Pi desktop, about 155-205 MB. Chromium at 1080p ran out of GPU
+  memory ("Skia OOM"); at 720p it loads pages, slowly. Chromium is the big one: expect 150-250 MB with one
   or two tabs, so simple sites and one tab at a time. zram makes room, but
   heavy sites (big web apps, many tabs) are Remote mode territory.
 - **Video.** H.264 up to 1080p30 is decoded in hardware; VP9 and H.265 are

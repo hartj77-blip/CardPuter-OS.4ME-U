@@ -1,0 +1,64 @@
+#!/usr/bin/python3 -I
+# vt-switch N: bring virtual terminal N to the front, like chvt, but without
+# hanging and without drawing on the LCD.
+#
+# ZeroShell keeps its tty1 in graphics mode (KD_GRAPHICS) so the console
+# doesn't draw over it, and leaves VT switching automatic (VT_AUTO). In that
+# combination the kernel ignores every switch request, so `chvt 2` for Dock
+# mode waited forever and the monitor stayed blank.
+#
+# Putting tty1 in text mode for the switch works, but the console then
+# repaints tty1 over ZeroShell on the LCD. Instead, for the moment of the
+# switch, this takes VT_PROCESS mode on the VT in front: the kernel asks us
+# (SIGUSR1) before leaving it, we say yes (VT_RELDISP), and the VT's own
+# mode is put back. The VT stays in graphics mode throughout.
+#
+# Exit 1 if the switch didn't happen within 5 seconds. Used by
+# zeroos-dock.service (to tty2 and back to tty1). Needs root.
+import fcntl
+import os
+import signal
+import struct
+import sys
+import time
+
+VT_GETMODE, VT_SETMODE, VT_RELDISP, VT_ACTIVATE = 0x5601, 0x5602, 0x5605, 0x5606
+VT_PROCESS = 0x01
+MODE = "bbhhh"   # struct vt_mode: mode, waitv, relsig, acqsig, frsig
+
+
+def active():
+    with open("/sys/class/tty/tty0/active") as f:
+        return f.read().strip()
+
+
+def main():
+    if len(sys.argv) != 2 or not sys.argv[1].isdigit():
+        sys.exit("usage: vt-switch N")
+    target = int(sys.argv[1])
+    if active() == f"tty{target}":
+        return 0
+    front = os.open(f"/dev/{active()}", os.O_RDWR | os.O_NOCTTY)
+    saved = fcntl.ioctl(front, VT_GETMODE, bytes(struct.calcsize(MODE)))
+    # The kernel signals us when it wants to leave the VT: allow it.
+    signal.signal(signal.SIGUSR1, lambda *_: fcntl.ioctl(front, VT_RELDISP, 1))
+    signal.signal(signal.SIGUSR2, lambda *_: None)
+    try:
+        fcntl.ioctl(front, VT_SETMODE,
+                    struct.pack(MODE, VT_PROCESS, 0, signal.SIGUSR1, signal.SIGUSR2, 0))
+        console = os.open("/dev/tty0", os.O_RDWR | os.O_NOCTTY)
+        fcntl.ioctl(console, VT_ACTIVATE, target)
+        os.close(console)
+        deadline = time.monotonic() + 5
+        while active() != f"tty{target}":
+            if time.monotonic() > deadline:
+                print(f"vt-switch: tty{target} didn't come to the front", file=sys.stderr)
+                return 1
+            time.sleep(0.05)
+        return 0
+    finally:
+        fcntl.ioctl(front, VT_SETMODE, saved)   # back to its own (VT_AUTO) mode
+        os.close(front)
+
+
+sys.exit(main())

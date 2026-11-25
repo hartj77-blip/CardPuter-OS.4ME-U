@@ -36,6 +36,7 @@ install -m 0755 "$F/bluetooth/zeroos-bluetooth-conf" "$D/usr/lib/zeroos/bluetoot
 install -m 0644 "$F/dock/rc.xml" "$F/dock/menu.xml" "$F/dock/autostart" "$F/dock/environment" \
                 "$F/dock/waybar.json" "$F/dock/waybar.css" "$D/etc/zeroos/dock/"
 install -m 0755 "$F/dock/dock-session"         "$D/usr/lib/zeroos/dock-session"
+install -m 0755 "$F/dock/dock-resolution" "$F/dock/vt-switch" "$D/usr/lib/zeroos/"
 install -m 0755 "$F/dock/zeroos-dock" "$F/dock/zeroos-browser" "$F/dock/zeroos-video" "$D/usr/bin/"
 install -m 0644 "$F/dock/zeroos-dock.service"  "$D/etc/systemd/system/"
 # Terminal app: tmux on tty3 (docs/REMOTE.md).
