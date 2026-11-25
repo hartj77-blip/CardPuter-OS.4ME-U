@@ -121,7 +121,7 @@ fi
 # M5Stack's app store (docs/APPS.md) goes last in the list, once, the same way.
 if [ ! -e "$ROOT/var/lib/zeroos/apps/.m5-store-added" ]; then
     if [ -f "$S" ] && ! sed -e 's/#.*//' -e 's/[[:space:]]//g' "$S" |
-            grep -qixE 'm5stack|https://cardputerzero\.github\.io/generated/registry\.json'; then
+            grep -qixE 'm5stack|https://(cardputerzero\.github\.io|cardputer\.cc)/generated/registry\.json'; then
         printf '%s\n' "# M5Stack's app store, last: community apps made for M5's own launcher." m5stack >> "$S"
         echo "zeroos: added M5Stack's app store to /etc/zeroos/apps.sources"
     fi

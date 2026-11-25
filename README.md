@@ -19,6 +19,15 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
 - [Try it in your browser](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) (the real home screen and apps, simulated hardware)
 - [Report a problem](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/issues)
 - [The apps repository](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U)
+- [The emulator's repository](https://github.com/hartj77-blip/emu-cardputer-os.4me-u)
+- [M5Stack's app store on ZeroOS: compatibility checklist](docs/M5-APPS.md)
+
+| Repository | What's in it |
+| --- | --- |
+| This one | The OS: the home screen (ZeroShell), the four built-in apps, the hardware layer, the SD card image, OS updates |
+| [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U) | Every other ZeroOS app, the packages the Apps app downloads, and the index that lists them |
+| [emu-cardputer-os.4me-u](https://github.com/hartj77-blip/emu-cardputer-os.4me-u) | The browser emulator: the real home screen and apps compiled to WebAssembly, [running here](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) |
+| [M5Stack's app store](https://github.com/CardputerZero/packages) | Not ours: about 180 community apps made for M5's own launcher, which ZeroOS can install too. [Which ones work on ZeroOS](docs/M5-APPS.md) |
 
 ## Contents
 
@@ -302,11 +311,27 @@ Apps that need extra software bring it with them and take it away again when rem
 installs Tailscale, Sync installs Syncthing, Camera installs libcamera, Mesh installs
 meshtasticd, GPS installs gpsd. None of that is on the base image.
 
+Every app above can be tried without a Cardputer in the
+[browser emulator](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) ([its repository](https://github.com/hartj77-blip/emu-cardputer-os.4me-u)).
+
+### From M5Stack's app store
+
+The Apps app also lists [M5Stack's app store](https://github.com/CardputerZero/packages): about
+180 community apps made for M5's own launcher, marked **M5**. ZeroOS installs and opens them its own
+way ([how](docs/APPS.md#m5stacks-app-store)), but they were made and tested for M5's system, so not
+all of them work here. The [compatibility checklist](docs/M5-APPS.md) lists every one of them, what
+a look inside its package found, and what has been checked on a real Cardputer running ZeroOS.
+
 ## Troubleshooting
 
 Update says "Up to date" on 0.1.x but there's a newer release. The device is still pointed at
 the project's old address. [Updates](docs/UPDATE.md#it-says-up-to-date-but-a-newer-release-exists)
 has a one-line fix.
+
+No **M5** apps in the Apps list (ZeroOS 0.8.0 and older, from late November 2026). M5Stack moved
+its app list to `cardputer.cc`, and the old address now sends ZeroOS to a plain-http page, which
+it refuses. The next release reads the new address. Until then: **Apps > Tab > P**, **Add a GitHub
+repo**, and type `https://cardputer.cc/generated/registry.json`.
 
 Apps won't install, or Terminal opens nothing, after updating from 0.1.x. Open Update and
 install the newest version, then open Apps and choose Update all.
@@ -1078,6 +1103,7 @@ tools/push-update.sh      send a build to a Cardputer over SSH
 tools/signing-key.sh      make the release key that signs updates and app lists (docs/UPDATE.md)
 tools/sign-release.sh     sign them, in the release workflow
 tools/irdb/               builds the IR code database from Flipper-IRDB
+tools/m5-apps.py          scans M5Stack's app store and writes docs/M5-APPS.md
 web/                      the browser simulator
 docs/                     guides and design notes
 .github/workflows/        CI, release, image build
@@ -1273,6 +1299,7 @@ the latest. See [Publishing an update](docs/UPDATE.md#publishing-an-update).
 Using it:
 [Keys](docs/KEYS.md) ·
 [Apps](docs/APPS.md) ·
+[M5Stack apps checklist](docs/M5-APPS.md) ·
 [Updates](docs/UPDATE.md) ·
 [Battery and performance](docs/PERFORMANCE.md)
 
@@ -1296,6 +1323,11 @@ Development:
 [Hardware notes](docs/HARDWARE.md) ·
 [Hardware test checklist](docs/HARDWARE-TEST.md) ·
 [Roadmap](docs/ROADMAP.md)
+
+Elsewhere:
+[Apps repository](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U) ·
+[Browser emulator](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) ([repository](https://github.com/hartj77-blip/emu-cardputer-os.4me-u)) ·
+[M5Stack's app store](https://github.com/CardputerZero/packages)
 
 Hardware docs from M5Stack: [Cardputer Zero](https://docs.m5stack.com/en/CardputerZero)
 
