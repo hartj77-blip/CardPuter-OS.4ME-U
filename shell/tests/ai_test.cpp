@@ -143,8 +143,10 @@ int main() {
     {
         std::string bin = d + "/bin";
         mkdir(bin.c_str(), 0755);
+        // One argument per line, so a flag is a whole line (the temp files'
+        // random names can contain "-L").
         std::ofstream(bin + "/curl") << "#!/bin/sh\n"
-                                        "echo \"$@\" > " << d << "/args\n"
+                                        "printf '%s\\n' \"$@\" > " << d << "/args\n"
                                         "for a; do case $a in @*) cat \"${a#@}\" >> " << d << "/files;; esac; done\n"
                                         "printf '{\"content\":[{\"type\":\"text\",\"text\":\"Four.\"}],"
                                         "\"stop_reason\":\"end_turn\"}\\n200'\n";
@@ -161,7 +163,9 @@ int main() {
         CHECK(reply == "Four.");
         CHECK(pid.load() == 0);
         CHECK(!has(slurp(d + "/args"), "sk-ant-secret"));
-        CHECK(!has(slurp(d + "/args"), "-L"));   // the key header never follows a redirect
+        // The key header never follows a redirect.
+        CHECK(!has("\n" + slurp(d + "/args"), "\n-L\n"));
+        CHECK(!has(slurp(d + "/args"), "--location"));
         CHECK(has(slurp(d + "/files"), "x-api-key: sk-ant-secret"));
         CHECK(has(slurp(d + "/files"), "\"What's 2+2?\""));
 
