@@ -5,39 +5,184 @@
 # installs/opens/keys/leaves: yes, no, part, n/a; empty = not tried yet.
 # zeroos and date: the ZeroOS version and day it was tried on a device.
 # note: replaces the scan's remarks about M5's launcher and desktops.
-aptool	likely							Install script tries to restart M5's launcher; harmless here
-cardputer-player	likely							Wayland code is an option; its launcher entry uses --framebuffer
-cardputer-remote	check							Phone remote. Its go-home action restarts M5's launcher, which ZeroOS doesn't have
-cardputer-zero-iptv	likely							
-cardputer-zero-radio	likely							Tk code is only its desktop preview
-cardputerzero-xiaozhi	likely							Only its installer's message names M5's launcher
-cz-battery-saver	check							Saves power by pausing M5's launcher; here only its other savings apply, and they overlap ZeroOS's own power saving
-cz-desk-mode	launcher							Swaps M5's launcher for a desktop on HDMI. ZeroOS's Dock app does this instead
-czcam	likely							Install script tries to restart M5's launcher; harmless here. ZeroOS's Camera app does the same job
-czmail	likely							Tk code is only its desktop preview
-czproxy	likely							Shares a lock file name with M5's launcher; harmless here
-czweather	likely							Install script tries to restart M5's launcher; harmless here
-doom-zero-dev0	check							Runs the game in its own X display and copies it to the LCD; heavy
-dx-zero	likely							Install script tries to restart M5's launcher; harmless here
-five	likely							Tk code is only its desktop preview
-flint	check							Adds boot services that take over the text console (fbcon) before login
-flipper-one-remote	likely							Shares a lock file name with M5's launcher; harmless here
-herdr-zero	likely							Ties itself to M5's launcher only when that is running
-icomzero	likely							Tk code is only its desktop preview
-lan-proxy	no-install							
-loki	likely							Install script tries to restart M5's launcher; harmless here
-meshtandem	likely							Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
-meshterm	likely							Tk code is only its desktop emulator
-meshzero	likely							Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
-nook-cardputerzero	check							Wants to be started by M5's launcher; without it, runs in its standalone mode
-raspyjack	check							Big install: web UI, Caddy, turns Apache off, and its scripts swap out M5's launcher (nothing to swap here)
-rfid	likely							
-seesay	likely							Qt and Tk are only inside bundled Python wheels
-tailzero	likely							Tailscale, like ZeroOS's Remote app: use one or the other
-talktome	likely							Wayland is only used for the clipboard
-vibeoffice	check							Runs in its own desktop (cage + WebKitGTK) mirrored to the LCD; heavy
-voice-input	no-install							Plugs into M5's launcher, so useless without it
-xiang	likely							Tk code is only its desktop preview
-zero-browser	check							Runs in its own desktop (labwc + QtWebKit) mirrored to the LCD; heavy
-zero-usbimager	check							Runs a GTK app in its own desktop (labwc) mirrored to the LCD
-zeropower	check							Power daemon that watches M5's launcher; overlaps ZeroOS's own power saving
+aptool	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here
+cardputer-player	likely	yes	yes		yes	0.7.1	2026-11-25	Wayland code is an option; its launcher entry uses --framebuffer
+cardputer-remote	check	yes	yes		yes	0.7.1	2026-11-25	Phone remote. Its go-home action restarts M5's launcher, which ZeroOS doesn't have
+cardputer-zero-iptv	likely	yes	yes	yes	yes	0.7.1	2026-11-25	
+cardputer-zero-radio	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tk code is only its desktop preview
+cardputerzero-xiaozhi	likely	yes	yes		yes	0.7.1	2026-11-25	Only its installer's message names M5's launcher
+cz-battery-saver	check	yes	yes	yes	yes	0.7.1	2026-11-25	Saves power by pausing M5's launcher; here only its other savings apply, and they overlap ZeroOS's own power saving
+cz-desk-mode	launcher	yes	yes	yes	yes	0.7.1	2026-11-25	Swaps M5's launcher for a desktop on HDMI. ZeroOS's Dock app does this instead
+czcam	likely	yes	yes		yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here. ZeroOS's Camera app does the same job
+czmail	likely	yes	yes		yes	0.7.1	2026-11-25	Tk code is only its desktop preview
+czproxy	likely	yes	yes		yes	0.7.1	2026-11-25	Shares a lock file name with M5's launcher; harmless here
+czweather	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here
+doom-zero-dev0	check	yes	yes	yes	part	0.7.1	2026-11-25	Runs the game in its own X display and copies it to the LCD; heavy; Needs Esc held twice (or Ctrl+Q) to leave
+dx-zero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here
+five	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tk code is only its desktop preview
+flint	check	yes	yes	yes	yes	0.7.1	2026-11-25	Adds boot services that take over the text console (fbcon) before login
+flipper-one-remote	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Shares a lock file name with M5's launcher; harmless here
+herdr-zero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Ties itself to M5's launcher only when that is running
+icomzero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tk code is only its desktop preview
+lan-proxy	no-install	no	n/a	n/a	n/a	0.7.1	2026-11-25	
+loki	likely	yes	yes		yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here
+meshtandem	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
+meshterm	likely	yes	yes		yes	0.7.1	2026-11-25	Tk code is only its desktop emulator
+meshzero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
+nook-cardputerzero	check	yes	yes	yes	yes	0.7.1	2026-11-25	Wants to be started by M5's launcher; without it, runs in its standalone mode
+raspyjack	check	yes	yes	yes	no	0.7.1	2026-11-25	Big install: web UI, Caddy, turns Apache off, and its scripts swap out M5's launcher (nothing to swap here); Hold Esc doesn't leave it; only restarting ZeroShell does; Removing it doesn't undo its setup: its web services keep running (ports 8080 and 8765), and a 4 GB swap file (with its /etc/fstab line), 4 boot services and the Kismet suite (36 packages) stay. Clean up by hand after removing it
+rfid	likely	yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Removing it leaves /usr/share/APPLaunch/apps/rfid behind
+seesay	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Qt and Tk are only inside bundled Python wheels
+tailzero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tailscale, like ZeroOS's Remote app: use one or the other
+talktome	likely	yes	yes		yes	0.7.1	2026-11-25	Wayland is only used for the clipboard
+vibeoffice	check	yes	yes		yes	0.7.1	2026-11-25	Runs in its own desktop (cage + WebKitGTK) mirrored to the LCD; heavy
+voice-input	no-install	no	n/a	n/a	n/a	0.7.1	2026-11-25	Plugs into M5's launcher, so useless without it
+xiang	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tk code is only its desktop preview
+zero-browser	check	yes	yes	yes	yes	0.7.1	2026-11-25	Runs in its own desktop (labwc + QtWebKit) mirrored to the LCD; heavy
+zero-usbimager	check	yes	yes		yes	0.7.1	2026-11-25	Runs a GTK app in its own desktop (labwc) mirrored to the LCD
+zeropower	check	yes	yes	yes	yes	0.7.1	2026-11-25	Power daemon that watches M5's launcher; overlaps ZeroOS's own power saving
+coinflip		yes	yes	yes	yes	0.7.1	2026-11-25	
+craps		yes	yes	yes	yes	0.7.1	2026-11-25	
+sudokuzero		yes	yes	yes	yes	0.7.1	2026-11-25	
+battleship		yes	yes	yes	yes	0.7.1	2026-11-25	
+zerochord		yes	yes		yes	0.7.1	2026-11-25	
+wanwu-desktop		yes	yes		part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Opens to "can't find the desktop (lightdm/labwc not running?)": it needs M5's desktop, not ZeroOS's Dock
+acidzero		yes	yes		yes	0.7.1	2026-11-25	
+advancewebui		yes	no		yes	0.7.1	2026-11-25	Crashes at launch (segmentation fault)
+airfiles		yes	yes		yes	0.7.1	2026-11-25	Needs ZeroOS with the LCD as fb0 (PR #90): before that it stopped at launch
+ai-wars		yes	yes	yes	yes	0.7.1	2026-11-25	
+amiibo-sim		yes	yes		yes	0.7.1	2026-11-25	
+aria2-remote		yes	yes		yes	0.7.1	2026-11-25	
+auracam		yes	no		part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+beamhound		yes	yes		yes	0.7.1	2026-11-25	
+bitmap16dx		yes	yes	yes	yes	0.7.1	2026-11-25	
+brucecardputerzero		yes	yes		no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+camillia		yes	yes	yes	yes	0.7.1	2026-11-25	
+cardbili		yes	yes	yes	yes	0.7.1	2026-11-25	
+cardflash		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+card-hy2		yes	yes		yes	0.7.1	2026-11-25	
+cardmesh		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+cardputersdr		yes	yes		yes	0.7.1	2026-11-25	
+cardputerzero-astro-box		yes	no		yes	0.7.1	2026-11-25	Stops at launch: needs libcamera.so.0.7, which this system's libcamera doesn't have
+cardputer-zero-geiger		yes	yes		yes	0.7.1	2026-11-25	
+cardputerzero-pwnagotchi		yes	yes		yes	0.7.1	2026-11-25	
+cardputerzero-superduper		yes	yes		yes	0.7.1	2026-11-25	
+cardrouter		yes	yes	yes	yes	0.7.1	2026-11-25	
+cardtube		yes	yes	yes	yes	0.7.1	2026-11-25	
+chainled		yes	yes	yes	yes	0.7.1	2026-11-25	
+controller		yes	yes		yes	0.7.1	2026-11-25	
+cp0-ir-remote		yes	yes	yes	yes	0.7.1	2026-11-25	
+crockogoldslots		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Its sound helper fails (pw-cat: failed to open audio file), so it's probably silent
+cwtrainerzero		yes	yes	yes	yes	0.7.1	2026-11-25	
+cybercam		yes	yes	yes	yes	0.7.1	2026-11-25	
+cz-peers		yes	yes		part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+dalicam		yes	yes	yes	yes	0.7.1	2026-11-25	
+doodycalls		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does; Its sound helper fails (pw-cat: failed to open audio file), so it's probably silent
+dweebs-pets		yes	yes	yes	yes	0.7.1	2026-11-25	Its sound helper fails (pw-cat: failed to open audio file), so it's probably silent
+edgecam		yes	yes	yes	yes	0.7.1	2026-11-25	
+esp32c5-spectrum		yes	yes		yes	0.7.1	2026-11-25	
+ethernet-tester		yes	yes	yes	yes	0.7.1	2026-11-25	
+flagpi		yes	yes		yes	0.7.1	2026-11-25	
+flight-club		yes	yes	yes	yes	0.7.1	2026-11-25	
+flightzero		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+fontpreview		yes	yes	yes	yes	0.7.1	2026-11-25	
+frame		yes	yes	yes	yes	0.7.1	2026-11-25	
+frotz-zero		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+fxcam		yes	no		yes	0.7.1	2026-11-25	
+geminilive		yes	yes		yes	0.7.1	2026-11-25	
+ghost-hunter		yes	yes		yes	0.7.1	2026-11-25	
+hamlog		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+hass-zero		yes	yes	yes	yes	0.7.1	2026-11-25	
+ipdoit-for-cardputer-zero		yes	yes	yes	yes	0.7.1	2026-11-25	
+jiggler		yes	yes		yes	0.7.1	2026-11-25	
+kanstl		yes	yes	yes	yes	0.7.1	2026-11-25	
+kesha-llm		yes	yes	yes	yes	0.7.1	2026-11-25	
+key-dash		yes	yes		yes	0.7.1	2026-11-25	
+kimi-remote		yes	yes		yes	0.7.1	2026-11-25	
+klipper-deck-zero		yes	yes		yes	0.7.1	2026-11-25	
+kvxputerzero		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+launcherespflasher		yes	no		no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+lofibox-cardputer-zero		yes	yes	yes	yes	0.7.1	2026-11-25	
+lokicz		yes	yes	yes	yes	0.7.1	2026-11-25	
+lookout		yes	yes	yes	yes	0.7.1	2026-11-25	
+airsim-cardputer		yes	yes		yes	0.7.1	2026-11-25	
+lora-tunnel		yes	yes	yes	yes	0.7.1	2026-11-25	
+matrixzero		yes	yes	yes	yes	0.7.1	2026-11-25	
+meshcore-zero		yes	yes	yes	yes	0.7.1	2026-11-25	
+mimo-talk		yes	yes	yes	yes	0.7.1	2026-11-25	
+mod-player		yes	yes	yes	yes	0.7.1	2026-11-25	
+monster-cyberspace		yes	yes	yes	yes	0.7.1	2026-11-25	
+mountable		yes	yes	yes	yes	0.7.1	2026-11-25	
+mouse-jiggler		yes	yes		yes	0.7.1	2026-11-25	
+m-pocket		yes	yes		yes	0.7.1	2026-11-25	
+muser		yes	yes	yes	yes	0.7.1	2026-11-25	
+musictagger		yes	yes	yes	yes	0.7.1	2026-11-25	
+nettoolkit		yes	yes	yes	yes	0.7.1	2026-11-25	
+nfcqsl		yes	yes		yes	0.7.1	2026-11-25	
+ns-con		yes	no		no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does; Exits at launch
+octet		yes	yes	yes	yes	0.7.1	2026-11-25	
+opencartazero		yes	yes	yes	yes	0.7.1	2026-11-25	
+pixelaces		yes	yes	yes	yes	0.7.1	2026-11-25	
+plai		yes	yes	yes	yes	0.7.1	2026-11-25	
+pocket-lorascan		yes	yes	yes	yes	0.7.1	2026-11-25	
+pocket-sattrack		yes	yes		yes	0.7.1	2026-11-25	
+pocket-sysmon		yes	yes	yes	yes	0.7.1	2026-11-25	
+pocket-trail		yes	yes	yes	yes	0.7.1	2026-11-25	
+pocket-zero-tools		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+quartermaster		yes	yes	yes	yes	0.7.1	2026-11-25	
+r86		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+refract-pocket		yes	yes	yes	yes	0.7.1	2026-11-25	
+retro-zero		yes	yes	yes	yes	0.7.1	2026-11-25	
+rf-heatmap		yes	yes	yes	yes	0.7.1	2026-11-25	
+rtl-sdr-receiver		yes	yes		yes	0.7.1	2026-11-25	
+rubiks2x2x2-autosolver		yes	yes		yes	0.7.1	2026-11-25	
+scheff-echolink		yes	yes		yes	0.7.1	2026-11-25	
+scheff-zello		yes	yes	yes	yes	0.7.1	2026-11-25	
+sondechase		yes	yes		yes	0.7.1	2026-11-25	
+sparrow		yes	yes	yes	yes	0.7.1	2026-11-25	
+square-sdr		yes	yes		yes	0.7.1	2026-11-25	
+stickzero		yes	yes		yes	0.7.1	2026-11-25	
+strawberry-video-player		yes	yes	yes	yes	0.7.1	2026-11-25	
+subghz		yes	yes	yes	yes	0.7.1	2026-11-25	
+tailputerzero		yes	yes		yes	0.7.1	2026-11-25	
+telega		yes	yes		yes	0.7.1	2026-11-25	
+tic80-c0		yes	yes	yes	yes	0.7.1	2026-11-25	
+tyrell-video		yes	yes		yes	0.7.1	2026-11-25	
+ultimate-flasher-cardputerzero		yes	yes		yes	0.7.1	2026-11-25	
+ultimate-remote		yes	yes	yes	yes	0.7.1	2026-11-25	
+updoit-for-cardputer-zero		yes	yes	yes	yes	0.7.1	2026-11-25	
+wallpaper		yes	yes		yes	0.7.1	2026-11-25	
+wanwu-usbscreen		yes	yes	yes	yes	0.7.1	2026-11-25	
+wanwu-wireless		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+wasteland		yes	yes	yes	yes	0.7.1	2026-11-25	
+wifi-manager		yes	yes	yes	yes	0.7.1	2026-11-25	
+wirezero		yes	yes		yes	0.7.1	2026-11-25	
+xianjian1-zero		yes	yes		part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+zero-cellular		yes	yes		yes	0.7.1	2026-11-25	Removing it leaves a zero-cellular folder behind
+zerodaw		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+zerodesk		yes	yes		yes	0.7.1	2026-11-25	
+zerodesk-cp0		yes	yes		yes	0.7.1	2026-11-25	
+zerogallery		yes	yes	yes	yes	0.7.1	2026-11-25	
+zerogotchi		yes	yes	yes	yes	0.7.1	2026-11-25	
+zerogps		yes	yes	yes	yes	0.7.1	2026-11-25	
+zero-music		yes	yes	yes	yes	0.7.1	2026-11-25	
+zero-music163		yes	yes		yes	0.7.1	2026-11-25	
+zero-news		yes	yes	yes	yes	0.7.1	2026-11-25	
+zero-print		yes	yes	yes	yes	0.7.1	2026-11-25	
+zeroradio		yes	yes	yes	yes	0.7.1	2026-11-25	
+zerosdr		yes	yes		yes	0.7.1	2026-11-25	
+zerosend		yes	yes		yes	0.7.1	2026-11-25	
+zerosky		yes	yes		part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+zero-ssh		yes	yes		yes	0.7.1	2026-11-25	
+zero-stocks		yes	yes	yes	yes	0.7.1	2026-11-25	
+zerosub		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+zerotag		yes	yes		yes	0.7.1	2026-11-25	
+zerotracker		yes	yes		yes	0.7.1	2026-11-25	
+zerotvbgone		yes	yes	yes	yes	0.7.1	2026-11-25	
+zero-watt		yes	yes		yes	0.7.1	2026-11-25	
+zerowave		yes	yes	yes	yes	0.7.1	2026-11-25	
+zero-weather		yes	yes		yes	0.7.1	2026-11-25	
+ziiro		yes	yes	yes	yes	0.7.1	2026-11-25	
+zread		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+zsynth		yes	yes		yes	0.7.1	2026-11-25	
+zeroamp		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Its "Wi-Fi guardian" switches Wi-Fi off while it plays; turn Wi-Fi back on after
