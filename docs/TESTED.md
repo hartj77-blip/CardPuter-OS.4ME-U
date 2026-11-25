@@ -103,7 +103,8 @@ The other ~170 are untested.
 ## Known issues found
 
 1. **Recorder audio is near silent.** Peak level was −54 dB, and only −44 dB with a loud
-   tone playing on the speaker. Mic path or gain needs a look.
+   tone playing on the speaker. The cause is the mic gain left at the chip's default; fixed in
+   #79.
 2. **Camera ignores a short Esc press.** A tap does nothing and a 1.3 s hold doesn't leave.
    Only a hold of 1.5 s or more goes home.
 3. **Time zone defaults to UTC**, so Clock and the status bar show UTC.
@@ -112,6 +113,9 @@ The other ~170 are untested.
    Enter twice installs `m5-wanwu-desktop`.
 6. **Lock screen** takes two key presses to get back (wake, then dismiss). This may be
    intended.
+7. **`sudo reboot` doesn't come back.** Shutdown completes in the journal ("Shutting down",
+   filesystems synced), then the board never restarts, and the 2-minute hardware watchdog
+   doesn't recover it either. It needed a power cycle. Seen once; not yet re-tested.
 
 ## Still to test by hand
 
