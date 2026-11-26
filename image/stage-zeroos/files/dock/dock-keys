@@ -1,0 +1,157 @@
+#!/usr/bin/python3 -I
+# dock-keys: the Cardputer's own keyboard on the Dock desktop.
+#
+# The keyboard (TCA8418 on I2C) sends its symbols as keycodes of its own
+# (26 for "!", 71 for "-", ...), which only the console keymap
+# (tca8418_keypad_m5stack_keymap.map) turns into characters. A desktop reads
+# them as the standard keys with those numbers ("!" came out as "["), and it
+# uses one layout for every keyboard, so a USB keyboard on the same desktop
+# rules out remapping the layout. M5's image also keeps the keyboard off the
+# desktop's seat (99-ignore-i2c-key.rules: seat1).
+#
+# So while docked this takes the keyboard for itself (EVIOCGRAB; ZeroShell
+# ignores keys while docked anyway) and types through a virtual keyboard
+# (uinput, on the desktop's seat): each symbol as the standard key, with Shift
+# added or taken away as the character needs; everything else as it is.
+# Brightness keys are dropped: the only backlight is the LCD's, and the
+# desktop's brightness tool turned it off.
+#
+# Run by zeroos-dock-keys.service, which runs with Dock mode. Needs root.
+import fcntl
+import os
+import signal
+import struct
+import sys
+
+EV_SYN, EV_KEY = 0x00, 0x01
+KEY_LEFTSHIFT, KEY_RIGHTSHIFT = 42, 54
+DROP = {224, 225}   # KEY_BRIGHTNESSDOWN, KEY_BRIGHTNESSUP
+# The keyboard's own symbol keycode -> (standard keycode, with Shift).
+SYMBOLS = {
+    26: (2, True),     # !
+    27: (3, True),     # @
+    39: (4, True),     # #
+    40: (5, True),     # $
+    41: (6, True),     # %
+    43: (7, True),     # ^
+    51: (8, True),     # &
+    52: (9, True),     # *
+    53: (10, True),    # (
+    94: (11, True),    # )
+    55: (41, True),    # ~
+    69: (41, False),   # `
+    70: (12, True),    # _
+    71: (12, False),   # -
+    72: (13, True),    # +
+    73: (13, False),   # =
+    74: (26, False),   # [
+    75: (27, False),   # ]
+    76: (26, True),    # {
+    77: (27, True),    # }
+    79: (39, False),   # ;
+    80: (39, True),    # :
+    81: (40, False),   # '
+    82: (40, True),    # "
+    83: (51, True),    # <
+    85: (52, True),    # >
+    86: (43, False),   # backslash
+    89: (43, True),    # |
+    90: (51, False),   # ,
+    91: (52, False),   # .
+    92: (53, False),   # /
+    93: (53, True),    # ?
+}
+
+EVENT = "llHHi"   # struct input_event on 64-bit: time, type, code, value
+EVIOCGRAB = 0x40044590
+UI_SET_EVBIT, UI_SET_KEYBIT = 0x40045564, 0x40045565
+UI_DEV_CREATE, UI_DEV_DESTROY = 0x5501, 0x5502
+
+
+def find_keyboard():
+    """The built-in keyboard's event node, by its driver name."""
+    name = None
+    for line in open("/proc/bus/input/devices"):
+        if line.startswith("N: Name="):
+            name = line.strip()[len('N: Name="'):-1]
+        elif line.startswith("H: Handlers=") and name and name.startswith("tca8418"):
+            for h in line.split("=", 1)[1].split():
+                if h.startswith("event"):
+                    return "/dev/input/" + h
+    return None
+
+
+def main():
+    path = find_keyboard()
+    if not path:
+        sys.exit("dock-keys: no built-in keyboard (tca8418)")
+    kb = os.open(path, os.O_RDONLY)
+    ui = os.open("/dev/uinput", os.O_WRONLY | os.O_NONBLOCK)
+    fcntl.ioctl(ui, UI_SET_EVBIT, EV_KEY)
+    fcntl.ioctl(ui, UI_SET_EVBIT, EV_SYN)
+    for code in range(1, 256):
+        fcntl.ioctl(ui, UI_SET_KEYBIT, code)
+    # struct uinput_user_dev: name[80], id (bustype, vendor, product,
+    # version), ff_effects_max, absmax/absmin/absfuzz/absflat[64] each.
+    dev = struct.pack("80sHHHHi", b"Cardputer keyboard (Dock)", 0x19, 0x1, 0x1, 1, 0)
+    os.write(ui, dev + bytes(4 * 64 * 4))
+    fcntl.ioctl(ui, UI_DEV_CREATE)
+    fcntl.ioctl(kb, EVIOCGRAB, 1)
+
+    def stop(*_):
+        fcntl.ioctl(kb, EVIOCGRAB, 0)
+        fcntl.ioctl(ui, UI_DEV_DESTROY)
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+
+    def emit(code, value):
+        os.write(ui, struct.pack(EVENT, 0, 0, EV_KEY, code, value))
+
+    def sync():
+        os.write(ui, struct.pack(EVENT, 0, 0, EV_SYN, 0, 0))
+
+    shift_held = set()   # the user's own Shift keys that are down
+    size = struct.calcsize(EVENT)
+    while True:
+        data = os.read(kb, size * 64)
+        for i in range(0, len(data) - size + 1, size):
+            _, _, etype, code, value = struct.unpack(EVENT, data[i:i + size])
+            if etype != EV_KEY:
+                continue   # our own SYN follows each key
+            if code in DROP:
+                continue
+            if code in (KEY_LEFTSHIFT, KEY_RIGHTSHIFT):
+                if value:
+                    shift_held.add(code)
+                else:
+                    shift_held.discard(code)
+            if code not in SYMBOLS:
+                emit(code, value)
+                sync()
+                continue
+            std, shifted = SYMBOLS[code]
+            if value == 2:   # auto-repeat: the key only
+                emit(std, 2)
+                sync()
+                continue
+            need = shifted and not shift_held      # press Shift for it
+            lift = not shifted and shift_held      # let go of the user's Shift
+            if value == 1:
+                if need:
+                    emit(KEY_LEFTSHIFT, 1)
+                for s in shift_held if lift else ():
+                    emit(s, 0)
+                emit(std, 1)
+                sync()
+            else:
+                emit(std, 0)
+                if need:
+                    emit(KEY_LEFTSHIFT, 0)
+                for s in shift_held if lift else ():
+                    emit(s, 1)
+                sync()
+
+
+main()

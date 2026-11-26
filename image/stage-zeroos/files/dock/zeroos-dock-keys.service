@@ -1,0 +1,12 @@
+# The Cardputer's own keyboard on the Dock desktop, with its symbol keys
+# translated (/usr/lib/zeroos/dock-keys explains). Runs while Dock mode runs:
+# wanted by zeroos-dock.service, and stopped with it.
+[Unit]
+Description=ZeroOS Dock mode: the Cardputer's keyboard on the desktop
+BindsTo=zeroos-dock.service
+After=zeroos-dock.service
+
+[Service]
+ExecStart=/usr/lib/zeroos/dock-keys
+Restart=on-failure
+RestartSec=1
