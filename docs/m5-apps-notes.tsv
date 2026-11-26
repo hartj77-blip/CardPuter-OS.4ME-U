@@ -186,3 +186,13 @@ ziiro		yes	yes	yes	yes	0.7.1	2026-11-25
 zread		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
 zsynth		yes	yes		yes	0.7.1	2026-11-25	
 zeroamp		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Its "Wi-Fi guardian" switches Wi-Fi off while it plays; turn Wi-Fi back on after
+card-pi		yes	yes	yes	yes	0.7.1	2026-11-25	
+cz-tv		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+displaymod		yes	yes	yes	yes	0.7.1	2026-11-25	Opens as "BigTermCLI", a big-text terminal tool
+dualradio		yes	yes	yes	yes	0.7.1	2026-11-25	Removing it leaves a __pycache__ folder in /usr/share/APPLaunch/apps/dualradio
+fpv-checklist		yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave
+landevil		yes	yes	yes	yes	0.7.1	2026-11-25	Removing it leaves ~/landevil/ports.csv behind
+magscan		yes	yes	yes	yes	0.7.1	2026-11-25	
+piano-zero		yes	yes	yes	no	0.7.1	2026-11-25	Hold Esc doesn't leave it; only restarting ZeroShell does
+pocketfish		yes	yes	yes	yes	0.7.1	2026-11-25	
+qso-zero		yes	yes		yes	0.7.1	2026-11-25	

@@ -6,7 +6,7 @@ ZeroOS's Apps app lists [M5Stack's app store](https://github.com/CardputerZero/p
 
 Other places: [ZeroOS](../README.md) · [ZeroOS apps](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U) · [Browser emulator](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) ([repository](https://github.com/hartj77-blip/emu-cardputer-os.4me-u))
 
-Store list of 2026-11-25, 191 apps. Checked on a device so far: **181**.
+Store list of 2026-11-25, 191 apps. Checked on a device so far: **191**.
 
 ## Summary
 
@@ -62,7 +62,7 @@ Nothing rules it out, but something in it may not fit ZeroOS: see the notes.
 | [Flint](https://github.com/flintdevices/flint)<br>`m5-flint` 0.0.59 | Security, Radio & Comms | needs extra hardware | opens /dev/input/eventN by number (may pick the wrong device); uses /dev/ttyN; adds you to groups; Adds boot services that take over the text console (fbcon) before login; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [RaspyJack](https://github.com/7h30th3r0n3/RaspyJack)<br>`m5-raspyjack` 0.1.4-raspyjack1 | Security, Radio & Comms | runs in the background, needs extra hardware, camera, microphone, motion sensor | opens /dev/input/eventN by number (may pick the wrong device); Big install: web UI, Caddy, turns Apache off, and its scripts swap out M5's launcher (nothing to swap here); Hold Esc doesn't leave it; only restarting ZeroShell does; Removing it doesn't undo its setup: its web services keep running (ports 8080 and 8765), and a 4 GB swap file (with its /etc/fstab line), 4 boot services and the Kismet suite (36 packages) stay. Clean up by hand after removing it; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ❌ |
 | [Battery Saver](https://github.com/InstantComet/cz-battery-saver)<br>`m5-cz-battery-saver` 1.1.1 | System Tools | runs in the background | Saves power by pausing M5's launcher; here only its other savings apply, and they overlap ZeroOS's own power saving; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
-| [DualRadio](https://github.com/RIAL0/DualRadio)<br>`m5-dualradio` 1.4.1 | System Tools, Radio & Comms | needs extra hardware | mentions M5's launcher | ☐ | ☐ | ☐ | ☐ |
+| [DualRadio](https://github.com/RIAL0/DualRadio)<br>`m5-dualradio` 1.4.1 | System Tools, Radio & Comms | needs extra hardware | Removing it leaves a __pycache__ folder in /usr/share/APPLaunch/apps/dualradio; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Nook](https://github.com/delikely/Nook)<br>`m5-nook-cardputerzero` 0.1.10 | System Tools, Security | runs in the background, needs extra hardware | Wants to be started by M5's launcher; without it, runs in its standalone mode; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | Remote<br>`m5-cardputer-remote` 0.2-6 | System Tools, Development |  | Phone remote. Its go-home action restarts M5's launcher, which ZeroOS doesn't have; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [USB Imager](https://github.com/geo-tp/USBImager-Zero)<br>`m5-zero-usbimager` 1.0.10-24.gtk | System Tools, Development |  | Runs a GTK app in its own desktop (labwc) mirrored to the LCD; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
@@ -91,7 +91,7 @@ Nothing in the package stands in the way: it draws on the LCD's framebuffer (or 
 | [Email](https://github.com/H4W9/CardputerZero_Mail)<br>`m5-czmail` 0.4.1 | Creative & Office | microphone | adds you to groups; Tk code is only its desktop preview; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [FXCam](https://github.com/imliubo/fxcam-cp0)<br>`m5-fxcam` 1.0.2-m5stack1 | Creative & Office, Media | camera | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ❌ | ☐ | ✅ |
 | MusicTagger<br>`m5-musictagger` 0.2.1 | Creative & Office, Media |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
-| [Piano Zero](https://github.com/adrianomoraes/CardputerZero-PianoZero_release)<br>`m5-piano-zero` 0.4.0-m5stack1 | Creative & Office |  |  | ☐ | ☐ | ☐ | ☐ |
+| [Piano Zero](https://github.com/adrianomoraes/CardputerZero-PianoZero_release)<br>`m5-piano-zero` 0.4.0-m5stack1 | Creative & Office |  | Hold Esc doesn't leave it; only restarting ZeroShell does; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ❌ |
 | Zero DAW<br>`m5-zerodaw` 1.2.10-1 | Creative & Office, Media | needs extra hardware, microphone, monitor | uses /dev/ttyN; Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
 | [ZeroChord](https://github.com/momo20261121/ZeroChord)<br>`m5-zerochord` 1.2.1 | Creative & Office, Media |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [ZeroTracker](https://github.com/andreahaku/zerotracker)<br>`m5-zerotracker` 0.1.0-rev1 | Creative & Office, Media | microphone | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
@@ -114,7 +114,7 @@ Nothing in the package stands in the way: it draws on the LCD's framebuffer (or 
 | [Ghost Hunter](https://github.com/HarryYGit/zgame-ghost-hunter)<br>`m5-ghost-hunter` 2.1.0 | Games, Radio & Comms | needs extra hardware, motion sensor | adds you to groups; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [NS-Con](https://github.com/RiviaRammer/CardputerZeroApps)<br>`m5-ns-con` 0.2.6 | Games, Emulators |  | Hold Esc doesn't leave it; only restarting ZeroShell does; Exits at launch; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ❌ | ☐ | ❌ |
 | Pixel Aces<br>`m5-pixelaces` 0.3.0 | Games |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
-| PocketFish<br>`m5-pocketfish` 0.3.3 | Games, Lifestyle |  |  | ☐ | ☐ | ☐ | ☐ |
+| PocketFish<br>`m5-pocketfish` 0.3.3 | Games, Lifestyle |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | REFRACT Pocket<br>`m5-refract-pocket` 6.5 | Games, Emulators | needs extra hardware, monitor | uses /dev/ttyN; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Retro-Zero](https://github.com/geo-tp/Retro-Zero)<br>`m5-retro-zero` 0.1.0-3 | Games, Emulators | needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Rubiks 2x2x2](https://github.com/SlendyGamer/rubiks2x2x2-autosolver-M5StackCardputerZero.git)<br>`m5-rubiks2x2x2-autosolver` 0.2.1-rev1 | Games, Education |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
@@ -147,8 +147,8 @@ Nothing in the package stands in the way: it draws on the LCD's framebuffer (or 
 | [ZeroSub](https://github.com/csaboka21/ZeroSub)<br>`m5-zerosub` 0.18.18-rev1 | Hardware & IoT, Radio & Comms | needs extra hardware, motion sensor | Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
 | [ZeroTVBGone](https://github.com/baltamir1978/ZeroTVBGone)<br>`m5-zerotvbgone` 0.1.0-rev1 | Hardware & IoT |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [czweather](https://github.com/users/zjg622/projects/1)<br>`m5-czweather` 1.2.1 | Lifestyle, Other |  | Install script tries to restart M5's launcher; harmless here; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
-| [FPV Toolkit](https://github.com/DOKUA/fpv-checklist)<br>`m5-fpv-checklist` 0.2.2-rev1 | Lifestyle, Hardware & IoT |  |  | ☐ | ☐ | ☐ | ☐ |
-| [MagScan](https://github.com/nerdosity/magscan)<br>`m5-magscan` 1.0.2 | Lifestyle, Other | motion sensor | adds you to groups | ☐ | ☐ | ☐ | ☐ |
+| [FPV Toolkit](https://github.com/DOKUA/fpv-checklist)<br>`m5-fpv-checklist` 0.2.2-rev1 | Lifestyle, Hardware & IoT |  | Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
+| [MagScan](https://github.com/nerdosity/magscan)<br>`m5-magscan` 1.0.2 | Lifestyle, Other | motion sensor | adds you to groups; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | Sparrow<br>`m5-sparrow` 1.2.0-rev1 | Lifestyle, Education | microphone, motion sensor | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Stocks](https://github.com/ChrisOr-Dev/zero-stocks)<br>`m5-zero-stocks` 1.0.2 | Lifestyle |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Weather](https://github.com/ChrisOr-Dev/zero-weather)<br>`m5-zero-weather` 1.1.0 | Lifestyle | needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
@@ -163,13 +163,13 @@ Nothing in the package stands in the way: it draws on the LCD's framebuffer (or 
 | [Mod Player](https://github.com/MrJoshMurray/mod-player)<br>`m5-mod-player` 0.2.2-rev1 | Media |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [News](https://github.com/ChrisOr-Dev/zero-news)<br>`m5-zero-news` 1.0.2 | Media |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Strawberry Video Player](https://github.com/dave-taylor-7654/strawberry-video-player)<br>`m5-strawberry-video-player` 2.7.15 | Media, System Tools | monitor | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
-| [TV](https://github.com/argosautomation/cz-tv)<br>`m5-cz-tv` 1.4 | Media | monitor |  | ☐ | ☐ | ☐ | ☐ |
+| [TV](https://github.com/argosautomation/cz-tv)<br>`m5-cz-tv` 1.4 | Media | monitor | Hold Esc doesn't leave it; only restarting ZeroShell does; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ❌ |
 | Tyrell Video<br>`m5-tyrell-video` 0.1.7-1 | Media | runs in the background, monitor | uses /dev/ttyN; adds you to groups; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [Zero Music](https://github.com/YuHaibo/ZeroMusic)<br>`m5-zero-music` 1.0.0-rev1 | Media |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | ZeroAmp<br>`m5-zeroamp` 1.8.6 | Media |  | Needs Esc held twice (or Ctrl+Q) to leave; Its "Wi-Fi guardian" switches Wi-Fi off while it plays; turn Wi-Fi back on after; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
 | [ZeroGallery](https://github.com/baltamir1978/ZeroGallery)<br>`m5-zerogallery` 0.3.0-rev1 | Media | motion sensor | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [ZeroMusic163](https://github.com/tongfei11/ZeroMusic163)<br>`m5-zero-music163` 0.1.1 | Media, Lifestyle |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
-| [zread](https://github.com/JazzplayerL9/zread)<br>`m5-zread` 0.2.0-1 | Media, Other |  | opens in Terminal; Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
+| [zread](https://github.com/JazzplayerL9/zread)<br>`m5-zread` 0.2.1-1 | Media, Other |  | opens in Terminal; Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
 | [AirSIM Cardputer](https://github.com/kai-wu-cortex/airsim-cardputer)<br>`m5-airsim-cardputer` 0.3.13-1 | Radio & Comms | needs extra hardware, microphone | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [amiibo_sim](https://github.com/RiviaRammer/CardputerZeroApps)<br>`m5-amiibo-sim` 0.2.1 | Radio & Comms, Games | needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [APTool](https://github.com/FPVZaphod/APTool)<br>`m5-aptool` 1.1.0-1 | Radio & Comms, System Tools |  | adds you to groups; Install script tries to restart M5's launcher; harmless here; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
@@ -190,7 +190,7 @@ Nothing in the package stands in the way: it draws on the LCD's framebuffer (or 
 | [Monster for Cyberspace](https://github.com/oumike/monster-cyberspace)<br>`m5-monster-cyberspace` 3.1.1 | Radio & Comms |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [NFCQSL](https://github.com/RiviaRammer/CardputerZeroApps)<br>`m5-nfcqsl` 0.2.0 | Radio & Comms | needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | Plai<br>`m5-plai` 3.0.1-1 | Radio & Comms | needs extra hardware, motion sensor | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
-| [QSO-Zero](https://www.github.com/CzarD0mn/QSO-Zero)<br>`m5-qso-zero` 0.2.6 | Radio & Comms | needs extra hardware, microphone, monitor | adds you to groups | ☐ | ☐ | ☐ | ☐ |
+| [QSO-Zero](https://www.github.com/CzarD0mn/QSO-Zero)<br>`m5-qso-zero` 0.2.6 | Radio & Comms | needs extra hardware, microphone, monitor | adds you to groups; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [Quartermaster](https://github.com/valleytechsolutions/Quartermaster)<br>`m5-quartermaster` 1.2.5 | Radio & Comms, Security | runs in the background, needs extra hardware | adds you to groups; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [RF Heatmap](https://github.com/igenexxx/rf-heatmap)<br>`m5-rf-heatmap` 0.3.10-1 | Radio & Comms, Hardware & IoT | needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [RTL SDR](https://github.com/MrJoshMurray/rtl-sdr-receiver)<br>`m5-rtl-sdr-receiver` 0.1.5 | Radio & Comms | needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
@@ -215,20 +215,20 @@ Nothing in the package stands in the way: it draws on the LCD's framebuffer (or 
 | Aria2 Remote<br>`m5-aria2-remote` 0.1.0-rev2 | System Tools |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [Beamhound](https://github.com/bfeller/beamhound)<br>`m5-beamhound` 0.1.0 | System Tools, Hardware & IoT |  | opens /dev/input/eventN by number (may pick the wrong device); tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [Card HY2](https://github.com/Moeyuuko/card-hy2)<br>`m5-card-hy2` 0.0.3 | System Tools | runs in the background, camera | adds you to groups; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
-| [Card Pi](https://github.com/Moeyuuko/Card-Pi)<br>`m5-card-pi` 0.0.5 | System Tools, AI |  |  | ☐ | ☐ | ☐ | ☐ |
+| [Card Pi](https://github.com/Moeyuuko/Card-Pi)<br>`m5-card-pi` 0.0.5 | System Tools, AI |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [CardFlash](https://gitlab.com/ScarletPachyderm/cardflash)<br>`m5-cardflash` 0.1.4-1 | System Tools |  | Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
 | CardRouter<br>`m5-cardrouter` 0.1.0 | System Tools, Radio & Comms |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | Controller<br>`m5-controller` 0.1.0-1 | System Tools, Games |  | opens /dev/input/eventN by number (may pick the wrong device); tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | CZProxy<br>`m5-czproxy` 0.3.1 | System Tools | runs in the background | Shares a lock file name with M5's launcher; harmless here; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | Desktop<br>`m5-wanwu-desktop` 1.0.1 | System Tools |  | adds you to groups; Needs Esc held twice (or Ctrl+Q) to leave; Opens to "can't find the desktop (lightdm/labwc not running?)": it needs M5's desktop, not ZeroOS's Dock; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | 🟡 |
-| [DisplayMOD](https://github.com/H4W9/CardputerZero_Mail)<br>`m5-displaymod` 3.1.7 | System Tools, Hardware & IoT | runs in the background, needs extra hardware, monitor | uses /dev/ttyN; 2 entries on home | ☐ | ☐ | ☐ | ☐ |
+| [DisplayMOD](https://github.com/H4W9/CardputerZero_Mail)<br>`m5-displaymod` 3.1.7 | System Tools, Hardware & IoT | runs in the background, needs extra hardware, monitor | uses /dev/ttyN; 2 entries on home; Opens as "BigTermCLI", a big-text terminal tool; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Ethernet Tester](https://github.com/LBreda/cp0-ethernet-tester)<br>`m5-ethernet-tester` 1.0.0-rev1 | System Tools, Hardware & IoT |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [FontPreview](https://github.com/Harrison-Xu/FontPreview)<br>`m5-fontpreview` 0.4.7-1 | System Tools |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Ipdoit](https://github.com/Sudrien/ipdoit-for-cardputer-zero)<br>`m5-ipdoit-for-cardputer-zero` 0.2.9 | System Tools | runs in the background | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Jiggler](https://github.com/intGus/jiggler)<br>`m5-jiggler` 0.1.0-m5stack1 | System Tools, Hardware & IoT | runs in the background, needs extra hardware | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
 | [KanSTL](https://github.com/nullbeing/KanSTL)<br>`m5-kanstl` 0.1.0 | System Tools, Development |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [kvxputerzero](https://github.com/kvx17/kvxputer)<br>`m5-kvxputerzero` 0.1.0-rev11 | System Tools, Security |  | Needs Esc held twice (or Ctrl+Q) to leave; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | 🟡 |
-| [LAN Devil](https://github.com/x22j/landevil-cardputer-zero)<br>`m5-landevil` 0.3.0 | System Tools, Security |  |  | ☐ | ☐ | ☐ | ☐ |
+| [LAN Devil](https://github.com/x22j/landevil-cardputer-zero)<br>`m5-landevil` 0.3.0 | System Tools, Security |  | Removing it leaves ~/landevil/ports.csv behind; tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Lookout](https://github.com/bfeller/beamhound)<br>`m5-lookout` 0.1.0 | System Tools, Media | camera, microphone | opens /dev/input/eventN by number (may pick the wrong device); tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Mountable](https://github.com/s0liton/Mountable)<br>`m5-mountable` 0.1.0 | System Tools, Media | runs in the background | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ✅ | ✅ |
 | [Mouse Jiggler](https://github.com/kkazakov/cardputer-zero-mouse-emu)<br>`m5-mouse-jiggler` 0.2.7 | System Tools |  | tried on ZeroOS 0.7.1 (2026-11-25) | ✅ | ✅ | ☐ | ✅ |
