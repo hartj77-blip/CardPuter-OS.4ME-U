@@ -18,7 +18,9 @@ std::unique_ptr<App> make_bluetooth_section(const char* back);
 
 // The line over a section's list: "Settings > Wi-Fi" and, on the right, what
 // the section has to say for itself ("Connected to HomeNet"), in `color`.
-// The list goes under it: list_.build(root, 2, 18, kScreenW - 4, kBodyH - 20).
-void settings_heading(lv_obj_t* root, const char* section, const std::string& state = "", uint32_t color = 0);
+// Returns that label on the right (nullptr without a `state`), for a section
+// that keeps it up to date. The list goes under the line:
+// list_.build(root, 2, 18, kScreenW - 4, kBodyH - 20).
+lv_obj_t* settings_heading(lv_obj_t* root, const char* section, const std::string& state = "", uint32_t color = 0);
 
 }  // namespace zs

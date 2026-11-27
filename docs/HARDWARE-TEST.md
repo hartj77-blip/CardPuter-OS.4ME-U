@@ -31,7 +31,7 @@ override afterwards with `sudo systemctl revert zeroshell`.
 
 - [ ] **Notes**: type a paragraph quickly, Esc, reopen: every letter is there.
 - [ ] **Clock**: time is right; Space starts and stops the stopwatch.
-- [ ] **Battery**: shows a real percentage and time left; plugging in USB shows charging.
+- [ ] **Battery** (Settings > Battery & power; it is no longer an app): the heading shows a real percentage and time left, and the rows under the settings show power draw, voltage, current, temperature, health and cycles, changing every second; plugging in USB shows charging. Typing "battery" on the home screen opens it, and so does 5 in the taskbar panel. If the old Battery app was installed, it is gone from All apps, and Apps > Tab > U removes its package.
 - [ ] **System**: CPU, memory and temperature show real, changing numbers.
 - [ ] **Compass**: needle moves as you turn the device (Lite model: should say "No IMU").
 - [ ] **Media**: copy a song into ~/Music, it plays through the speaker; Fn + Q pauses it. **Recorder**: record a voice note and play it back.

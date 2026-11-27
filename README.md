@@ -262,13 +262,13 @@ Run `zeroos-measure` in a terminal for a memory, CPU and battery report. The det
 ### Built in
 
 These three are part of ZeroOS itself and can't be removed, so a device can always get online,
-update and install apps. Wi-Fi and Bluetooth are not apps: they are the first two sections of
-Settings, and typing `wifi` or `bluetooth` on the home screen opens Settings there.
+update and install apps. Wi-Fi, Bluetooth and Battery are not apps: they are sections of
+Settings, and typing `wifi`, `bluetooth` or `battery` on the home screen opens Settings there.
 
 | App | What it does |
 | --- | --- |
 | Apps | Browse, install, update and remove apps ([guide](docs/APPS.md)) |
-| Settings | Wi-Fi (find and join networks), Bluetooth (pair and connect devices), brightness, volume, power saving, running programs, restart, shut down |
+| Settings | Wi-Fi (find and join networks), Bluetooth (pair and connect devices), brightness, volume, battery (time left, power draw, power profile, power saving), running programs, restart, shut down |
 | Update | Install a newer ZeroOS over the network ([guide](docs/UPDATE.md)) |
 
 ### Installable
@@ -285,7 +285,6 @@ separate package with its own version, so updating one app never touches another
 | Notes | Quick text notes |
 | Clock | Clock and stopwatch |
 | Compass | Compass and spirit level |
-| Battery | Time left, power draw and power profiles ([guide](docs/PERFORMANCE.md)) |
 | System | CPU, memory, storage and temperature |
 | Media | Music from the SD card, USB drives and server shares, in a classic MP3-player look, with other looks to switch to (T) |
 | Jellyfin | Music, movies and shows from your Jellyfin server ([guide](docs/JELLYFIN.md)) |

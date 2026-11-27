@@ -49,6 +49,10 @@ M5_STORE=https://cardputer.cc/generated/registry.json
 M5_STORE_OLD=https://cardputerzero.github.io/generated/registry.json
 M5_DIR=$STATE_DIR/m5            # m5-<package>: what ZeroShell reads to list it
 M5_DESKTOP=/usr/share/APPLaunch/applications
+# Apps that became part of ZeroOS itself (Battery: Settings > Battery &
+# power). ZeroShell no longer loads their modules, so they are never offered
+# or installed, and update-all takes an installed one off.
+RETIRED="battery"
 
 action="" app="" last_state=""
 
@@ -127,9 +131,9 @@ list_sources() {
 # so is one built for another app ABI or another kind of computer.
 filter_index() {
     local src=$1 abi=$2 arch=$3
-    awk -v src="$src" -v abi="$abi" -v arch="$arch" '
+    awk -v src="$src" -v abi="$abi" -v arch="$arch" -v retired="$RETIRED" '
         function flush(   n, k, i) {
-            if (id != "" && ok && v["abi"] == abi \
+            if (id != "" && ok && !(id in gone) && v["abi"] == abi \
                 && v["file"] ~ ("^zeroos-app-" id "_[0-9][0-9A-Za-z.+~-]*_(" arch "|all)\\.deb$") \
                 && v["version"] ~ /^[0-9][0-9A-Za-z.+~-]*$/ && v["sha256"] ~ /^[0-9a-f]+$/ \
                 && length(v["sha256"]) == 64 && v["size"] ~ /^[0-9]+$/ \
@@ -144,7 +148,7 @@ filter_index() {
             }
             id = ""; ok = 1; split("", v)
         }
-        BEGIN { ok = 1 }
+        BEGIN { ok = 1; n = split(retired, r, " "); for (i = 1; i <= n; i++) gone[r[i]] = 1 }
         /^[[:space:]]*$/ { flush(); next }
         /^#/ { next }
         {
@@ -469,6 +473,18 @@ drop_stale_apps() {
     done
 }
 
+# Apps that are part of ZeroOS now (RETIRED): ZeroShell no longer loads
+# their modules, so the packages only take up space. Take them off.
+drop_retired_apps() {
+    local id
+    for id in $RETIRED; do
+        [ -n "$(installed_version "$id")" ] || continue
+        log "$id is part of ZeroOS now (it is in Settings); taking the old app off"
+        dpkg --remove "zeroos-app-$id" >&2 || log "could not take off $id"
+        rm -f -- "$STATE_DIR/extras/$id"
+    done
+}
+
 # apt_put_on <deb>...: install packages and what they depend on.
 apt_put_on() {
     # Something left half installed (a power cut, an extra that would not set
@@ -515,6 +531,7 @@ install_debs() {
     arch=$(dpkg-deb -f "$deb" Architecture 2>/dev/null)
     ver=$(dpkg-deb -f "$deb" Version 2>/dev/null)
     [ "$pkg" = "zeroos-app-$id" ] || fail "Not the package for $id"
+    case " $RETIRED " in *" $id "*) fail "$id is part of ZeroOS now: it is in Settings" ;; esac
     [ "$arch" = all ] || [ "$arch" = "$(dpkg --print-architecture)" ] ||
         fail "This app is for another kind of computer ($arch)"
     status installing 100
@@ -629,6 +646,7 @@ upgrade_all() {
     refresh || exit 1
     action=upgrade
     drop_stale_apps
+    drop_retired_apps
     todo=$(dpkg-query -W -f '${db:Status-Abbrev} ${Package} ${Version}\n' 'zeroos-app-*' 2>/dev/null |
            awk '$1 == "ii" {sub(/^zeroos-app-/, "", $2); print $2, $3}'; m5_installed)
     while read -r id ver; do

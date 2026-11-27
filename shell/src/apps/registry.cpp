@@ -89,14 +89,22 @@ const AppModule* load(const std::string& path, const struct stat& st) {
         return nullptr;   // the handle stays open; it's harmless and tiny
     }
     l.mod = m;
-    for (const AppModule* a = m; a->id; ++a)
-        std::fprintf(stderr, "zeroshell: loaded app %s from %s\n", a->id, path.c_str());
+    for (const AppModule* a = m; a->id; ++a) {
+        if (app_is_settings_section(a->id))   // scan() leaves it out
+            std::fprintf(stderr, "zeroshell: %s is in Settings now; its old app in %s is not used\n", a->id, path.c_str());
+        else
+            std::fprintf(stderr, "zeroshell: loaded app %s from %s\n", a->id, path.c_str());
+    }
     return m;
 }
 
 void scan() {
     g_apps.clear();
     zs_builtin_apps(g_apps);
+    // An apps-repository build may still list one that is in Settings now.
+    g_apps.erase(std::remove_if(g_apps.begin(), g_apps.end(),
+                                [](const AppInfo& a) { return app_is_settings_section(a.id); }),
+                 g_apps.end());
     std::string dir = module_dir();
     if (DIR* d = opendir(dir.c_str())) {
         std::vector<std::string> names;
@@ -112,6 +120,9 @@ void scan() {
             if (stat(path.c_str(), &st) != 0 || !S_ISREG(st.st_mode)) continue;
             const AppModule* m = load(path, st);
             for (; m && m->id; ++m) {
+                // An app from before it moved into Settings (Battery): its
+                // package is still installed, until Apps > Update all.
+                if (app_is_settings_section(m->id)) continue;
                 bool taken = false;   // a built-in app (or one loaded already) wins
                 for (auto& a : g_apps) taken = taken || a.id == m->id;
                 if (taken) continue;
@@ -143,6 +154,10 @@ std::vector<std::string> app_registry_dirs() {
     std::vector<std::string> v{module_dir()};
     m5_app_dirs(v);
     return v;
+}
+
+bool app_is_settings_section(const std::string& id) {
+    return id == "wifi" || id == "bluetooth" || id == "battery";
 }
 
 const AppInfo* app_find(const std::string& id) {

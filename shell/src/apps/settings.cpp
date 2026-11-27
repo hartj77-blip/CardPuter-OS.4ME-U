@@ -1,7 +1,8 @@
 // Settings: one numbered list of sections (docs/UX.md), each a list of its
 // own. Values change with Left/Right (or Enter). Wi-Fi and Bluetooth are
-// sections with a file of their own (apps/settings_sections.h); the sections
-// that are apps (Update, About) open them, and Esc there comes back here.
+// sections with a file of their own (apps/settings_sections.h); Battery &
+// power also shows the fuel gauge's readings; the sections that are apps
+// (Update, About) open them, and Esc there comes back here.
 #include <algorithm>
 #include <functional>
 #include <string>
@@ -52,7 +53,9 @@ public:
 
     void tick() override {
         if (section_) section_->tick();
-        if (page_ == Page::Running && ++ticks_ % 20 == 0) refresh_running();   // every ~2 s
+        ++ticks_;
+        if (page_ == Page::Running && ticks_ % 20 == 0) refresh_running();   // every ~2 s
+        if (page_ == Page::Battery && ticks_ % 10 == 0) refresh_battery();   // every second
     }
 
     bool on_back() override {
@@ -69,6 +72,7 @@ private:
         page_ = p;
         has_values_ = false;
         free_ = nullptr;
+        battery_state_ = nullptr;
         section_.reset();   // while its widgets still exist, as the shell closes an app
         list_.reset();
         lv_obj_clean(root_);
@@ -86,7 +90,10 @@ private:
         if (p == Page::Root) {
             list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 4);
         } else {
-            settings_heading(root_, kNames[int(p)]);
+            uint32_t color = kMuted;
+            std::string state = p == Page::Battery ? battery_state(color) : "";
+            lv_obj_t* s = settings_heading(root_, kNames[int(p)], state, color);
+            if (p == Page::Battery) battery_state_ = s;
             list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);
         }
         switch (p) {
@@ -145,7 +152,9 @@ private:
                   [this] { open(Page::Display); });
         list_.add(LV_SYMBOL_VOLUME_MAX, "Sound", h.muted() ? "Muted" : fmt("%d%%", h.volume()),
                   [this] { open(Page::Sound); });
-        list_.add(LV_SYMBOL_BATTERY_3, "Battery & power", kProfiles[std::clamp(int(p.profile()), 0, 2)],
+        int charge = h.battery().percent;
+        std::string profile = kProfiles[std::clamp(int(p.profile()), 0, 2)];
+        list_.add(LV_SYMBOL_BATTERY_3, "Battery & power", charge < 0 ? profile : fmt("%d%%, ", charge) + profile,
                   [this] { open(Page::Battery); });
         list_.add(LV_SYMBOL_SHUFFLE, "Remote & sync", "", [this] { open(Page::Remote); });
         list_.add(LV_SYMBOL_DOWNLOAD, "Software update", version.empty() ? "" : version,
@@ -185,6 +194,38 @@ private:
         toggle(LV_SYMBOL_MUTE, "Mute", h.muted(), [](bool on) { hal().set_muted(on); });
     }
 
+    // ---- Battery & power ------------------------------------------------
+    // The settings first, then what the fuel gauge (BQ27220) reads. The
+    // charge and the time left are in the heading. All of it follows every
+    // second without rebuilding the list, so the focus doesn't jump.
+
+    // "78%, 2h 32m left", "78%, full in 1h 05m", "100%, plugged in".
+    static std::string battery_state(uint32_t& color) {
+        BatteryInfo b = hal().battery();
+        color = b.charging ? kGood : b.percent < 0 ? kMuted : b.percent < 15 ? kBad : b.percent < 30 ? kWarn : kMuted;
+        if (b.percent < 0) return "No battery gauge";
+        int left = power().minutes_left();
+        std::string s = fmt("%d%%, ", b.percent);
+        if (left >= 0) return s + (b.charging ? fmt("full in %dh %02dm", left / 60, left % 60)
+                                              : fmt("%dh %02dm left", left / 60, left % 60));
+        return s + (b.charging ? "charging" : b.external_power ? "plugged in" : "on battery");
+    }
+
+    // The readings, in the order battery_page() lists them.
+    static std::vector<std::string> battery_readings() {
+        BatteryInfo b = hal().battery();
+        int mw = power().avg_power_mw();
+        std::string health = b.health_percent < 0 ? "--"
+                             : b.charge_full_mah > 0 ? fmt("%d%% (%d mAh)", b.health_percent, b.charge_full_mah)
+                                                     : fmt("%d%%", b.health_percent);
+        return {mw > 0 ? fmt("%.2f W", mw / 1000.0) : "--",
+                fmt("%.2f V", b.voltage_mv / 1000.0),
+                fmt("%d mA", b.current_ma),
+                fmt("%.1f C", b.temp_c10 / 10.0),
+                health,
+                b.cycle_count < 0 ? "--" : fmt("%d", b.cycle_count)};
+    }
+
     void battery_page() {
         auto& p = power();
         choice(LV_SYMBOL_CHARGE, "Power profile", {{"Saver", 0}, {"Balanced", 1}, {"Performance", 2}},
@@ -192,7 +233,32 @@ private:
         toggle(LV_SYMBOL_WIFI, "Wi-Fi off with screen", p.wifi_sleep(), [](bool on) { power().set_wifi_sleep(on); });
         toggle(LV_SYMBOL_BATTERY_2, "Time left in top bar", p.show_time_left(),
                [](bool on) { power().set_show_time_left(on); });
-        if (app_find("battery")) list_.add(LV_SYMBOL_BATTERY_3, "Battery details", "", [] { shell_open_app("battery"); });
+        // The low-battery saver overrides the profile above while it is on.
+        low_saver_ = p.effective_profile() != p.profile();
+        if (low_saver_) list_.add(LV_SYMBOL_WARNING, "Battery low: running as Saver", "", nullptr);
+        static const char* const kReadings[] = {"Power draw", "Voltage", "Current", "Temperature", "Health", "Cycles"};
+        std::vector<std::string> now = battery_readings();
+        for (size_t i = 0; i < now.size(); ++i) {
+            int row = list_.add(nullptr, kReadings[i], now[i], nullptr);
+            if (i == 0) readings_row_ = row;
+        }
+    }
+
+    void refresh_battery() {
+        auto& p = power();
+        if ((p.effective_profile() != p.profile()) != low_saver_) {   // its row comes or goes
+            int keep = list_.focused();
+            show(Page::Battery);
+            if (keep > 0 && keep < list_.size()) list_.focus(keep);
+            return;
+        }
+        std::vector<std::string> now = battery_readings();
+        for (size_t i = 0; i < now.size(); ++i) list_.set_value(readings_row_ + int(i), now[i]);
+        if (battery_state_) {
+            uint32_t color = kMuted;
+            lv_label_set_text(battery_state_, battery_state(color).c_str());
+            lv_obj_set_style_text_color(battery_state_, c(color), 0);
+        }
     }
 
     void remote_page() {
@@ -334,6 +400,9 @@ private:
     bool has_values_ = false;   // the page has value rows (the bar says Left/Right change them)
     std::vector<ProcInfo> procs_;   // Running programs, in list order
     lv_obj_t* free_ = nullptr;      // its "N MB free" label
+    lv_obj_t* battery_state_ = nullptr;   // Battery & power: the charge and time left, in the heading
+    int readings_row_ = 0;                // ... its first reading's row
+    bool low_saver_ = false;              // ... the low-battery row is showing
     int ticks_ = 0;
     bool direct_ = false;            // opened straight at a section (from search)
     std::unique_ptr<App> section_;   // Wi-Fi or Bluetooth, while it has the screen
@@ -343,11 +412,11 @@ private:
 
 std::unique_ptr<App> make_settings_app() { return std::make_unique<SettingsApp>(); }
 
-void settings_heading(lv_obj_t* root, const char* section, const std::string& state, uint32_t color) {
+lv_obj_t* settings_heading(lv_obj_t* root, const char* section, const std::string& state, uint32_t color) {
     using namespace theme;
     lv_obj_t* h = label(root, (std::string("Settings  " LV_SYMBOL_RIGHT "  ") + section).c_str(), &zs_font_12, kMuted);
     lv_obj_set_pos(h, 8, 2);
-    if (state.empty()) return;
+    if (state.empty()) return nullptr;
     // What is left of the line, so a long network name ends in dots.
     lv_obj_update_layout(h);
     lv_obj_t* s = label(root, state.c_str(), &zs_font_12, color);
@@ -355,6 +424,7 @@ void settings_heading(lv_obj_t* root, const char* section, const std::string& st
     lv_label_set_long_mode(s, LV_LABEL_LONG_DOT);
     lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_RIGHT, 0);
     lv_obj_align(s, LV_ALIGN_TOP_RIGHT, -8, 2);
+    return s;
 }
 
 }  // namespace zs

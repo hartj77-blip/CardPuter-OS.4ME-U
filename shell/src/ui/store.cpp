@@ -109,7 +109,6 @@ const MockApp kMockApps[] = {
     {"gps", "GPS", "Position, saved spots and GPX tracks with a GPS module", "gpsd", 90, nullptr},
     {"mesh", "Mesh", "Meshtastic text messages over LoRa (Cap LoRa-1262)", "meshtasticd", 110, nullptr},
     {"compass", "Compass", "Compass and spirit level", "", 40, nullptr},
-    {"battery", "Battery", "Time left, power draw and power profile", "", 40, nullptr},
     {"clock", "Clock", "Clock and stopwatch", "", 30, nullptr},
     {"sysmon", "System", "CPU, memory and what uses it", "", 50, nullptr},
     {"dev", "Dev Tools", "Projects with one-key run, micro editor, REPLs, Git and a serial monitor",
@@ -306,6 +305,8 @@ std::vector<Entry> real_catalog() {
     }
     // Installed, but no source offers it now: still list it, so it can be removed.
     for (auto& [id, ver] : inst) {
+        // In Settings now (Battery): Update all takes the old app off.
+        if (app_is_settings_section(id)) continue;
         Entry x;
         x.id = id;
         const AppInfo* a = app_find(id);

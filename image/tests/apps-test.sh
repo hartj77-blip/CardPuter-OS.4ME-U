@@ -281,6 +281,33 @@ printf 'zeroos-app-notes 1.0.0 zeroos-app-abi-%s\n' "$ABI" > "$T/installed"
 apps install gps
 grep -q 'dpkg --remove' "$T/apt.log" && bad "current app ABI: app taken off" || ok "current app ABI: apps left alone"
 rm -f "$T/state/restore"
+# An app that became part of ZeroOS (Battery is in Settings now). A source
+# that still carries it (for older ZeroOS) doesn't get it offered here, its
+# package can't be installed by hand, and update-all takes off one that is
+# still installed, and nothing else.
+echo "not really a module" > "$T/mods/battery.so"
+printf 'NAME="Battery"\nSUMMARY="Time left"\n' > "$T/pkgs/battery.pkg"
+mk a battery 1.0.0
+: > "$T/installed"
+apps run refresh
+cat_has app=battery && bad "retired app: still offered" || ok "retired app: not offered"
+cat_has app=notes && cat_has app=gps && ok "retired app: the others still are" || bad "retired app: others dropped"
+: > "$T/apt.log"
+apps install battery || true
+expect "retired app: install refused" state failed
+apps install-file "$T/a/zeroos-app-battery_1.0.0_arm64.deb" || true
+expect "retired app: its package refused too" state failed
+grep -q "apt-get install " "$T/apt.log" && bad "retired app: apt ran" || ok "retired app: nothing installed"
+printf 'zeroos-app-battery 1.0.0 zeroos-app-abi-%s\nzeroos-app-notes 1.0.0 zeroos-app-abi-%s\n' "$ABI" "$ABI" > "$T/installed"
+: > "$T/apt.log"
+apps run upgrade
+expect "retired app, upgrade: done" state done
+grep -q 'dpkg --remove zeroos-app-battery' "$T/apt.log" && ok "retired app, upgrade: the old app is taken off" ||
+    bad "retired app, upgrade: $(cat "$T/apt.log")"
+grep -q 'dpkg --remove zeroos-app-notes' "$T/apt.log" && bad "retired app, upgrade: took off another app" ||
+    ok "retired app, upgrade: other apps stay"
+[ -e "$T/state/restore" ] && bad "retired app, upgrade: listed to put back" || ok "retired app, upgrade: not put back"
+: > "$T/installed"
 # A renamed app: its package takes over the old one's, and update-all swaps
 # it in for whoever has the old one.
 mkdir -p "$T/c"

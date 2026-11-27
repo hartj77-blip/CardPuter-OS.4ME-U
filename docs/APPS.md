@@ -1,9 +1,9 @@
 # Apps
 
-ZeroOS itself is small: it comes with **Apps**, **Settings** (Wi-Fi and Bluetooth are sections of
-it) and **Update**, which are what a device needs to get online, update itself and install apps. Everything else is an app you
+ZeroOS itself is small: it comes with **Apps**, **Settings** (Wi-Fi, Bluetooth and Battery are
+sections of it) and **Update**, which are what a device needs to get online, update itself and install apps. Everything else is an app you
 install from the **Apps** app, downloaded from the apps repository,
-[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): Battery, Camera, Car,
+[CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): Camera, Car,
 Clock, Compass, Dock, Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal,
 Tether and AI, the [Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Libretro](GAMES.md).
 
@@ -18,6 +18,11 @@ first install or **U** after the update takes those old builds off (your files a
 and **U** installs the new builds. It then clears extras that only the old builds needed. Before ZeroOS 0.3.1 the old builds were left on and every
 install failed with "Could not install"; if you see that, update ZeroOS first, or run
 `sudo apt-get -f install -y` over SSH once.
+
+Battery was an installable app up to ZeroOS 0.8.4. It is **Settings > Battery & power** now, on
+every device. A device that still has the old Battery app installed doesn't show it any more, and
+**Apps > Tab > U** takes its package off. The apps repository keeps publishing it for devices on an
+older ZeroOS; a newer one leaves it out of the list (`RETIRED` in `zeroos-apps`).
 
 Each app brings its own extras with it, so the base image doesn't carry them: Remote brings
 Tailscale, Sync brings Syncthing, Camera brings libcamera and M5Stack's camera program, Mesh brings

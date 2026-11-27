@@ -123,7 +123,7 @@ System, Game Gear, Atari 2600, PC Engine, WonderSwan and Mega Drive run at full 
 Advance and Super Nintendo (Snes9x 2010) run at full speed in most games. bsnes-mercury is too
 slow here; use Snes9x 2010. PlayStation (PCSX ReARMed) runs many games at full speed. These are
 estimates for this chip and haven't been measured on the device yet. Use the **Performance**
-power profile in **Battery** for the demanding ones.
+power profile (**Settings > Battery & power**) for the demanding ones.
 
 The picture is scaled to fit the screen, keeping its shape. A Game Boy picture (160 x 144) is
 shown at its real size, because that looks sharpest. Bigger pictures are scaled down, so very
