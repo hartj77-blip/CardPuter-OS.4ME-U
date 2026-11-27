@@ -144,7 +144,7 @@ done
 left=$(comm -13 <(echo "$before") <(pkgs))
 [ -z "$left" ] && ok "removing every app takes its extras away" ||
     { bad "left behind after removing every app:"; echo "$left" | sed 's/^/     /'
-      echo "     what zeroos-apps said about them:"; grep -h 'left behind' /tmp/remove-*.log | sed 's/^/     /'; }
+      echo "     what zeroos-apps said about them:"; grep -hE 'left behind|autoremove failed|^E: |dpkg: error|dpkg: warning: (while removing|subprocess)|returned error exit status' /tmp/remove-*.log | sed 's/^/     /'; }
 leftfiles=$(find /usr/lib/zeroos/apps -name '*.so' 2>/dev/null)
 [ -z "$leftfiles" ] && ok "no modules left" || bad "modules left: $leftfiles"
 
