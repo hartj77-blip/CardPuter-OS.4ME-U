@@ -55,7 +55,12 @@ export ZEROOS_APPS_ALLOW_FILE=1
 apt-get update -qq >/dev/null 2>&1
 # Always on the device (Raspberry Pi OS; zeroos-apps needs curl); here an app's extras would pull them
 # in, and apt then keeps them, so they would look left behind.
-apt-get install -y -qq --no-install-recommends curl ca-certificates file dbus systemd systemd-sysv libpam-systemd dbus-user-session >/dev/null 2>&1
+apt-get install -y -qq --no-install-recommends curl ca-certificates file dbus systemd systemd-sysv libpam-systemd dbus-user-session bsdextrautils libkmod2 sensible-utils >/dev/null 2>&1
+# The firmware partition, as on the device: Raspberry Pi's packages look for it
+# (get_fw_loc) when they go, and rpd-plym-splash's removal fails without one.
+mkdir -p /boot/firmware
+[ -e /boot/firmware/config.txt ] || : > /boot/firmware/config.txt
+[ -e /boot/firmware/cmdline.txt ] || echo "console=tty1 root=/dev/mmcblk0p2 rootwait quiet splash" > /boot/firmware/cmdline.txt
 zeroos-apps refresh 2>/dev/null && ok "catalog read" || bad "zeroos-apps refresh"
 ids=${*:-$(awk -F= '$1 == "app" {print $2}' "$APPS/zeroos-apps.index")}
 offered=$(awk -v RS= '{ split($0, l, "\n"); print substr(l[1], 5) }' /var/lib/zeroos/apps/catalog)
@@ -143,7 +148,8 @@ for id in $ids; do
 done
 left=$(comm -13 <(echo "$before") <(pkgs))
 [ -z "$left" ] && ok "removing every app takes its extras away" ||
-    { bad "left behind after removing every app:"; echo "$left" | sed 's/^/     /'; }
+    { bad "left behind after removing every app:"; echo "$left" | sed 's/^/     /'
+      echo "     what zeroos-apps said about them:"; grep -hE 'left behind|autoremove failed|^E: |dpkg: error|dpkg: warning: (while removing|subprocess)|returned error exit status' /tmp/remove-*.log | sed 's/^/     /'; }
 leftfiles=$(find /usr/lib/zeroos/apps -name '*.so' 2>/dev/null)
 [ -z "$leftfiles" ] && ok "no modules left" || bad "modules left: $leftfiles"
 
