@@ -117,6 +117,9 @@ You need a microSD card and a computer to write it from.
    In Raspberry Pi Imager, pick Raspberry Pi Zero 2 W as the device (the CM0 is the same chip).
 4. Put the card in the Cardputer and switch it on. The first boot takes a few minutes, because the
    card's filesystem is grown to fill the card. Boot text is shown on the screen while it runs.
+5. The first screen is a short welcome tour of the keys: Enter turns the page, Esc goes back a
+   page (on the first page it skips the tour). Its last page sets up Wi-Fi and the time zone. To
+   see it again later, type `tour` on the home screen.
 
 The image is built after each release is published, so for about 10 minutes after a new release
 the download link can show "not found". Wait a bit, or grab the image from an
@@ -158,6 +161,9 @@ the card; ZeroOS then runs as that user instead of `pi`. This needs a version ne
 (see [Troubleshooting](#troubleshooting)).
 
 ## Using it
+
+The quickest way to learn it is the welcome tour on the device: it opens by itself the first time,
+and typing `tour` on the home screen opens it again. It has a page to practise the arrow keys on.
 
 Arrow keys move, Enter opens, Esc goes back. The \` key also works as Esc. On the built-in
 keyboard the arrows are Fn + F, Z, X and C.

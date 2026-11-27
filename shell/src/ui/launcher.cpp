@@ -29,6 +29,7 @@
 #include "ui/shell.h"
 #include "ui/suggest_bar.h"
 #include "ui/theme.h"
+#include "ui/welcome.h"
 
 namespace zs {
 
@@ -285,6 +286,11 @@ std::vector<Result> search(const std::string& q) {
                            if (arg.empty()) shell_open_app(app);
                            else shell_open_app(app, arg);
                        }});
+        out.back().score = sc;
+    }
+    // The welcome tour (ui/welcome.h): how to get around, again.
+    if (int sc = search_score("Welcome tour", "tour help keys keyboard guide tutorial intro how", q)) {
+        out.push_back({LV_SYMBOL_KEYBOARD, "Welcome tour", "Setting", [] { shell_open_app(kWelcomeId); }});
         out.back().score = sc;
     }
     // Best match first; equally good ones as docs/UX.md groups them: apps,

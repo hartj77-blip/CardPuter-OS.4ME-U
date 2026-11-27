@@ -144,5 +144,14 @@ STEPS+=",down,enter,wait:300,shot:91-games-list.ppm"
 STEPS+=",enter,wait:1000,key:d,key:d,wait:300,shot:92-games-playing.ppm"
 STEPS+=",esc,wait:300,shot:93-games-menu.ppm"
 STEPS+=",down,down,down,down,enter,wait:500,key:c,wait:300,shot:94-games-cores.ppm,esc,esc"
+# The welcome tour (ui/welcome.h): a new user's first screen. A script starts
+# at Home, so it is opened here; the arrows page with all four keys tried.
+STEPS+=",open:welcome,shot:50-welcome.ppm"
+STEPS+=",enter,up,left,down,right,shot:51-welcome-arrows.ppm"
+STEPS+=",enter,shot:52-welcome-moving.ppm,enter,shot:53-welcome-home.ppm"
+STEPS+=",enter,shot:54-welcome-menus.ppm,enter,shot:55-welcome-panel.ppm"
+STEPS+=",enter,shot:56-welcome-typing.ppm,enter,shot:57-welcome-lock.ppm"
+STEPS+=",enter,shot:58-welcome-done.ppm,esc,esc,esc,esc,esc,esc,esc,esc"
+STEPS+=",esc,wait:200,shot:59-welcome-skip.ppm,esc"
 (cd "$OUT" && HOME="$DEMO" TZ=UTC "$BIN" --script "$STEPS")
 python3 "$HERE/ppm2png.py" "$OUT"
