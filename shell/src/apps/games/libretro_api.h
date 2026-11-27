@@ -1,4 +1,4 @@
-// The part of the libretro API (https://docs.libretro.com) the Games app
+// The part of the libretro API (https://docs.libretro.com) the Libretro app
 // uses to drive an emulator core. The values and layouts are libretro's own
 // (libretro.h, MIT licence); only what a software-rendered, single-player
 // frontend needs is declared here.

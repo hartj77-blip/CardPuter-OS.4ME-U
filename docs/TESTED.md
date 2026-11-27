@@ -66,7 +66,7 @@ or ABI errors. Each took 1 to 4 minutes. ZeroShell never restarted.
 | Compass | PARTIAL | IMU found and heading is live. Rotation untested. |
 | Desktop (remote desktop) | PARTIAL | Opens to "Add a computer". No target was connected. |
 | Dev | PASS | Code, REPL (Python, Lua, calculator, SQLite), Git and Serial screens work. |
-| Games | PARTIAL | No ROMs ship. A homebrew NES ROM ran in Nestopia, and pause menu and Esc work. GB/GBA cores untested. |
+| Libretro | PARTIAL | No ROMs ship. A homebrew NES ROM ran in Nestopia, and pause menu and Esc work. GB/GBA cores untested. |
 | GPS | PASS | No module: "No GPS found" after a few seconds. Outdoor fix untested. |
 | Grove | PARTIAL | LED strip page opens. No strip attached. |
 | IR Remote | PARTIAL | Universal TV power codes send and remotes can be created. TV reaction and learning untested. |
@@ -139,5 +139,5 @@ The other ~170 are untested.
 - Jellyfin with a server.
 - RF with an SDR dongle.
 - Router with Tailscale signed in.
-- Games with real ROMs.
+- Libretro with real ROMs.
 - The remaining m5stack apps.

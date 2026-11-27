@@ -1,30 +1,30 @@
-# Games
+# Libretro
 
-**Games** plays your games for classic consoles on the built-in screen. It runs the emulators as
-**libretro cores**: the same emulator cores RetroArch uses, loaded by an app built for the
-Cardputer's 320 x 170 screen and keyboard. Install it from the **Apps** app.
+**Libretro** plays your games for classic consoles on the built-in screen. It runs the emulators as
+**[libretro](https://www.libretro.com) cores**: the same emulator cores RetroArch uses, loaded by an
+app built for the Cardputer's 320 x 170 screen and keyboard. Install it from the **Apps** app.
 
 Only play games you own. ZeroOS comes with no games and no console BIOS files.
 
 ## Why not RetroArch itself?
 
 RetroArch draws with OpenGL, and the built-in screen is a small SPI panel with no GPU behind it.
-RetroArch also expects a gamepad and a big screen for its menus. So Games is a small frontend of
+RetroArch also expects a gamepad and a big screen for its menus. So Libretro is a small frontend of
 its own that runs the same libretro cores, scales each picture to fit the panel, and uses the
-keyboard. A core you download for Games is a normal libretro core, and the save files are the
+keyboard. A core you download for Libretro is a normal libretro core, and the save files are the
 usual `.srm` battery saves.
 
-Games plays on a TV itself (below). In Dock mode ([Dock](DOCK.md)) you can also run RetroArch
-(`sudo apt install retroarch`), with the cores Games installed.
+Libretro plays on a TV itself (below). In Dock mode ([Dock](DOCK.md)) you can also run RetroArch
+(`sudo apt install retroarch`), with the cores Libretro installed.
 
 ## Consoles
 
 | Console | Folder in `~/Games` | Files | Core |
 | --- | --- | --- | --- |
-| NES / Famicom | `nes` | `.nes .fds .unf` | Nestopia (comes with Games), FCEUmm |
-| Game Boy | `gb` | `.gb` | Gambatte (comes with Games), mGBA |
+| NES / Famicom | `nes` | `.nes .fds .unf` | Nestopia (comes with Libretro), FCEUmm |
+| Game Boy | `gb` | `.gb` | Gambatte (comes with Libretro), mGBA |
 | Game Boy Color | `gbc` | `.gbc` | Gambatte, mGBA |
-| Game Boy Advance | `gba` | `.gba` | mGBA (comes with Games) |
+| Game Boy Advance | `gba` | `.gba` | mGBA (comes with Libretro) |
 | Super Nintendo | `snes` | `.sfc .smc` | Snes9x 2010 |
 | Mega Drive / Genesis | `md` | `.md .gen .smd .bin` | Genesis Plus GX, PicoDrive |
 | Master System / Game Gear | `sms` | `.sms .gg .sg` | Genesis Plus GX, PicoDrive |
@@ -49,20 +49,20 @@ Games opens with a folder for each console in `~/Games`. Copy your files in with
 
 ## Cores
 
-NES, Game Boy, Game Boy Color and Game Boy Advance work as soon as Games is installed: their
+NES, Game Boy, Game Boy Color and Game Boy Advance work as soon as Libretro is installed: their
 cores come from Debian with it. For the other consoles, press **C** for the core list and
 **Enter** on one to download it from libretro's nightly builds (buildbot.libretro.com, about
 1 to 3 MB each). Downloaded cores go in `~/Games/cores`; **Del** removes one. Removing the Games
 app keeps your games, saves and downloaded cores.
 
-**How safe is a downloaded core?** A core is a program that Games runs with your user's rights,
+**How safe is a downloaded core?** A core is a program that Libretro runs with your user's rights,
 so the download is kept narrow: https only, from the fixed address `buildbot.libretro.com`,
 following no redirects; unpacked aside and moved into place only when it is a whole Linux
 library; into `~/Games/cores`, which only you can write to. What it can't do is check the core
 against a known fingerprint: libretro's nightly builds change every day and come with no
 published checksums or signatures. So you trust libretro's build server (and its https
 certificate) for each core you download, as RetroArch users do. Cores from Debian (the ones
-Games installs, or `sudo apt install libretro-...`) are checked by apt's signatures and are
+Libretro installs, or `sudo apt install libretro-...`) are checked by apt's signatures and are
 the safer choice where one exists.
 
 You can also copy any `<name>_libretro.so` built for arm64 into `~/Games/cores` yourself. Games
@@ -80,7 +80,7 @@ before the system one.
 | Enter / Space | Start / Select |
 | Esc | Menu: Resume, Save state, Load state, Reset, Quit game |
 
-On a full-size keyboard, X and Z are A and B too. Hold several keys at once: Games reads the
+On a full-size keyboard, X and Z are A and B too. Hold several keys at once: Libretro reads the
 keyboard directly, so you can run and jump.
 
 **Gamepads** work as well: USB, or Bluetooth. Pair a Bluetooth one once: put it in pairing mode,
@@ -106,7 +106,7 @@ and 4 need a core with a multitap. In the menu, a gamepad's d-pad moves, A choos
 **On a TV.** With a TV or monitor on the HDMI port, the game plays on it at 720p, scaled up by a
 whole number where that fills most of the screen; the menu shows on both screens. Sound stays on
 the Cardputer. Plugging in or out mid-game moves the picture over. **Play on TV: Off** in the menu
-keeps it on the built-in screen. Leave Dock mode first: it has the HDMI port while it runs. Games
+keeps it on the built-in screen. Leave Dock mode first: it has the HDMI port while it runs. Libretro
 1.2.0 and later; details in the app's own guide (CardPuter-Apps.4ME-U, `apps/games/README.md`).
 
 **Saves.** Games with a battery save (most RPGs) are saved as they are played and when you quit,
@@ -128,3 +128,19 @@ power profile in **Battery** for the demanding ones.
 The picture is scaled to fit the screen, keeping its shape. A Game Boy picture (160 x 144) is
 shown at its real size, because that looks sharpest. Bigger pictures are scaled down, so very
 small text in some games can be hard to read.
+
+## Credits
+
+This app is named after what it runs. It is ZeroOS's own frontend for
+[libretro](https://www.libretro.com), and it is not made or endorsed by the libretro team.
+
+| Part | Where it comes from | Licence |
+| --- | --- | --- |
+| The libretro API | The constants and structs in `libretro_api.h` are libretro's own, from [`libretro.h`](https://github.com/libretro/libretro-common/blob/master/include/libretro.h) ([API docs](https://docs.libretro.com/development/cores/developing-cores/)) | MIT |
+| [Nestopia UE](https://github.com/libretro/nestopia) | NES core that comes with the app, Debian's `libretro-nestopia` | GPL-2.0 |
+| [Gambatte](https://github.com/libretro/gambatte-libretro) | Game Boy / Color core that comes with the app, Debian's `libretro-gambatte` | GPL-2.0 |
+| [mGBA](https://mgba.io) | Game Boy Advance core that comes with the app, Debian's `libretro-mgba` | MPL-2.0 |
+| Downloaded cores | [libretro's nightly builds](https://buildbot.libretro.com/nightly/linux/) | Each core's own licence, listed in its [core info file](https://github.com/libretro/libretro-core-info) |
+
+The app loads each core from its own file at run time (`dlopen`) and contains none of their code. RetroArch is
+libretro's own frontend; see [Why not RetroArch itself?](#why-not-retroarch-itself).

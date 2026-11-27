@@ -157,7 +157,7 @@ const std::map<std::string, const char*> kAppWords = {
     {"camera", "photo picture qr scan"},
     {"ir", "remote tv infrared"},
     {"remote", "tailscale vnc pc control"},
-    {"games", "play emulator retro"},
+    {"games", "games play emulator retro nes gameboy"},
     {"ai", "chat claude assistant"},
     {"gps", "location map track"},
     {"mesh", "meshtastic lora radio message"},

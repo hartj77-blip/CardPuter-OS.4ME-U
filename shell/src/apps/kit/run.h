@@ -1,5 +1,5 @@
 // Running command-line programs (git, make, curl...) from a ZeroShell app
-// without freezing the UI. Shared by the app packs (Dev Tools, Games).
+// without freezing the UI. Shared by the app packs (Dev Tools, Libretro).
 //
 // A Job runs one program on a background thread and streams its output to the
 // UI thread, which drains it each tick. In the simulator and the headless CI

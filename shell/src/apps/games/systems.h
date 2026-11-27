@@ -1,4 +1,4 @@
-// Which consoles the Games app knows, where their games go, and which libretro
+// Which consoles the Libretro app knows, where their games go, and which libretro
 // cores play them (docs/GAMES.md).
 #pragma once
 

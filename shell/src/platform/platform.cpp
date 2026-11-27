@@ -159,7 +159,7 @@ bool open_keyboard_at(const std::string& path, bool forced) {
     ioctl(fd, EVIOCGBIT(EV_KEY, sizeof keys), keys);
     bool builtin = is_builtin_name(name);
     // A keyboard has letters. Media remotes, power buttons and gamepads don't
-    // (the HAL reads media keys; Games reads gamepads).
+    // (the HAL reads media keys; Libretro reads gamepads).
     if (!forced && !builtin && !(has_key(keys, KEY_A) && has_key(keys, KEY_Z))) {
         close(fd);
         return false;

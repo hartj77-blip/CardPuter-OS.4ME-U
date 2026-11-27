@@ -302,7 +302,7 @@ separate package with its own version, so updating one app never touches another
 | Car | Music in the car, as a USB stick or over Bluetooth ([guide](docs/CAR.md)) |
 | AI | Chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/AI.md)) |
 | Dev Tools | Code editor and runner, REPL, Git, and a serial monitor for Arduino and ESP32 boards ([guide](docs/DEV.md)) |
-| Games | NES, Game Boy and GBA, plus SNES, Mega Drive, PlayStation and more with libretro cores. Bring your own games ([guide](docs/GAMES.md)) |
+| Libretro | NES, Game Boy and GBA, plus SNES, Mega Drive, PlayStation and more with libretro cores. Bring your own games ([guide](docs/GAMES.md)) |
 | GPS | Position, saved places and track recording. Needs a GPS module ([guide](docs/EXPANSION.md)) |
 | Mesh | Meshtastic text messages over LoRa. Needs the Cap LoRa-1262 ([guide](docs/EXPANSION.md)) |
 | Grove | Drive a NeoPixel LED strip from the Grove port |
@@ -1189,7 +1189,7 @@ cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/he
 | `ZS_APP_DIR` | Load app modules from this folder instead of `/usr/lib/zeroos/apps` |
 | `ZS_M5_APP_DIR`, `ZS_M5_STATE_DIR` | Read M5 launcher entries and `zeroos-apps`' notes on them from these folders instead of `/usr/share/APPLaunch/applications` and `/var/lib/zeroos/apps/m5` |
 | `NOTIFY_SOCKET`, `WATCHDOG_USEC` | Set by systemd, not by hand: where and how often to send the watchdog ping |
-| `ZS_GAMES_DIR`, `ZS_GAMES_CORES` | Where the Games app looks for games and libretro cores |
+| `ZS_GAMES_DIR`, `ZS_GAMES_CORES` | Where the Libretro app looks for games and libretro cores |
 | `ZEROOS_IR_DB` | Use another IR code database |
 
 ### Build for the device
@@ -1316,7 +1316,7 @@ Apps:
 [Dock](docs/DOCK.md) ·
 [GPS and LoRa](docs/EXPANSION.md) ·
 [Dev Tools](docs/DEV.md) ·
-[Games](docs/GAMES.md) ·
+[Libretro](docs/GAMES.md) ·
 [AI](docs/AI.md)
 
 Development:
@@ -1342,6 +1342,7 @@ ZeroOS's own code is MIT licensed, see [LICENSE](LICENSE). It builds on:
 | [LVGL](https://lvgl.io) 9.2.2 | Drawing the UI | MIT |
 | [quirc](https://github.com/dlbeer/quirc) 1.2 | Reading QR codes | ISC |
 | [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) | IR remote codes | CC0 |
+| The [libretro](https://www.libretro.com) API | The Libretro app's emulator cores ([credits](docs/GAMES.md#credits)) | MIT (the cores keep their own) |
 | M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen) | Building the image | BSD-3 |
 | M5Stack's [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays) | Screen, keyboard and other hardware | See that repository |
 | The [Ubuntu font](https://design.ubuntu.com/font) | The UI's typeface | Ubuntu Font Licence |
