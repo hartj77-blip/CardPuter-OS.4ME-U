@@ -885,6 +885,30 @@ public:
         return true;
     }
 
+    // Date and time: the zone is applied to this process, so the simulator's
+    // clock moves with it; the time itself is the computer's and stays.
+    TimeSettings time_settings() override { return {true, time_auto_, time_auto_, time_zone_}; }
+    bool set_time_automatic(bool on) override {
+        time_auto_ = on;
+        return true;
+    }
+    bool set_time(int year, int month, int day, int hour, int minute, int second) override {
+        if (time_auto_) return false;   // as the device refuses it
+        std::printf("[mock] set time %04d-%02d-%02d %02d:%02d:%02d\n", year, month, day, hour, minute, second);
+        return true;
+    }
+    std::vector<std::string> time_zones() override {
+        return {"Africa/Cairo",   "America/Chicago", "America/Los_Angeles", "America/New_York", "America/Sao_Paulo",
+                "Asia/Dubai",     "Asia/Kolkata",    "Asia/Shanghai",       "Asia/Tokyo",       "Australia/Sydney",
+                "Europe/Berlin",  "Europe/London",   "Pacific/Auckland",    "UTC"};
+    }
+    bool set_time_zone(const std::string& zone) override {
+        time_zone_ = zone;
+        setenv("TZ", zone.c_str(), 1);
+        tzset();
+        return true;
+    }
+
     void power_off() override { std::printf("[mock] power off\n"); }
     void reboot() override { std::printf("[mock] reboot\n"); }
     void beep(int, int) override {}
@@ -892,6 +916,8 @@ public:
 private:
     std::vector<ProcInfo> procs_;
     bool procs_init_ = false;
+    bool time_auto_ = true;
+    std::string time_zone_ = "UTC";
     VideoState vid_;
     PlayClock vid_clock_;
     long vid_offset_ms_ = 0, vid_last_ = -1;

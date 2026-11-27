@@ -55,6 +55,11 @@ STEPS+=",open:settings,shot:12-settings.ppm"
 STEPS+=",key:3,wait:200,right,shot:96-settings-display.ppm"
 STEPS+=",esc,key:9,wait:200,key:2,wait:200,shot:97-settings-confirm.ppm,esc"
 STEPS+=",open:settings,type:running,enter,wait:2300,shot:17b-settings-running.ppm"
+# Date & time: the section, typing a time (after agreeing to set it by hand),
+# and the time zones, filtered.
+STEPS+=",open:settings,key:6,wait:300,shot:17c-settings-time.ppm"
+STEPS+=",down,enter,wait:300,enter,wait:300,type:143,shot:17d-settings-time-set.ppm"
+STEPS+=",type:0,enter,wait:300,key:4,wait:300,type:lon,wait:200,shot:17e-settings-time-zone.ppm"
 STEPS+=",home,wait:31000,shot:18-screen-dimmed.ppm"
 STEPS+=",right,open:dock,wait:600,shot:19-dock-no-monitor.ppm"
 STEPS+=",hdmi:1,wait:1500,shot:20-dock-monitor.ppm"

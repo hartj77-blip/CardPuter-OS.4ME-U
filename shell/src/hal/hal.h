@@ -262,6 +262,14 @@ struct ProcMem {
     int rss_kb = 0;
 };
 
+// How the clock is kept (Settings > Date & time).
+struct TimeSettings {
+    bool can_automatic = false;   // the device can take the time from the internet (systemd-timesyncd)
+    bool automatic = false;       // ... and does, whenever it is online
+    bool synced = false;          // ... and has, since it started
+    std::string zone;             // "Europe/London"; "" if unknown
+};
+
 // A program running as the UI's user (Settings > Running programs).
 struct ProcInfo {
     int pid = 0;
@@ -518,6 +526,20 @@ public:
     // True while a connected phone's music plays here (its player says
     // "playing"). Waits on busctl and bluetoothctl, well under a second.
     virtual bool phone_playing() = 0;
+
+    // Date and time (Settings > Date & time). New functions go here, last:
+    // an app module built before them keeps working, because every function
+    // above stays where it was.
+    virtual TimeSettings time_settings() = 0;
+    // The time from the internet whenever the device is online, or not.
+    virtual bool set_time_automatic(bool on) = 0;
+    // The clock, as local time in the current zone. The hardware clock (RTC)
+    // is set with it, so the time holds while the power is off. False if it
+    // was refused: the system refuses while the time is automatic.
+    virtual bool set_time(int year, int month, int day, int hour, int minute, int second) = 0;
+    // Every time zone's name ("Europe/London"), A to Z.
+    virtual std::vector<std::string> time_zones() = 0;
+    virtual bool set_time_zone(const std::string& zone) = 0;
 };
 
 // MockHal for the simulator and tests; LinuxHal for the device.
