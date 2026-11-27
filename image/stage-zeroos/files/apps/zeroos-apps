@@ -544,12 +544,13 @@ note_brought() {
 # auto, none that anything outside them depends on or recommends, and only if
 # apt's own dry run would take nothing else.
 take_brought() {
-    [ -s "$STATE_DIR/brought" ] || return 0
-    local inst cands others keep rm outside round
+    [ -s "$STATE_DIR/brought" ] || { log "left behind: nothing recorded"; return 0; }
+    local inst cands others keep rm outside round err
     inst=$(installed_pkgs)
     comm -12 <(sort -u "$STATE_DIR/brought") <(echo "$inst") > "$STATE_DIR/brought.new" &&
         mv -f "$STATE_DIR/brought.new" "$STATE_DIR/brought"
     cands=$(comm -12 "$STATE_DIR/brought" <(apt-mark showauto 2>/dev/null | sort -u))
+    log "left behind: $(wc -l < "$STATE_DIR/brought") brought in still here, $(echo "$cands" | grep -c .) marked auto"
     [ -n "$cands" ] || return 0
     # What the rest of the system recommends stays, as autoremove would keep it.
     others=$(comm -23 <(echo "$inst") <(echo "$cands"))
@@ -558,14 +559,17 @@ take_brought() {
                --no-breaks --no-replaces --no-enhances $others 2>/dev/null |
            awk '$1 ~ /Recommends:$/ {print $2}' | sort -u)
     cands=$(comm -23 <(echo "$cands") <(echo "$keep"))
+    log "left behind: $(echo "$cands" | grep -c .) that nothing else recommends"
     for round in 1 2 3 4 5 6 7 8; do
         [ -n "$cands" ] || return 0
         # shellcheck disable=SC2086
-        rm=$(apt-get -s purge $cands 2>/dev/null) || { log "can't work out what apps left behind"; return 0; }
+        rm=$(apt-get -s purge $cands 2>/tmp/zeroos-apps-take.err) ||
+            { err=$(tail -3 /tmp/zeroos-apps-take.err); log "can't work out what apps left behind: $err"; return 0; }
         rm=$(echo "$rm" | awk '$1 == "Purg" || $1 == "Remv" {print $2}' | sort -u)
         outside=$(comm -23 <(echo "$rm") <(echo "$cands"))
         if [ -z "$outside" ]; then
             [ -n "$rm" ] || return 0
+            log "left behind: taking $(echo "$rm" | grep -c .) off"
             # shellcheck disable=SC2086
             apt-get purge -y $rm >&2 || log "could not remove what apps left behind"
             comm -12 "$STATE_DIR/brought" <(installed_pkgs) > "$STATE_DIR/brought.new" &&
@@ -577,7 +581,9 @@ take_brought() {
         keep=$(apt-cache depends --installed --recurse --no-recommends --no-suggests --no-conflicts \
                    --no-breaks --no-replaces --no-enhances $outside 2>/dev/null | grep -v '^[[:space:]<]' | sort -u)
         cands=$(comm -23 <(echo "$cands") <(sort -u <(echo "$keep") <(echo "$outside")))
+        log "left behind: $(echo "$outside" | grep -c .) others need some ($(echo "$outside" | head -3 | tr '\n' ' ')), $(echo "$cands" | grep -c .) left to try"
     done
+    log "left behind: gave up after $round rounds"
     return 0
 }
 
