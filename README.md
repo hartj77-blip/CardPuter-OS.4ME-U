@@ -1,6 +1,8 @@
 # ZeroOS for the Cardputer Zero
 
-IM CONSTANTLY WORKING ON THIS SO IF YOU HAVE A GOOD WORKING VERSION DONT UPDATE -IT COULD BE BETTER THO... README WILL BE UPDATED AS OFTEN AS I CAN. IF YOU USE IT - REPORT ISSUES - MAKE SUGGESTIONS - ILL SEE WHAT I CAN DO.
+> ZeroOS is under active development and changes often. If you have a version that works well
+> for you, there's no need to update straight away; newer versions are usually better, though.
+> If you use it, please [report problems and make suggestions](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/issues).
 
 ZeroOS is an operating system for the [M5Stack Cardputer Zero](https://shop.m5stack.com/pages/m5-cardputerzero),
 the pocket computer with a keyboard, a 320x170 screen and a Raspberry Pi CM0 inside.
@@ -14,6 +16,15 @@ It only runs on the Cardputer Zero. The original Cardputer and the Cardputer ADV
 inside, not a Raspberry Pi, and can't run it.
 
 This is a community project. It isn't made, endorsed or supported by M5Stack.
+
+**Is it safe to install?** All of ZeroOS is open source, here and in the
+[apps repository](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U). Every release is built
+from `main` by GitHub Actions, in public, and is only published if the full test run passes on that
+commit. Each download comes with a `.sha256` file so you can check it ([how](#install)). Updates are
+checked against their SHA-256 before they're installed, and if the new version doesn't start, the
+previous one goes back on. [Security and what you are trusting](#security-and-what-you-are-trusting)
+says exactly what you rely on, and [the credits](#license-and-third-party-code) list every project it
+builds on.
 
 - [Download](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest)
 - [Try it in your browser](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) (the real home screen and apps, simulated hardware)
@@ -1290,11 +1301,18 @@ Pull requests are welcome. All CI checks have to pass before anything merges int
 
 Releases are made with the
 [Release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/actions/workflows/release.yml)
-workflow: Run workflow, enter a version like `0.4.0`. It runs all of CI on the newest commit on
+workflow: Run workflow, enter a version like `0.9.1`. It runs all of CI on the newest commit on
 `main`, and only if that passes, tags it, builds the update package and apps, and publishes a
 GitHub release. The SD card image is built and attached about 10 minutes later. A version with a
 `-` (`0.5.0-rc1`) is published as a pre-release, which devices don't see until it's marked as
 the latest. See [Publishing an update](docs/UPDATE.md#publishing-an-update).
+
+Version numbers stay on 0.9.x until the owner decides it is time for 1.0: every release, whether
+it brings features or only fixes, is a patch bump (0.9.1, 0.9.2, ...), never 0.10.
+
+When a release is cut, this README is updated with it: the "newest release is x.y.z" line in
+[Status](#status-what-is-tested-and-what-isnt), and anything else that names the newest release.
+Lines that say what changed "up to" or "after" an older version are history and stay as they are.
 
 ## Guides
 
@@ -1335,21 +1353,84 @@ Hardware docs from M5Stack: [Cardputer Zero](https://docs.m5stack.com/en/Cardput
 
 ## License and third-party code
 
-ZeroOS's own code is MIT licensed, see [LICENSE](LICENSE). It builds on:
+ZeroOS's own code is MIT licensed, see [LICENSE](LICENSE). It stands on a lot of other people's
+work, listed here with thanks. Each project keeps its own licence. If something of yours is used
+and isn't listed, please [open an issue](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/issues)
+and it will be added.
+
+### Code built into ZeroOS
 
 | Project | Used for | License |
 | --- | --- | --- |
-| [LVGL](https://lvgl.io) 9.2.2 | Drawing the UI | MIT |
+| [LVGL](https://github.com/lvgl/lvgl) 9.2.2 | Drawing the UI | MIT |
 | [quirc](https://github.com/dlbeer/quirc) 1.2 | Reading QR codes | ISC |
-| [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) | IR remote codes | CC0 |
-| The [libretro](https://www.libretro.com) API | The Libretro app's emulator cores ([credits](docs/GAMES.md#credits)) | MIT (the cores keep their own) |
-| M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen) | Building the image | BSD-3 |
-| M5Stack's [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays) | Screen, keyboard and other hardware | See that repository |
-| The [Ubuntu font](https://design.ubuntu.com/font) | The UI's typeface | Ubuntu Font Licence |
+| [libretro](https://github.com/libretro/libretro-common) API ([docs](https://docs.libretro.com)) | How the Libretro app talks to emulator cores ([credits](docs/GAMES.md#credits); `shell/src/apps/games/libretro_api.h` re-declares the part of `libretro.h` it needs) | MIT |
+| [Meshtastic protobufs](https://github.com/meshtastic/protobufs) | Field numbers for Mesh's text chat with `meshtasticd` (hand-written, no protobuf library) | GPL-3.0 |
+
+### Fonts, icons and pictures
+
+| Work | Used for | License |
+| --- | --- | --- |
+| The [Ubuntu font](https://design.ubuntu.com/font) | The UI's typeface | [Ubuntu Font Licence](shell/src/fonts/UBUNTU-FONT-LICENCE.txt) |
+| [Font Awesome 5 Free](https://github.com/FortAwesome/Font-Awesome), as bundled with LVGL | The symbols and app icons in the UI fonts | Icons CC BY 4.0, font SIL OFL 1.1 |
+| [lv_font_conv](https://github.com/lvgl/lv_font_conv) | Converting those fonts for LVGL (`shell/tools/fonts.sh`) | MIT |
+| Terminus ([Debian's console-setup](https://salsa.debian.org/installer-team/console-setup)) | The text console on the built-in screen | SIL OFL 1.1 |
+| [Noto CJK](https://github.com/notofonts/noto-cjk) | Chinese, Japanese and Korean text | SIL OFL 1.1 |
+| The [Tango](https://en.wikipedia.org/wiki/Tango_Desktop_Project) palette | Terminal colours | Public domain |
 | Ansel Adams, [*Firehole River, Yellowstone National Park*](https://commons.wikimedia.org/wiki/File:Ansel_Adams_-_National_Archives_79-AA-T14.jpg) (ca. 1941-1942), U.S. National Archives 79-AA-T14 | The photograph on home | Public domain |
 | Ansel Adams, [*The Tetons and the Snake River*](https://commons.wikimedia.org/wiki/File:Adams_The_Tetons_and_the_Snake_River.jpg) (1942), U.S. National Archives 79-AA-G01 | The photograph on the lock screen | Public domain |
-| Raspberry Pi OS and Debian | Everything underneath | Various free licences |
+| [Space Grotesk](https://fonts.google.com/specimen/Space+Grotesk), [Inter](https://fonts.google.com/specimen/Inter), [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) (Google Fonts) | The browser emulator's page | SIL OFL 1.1 |
 
-The hardware notes draw on early owner reports, credited in [Hardware notes](docs/HARDWARE.md).
+### Data
+
+| Data | Used for | License |
+| --- | --- | --- |
+| [Flipper-IRDB](https://github.com/Lucaslhm/Flipper-IRDB) (commit `d126fb1`) | IR remote codes ([which files](docs/IR.md)) | CC0-1.0 |
+| [M5Stack's app store](https://github.com/CardputerZero/packages) | The list of M5 apps the Apps app can install. The apps are their authors', not ours | Each app's own |
+
+### Hardware support, image and packages
+
+| Project | Used for | License |
+| --- | --- | --- |
+| M5Stack's [pi-gen fork](https://github.com/CardputerZero/pi-gen) (commit `e3b4e32`) | Building the image | BSD-3 |
+| M5Stack's [board drivers](https://github.com/m5stack/m5stack-linux-dtoverlays) (commit `4f7aeee`) | Screen, keyboard and other hardware. The browser emulator's keyboard copies how M5's keyboard driver behaves | See that repository |
+| M5Stack's [CameraApp](https://github.com/CardputerZero/CameraApp) 1.0.4 | The Camera app's viewfinder and photos | MIT |
+| [Meshtastic](https://meshtastic.org) (`meshtasticd`, from [Meshtastic's openSUSE repository](https://download.opensuse.org/repositories/network:/Meshtastic:/beta/)) and its [board config](https://github.com/meshtastic/firmware) for this device | Mesh, LoRa messages over the Cap LoRa-1262 | GPL-3.0 |
+| [Tailscale](https://github.com/tailscale/tailscale) (from [Tailscale's repository](https://pkgs.tailscale.com/stable/)) and [Headscale](https://github.com/juanfont/headscale) as a login server | Remote | BSD-3 |
+| [Syncthing](https://github.com/syncthing/syncthing) | Sync | MPL-2.0 |
+| [libretro](https://www.libretro.com) emulator cores: Nestopia, Gambatte and mGBA from Debian; more downloaded when you ask, from [libretro's buildbot](https://buildbot.libretro.com) | The Libretro app | Each core's own. A few, such as Snes9x and Genesis Plus GX, are for non-commercial use only |
+| Raspberry Pi OS and Debian: NetworkManager, BlueZ, PipeWire, labwc, Chromium, mpv, tmux, curl and the rest of `image/stage-zeroos/00-packages` | Everything underneath | Each package's own |
+
+### Building and testing
+
+| Tool | Used for | License |
+| --- | --- | --- |
+| [Emscripten](https://github.com/emscripten-core/emscripten) 3.1.74, set up by [setup-emsdk](https://github.com/mymindstorm/setup-emsdk) | The browser emulator | MIT / UIUC |
+| [SDL2](https://github.com/libsdl-org/SDL) | The PC simulator's window | Zlib |
+| [Pillow](https://github.com/python-pillow/Pillow) | Wallpapers and screenshots | MIT-CMU |
+
+### Services ZeroOS can talk to
+
+These are other people's services. ZeroOS only talks to them when you use the app that needs them,
+with your own account or key.
+
+| Service | Used by |
+| --- | --- |
+| [Jellyfin](https://jellyfin.org) (your own server, through its [API](https://api.jellyfin.org)) | Jellyfin |
+| [Tailscale](https://tailscale.com) or your own [Headscale](https://headscale.net) | Remote, Router |
+| [Anthropic](https://www.anthropic.com), [OpenAI](https://openai.com), [Google Gemini](https://ai.google.dev), [OpenRouter](https://openrouter.ai), [Groq](https://groq.com), [Mistral](https://mistral.ai), [Ollama](https://ollama.com) and other OpenAI-compatible servers | The AI chat app |
+| [DuckDuckGo Lite](https://lite.duckduckgo.com/lite/) | Browser's search |
+| [GitHub](https://github.com) releases | OS and app updates |
+
+### People and references
+
+- Owners who took their Cardputer Zero apart first, credited in [Hardware notes](docs/HARDWARE.md):
+  [Markus Birth](https://blog.mbirth.uk/2026/11/11/taming-the-cardputerzero.html) and
+  [n0xa's M5CZ-Kali-Graft](https://github.com/n0xa/M5CZ-Kali-Graft).
+- [trail-mate](https://github.com/vicliu624/trail-mate)'s CardputerZero port, for the EXT port's pin map
+  and the LoRa radio's antenna switch ([expansion guide](docs/EXPANSION.md)).
+- [M5Stack's documentation](https://docs.m5stack.com/en/CardputerZero) for the device, its pin map and
+  the drawing the browser emulator's device is based on.
+- The [GPX 1.1](https://www.topografix.com/GPX/1/1/) format, for GPS tracks.
 
 Cardputer and M5Stack are trademarks of M5Stack and are only used here to name the hardware.
