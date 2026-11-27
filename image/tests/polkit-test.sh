@@ -41,6 +41,8 @@ expect("raw add-source unit", decide("pi", M, "zeroos-apps@add\\x2dsource:a-b.se
 expect("another user can't install", decide("mallory", M, unit("install:media")), "default");
 expect("pi may start the Terminal", decide("pi", M, "zeroos-terminal.service"), "yes");
 expect("pi may let phones reach Mesh", decide("pi", M, "zeroos-mesh-lan.service"), "yes");
+expect("pi may start and stop bluetoothd", decide("pi", M, "bluetooth.service"), "yes");
+expect("another user can't stop bluetoothd", decide("mallory", M, "bluetooth.service"), "default");
 expect("pi may not start sshd", decide("pi", M, "ssh.service"), "default");
 expect("pi may reboot", decide("pi", "org.freedesktop.login1.reboot", ""), "yes");
 // Settings > Date & time.

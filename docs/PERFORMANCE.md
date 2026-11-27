@@ -25,10 +25,79 @@ as they come in.
 | `boot_delay=0`, `disable_splash=1`, `display_auto_detect=0` | `stage-zeroos/01-run.sh` (config.txt) | The firmware's default 1 s wait, its rainbow screen, and a probe for a DSI panel this board doesn't have. |
 | CPU at full speed during boot (`cpufreq.default_governor=performance`) | `stage-zeroos/01-run.sh` (cmdline.txt) | Boot work isn't slowed by the governor ramping up. ZeroShell switches to the power profile's governor as soon as it starts. |
 | Dock, Chromium and the desktop start only when asked | `files/dock/zeroos-dock.service` (not enabled) | They cost nothing until you open Dock or plug in a monitor. |
+| PipeWire and bluetoothd run only while needed | `shell/src/hal/demand.h`, `linux_hal.cpp`, `stage-zeroos/package.sh` | Sound and Bluetooth used to sit in memory from boot whether used or not. See "Started when needed". |
+| The status bar starts no programs while nothing changes | `shell/src/hal/demand.h`, `linux_hal.cpp` | It used to run about seven (`nmcli`, `bluetoothctl`, `rfkill`...) every 2 s, and `wpctl` every second, screen on or off. See "Started when needed". |
 | LCD driver chain loaded first | `payload.sh` (`modules-load.d/zeroos-lcd.conf`) | The home screen waits for the LCD; left to udev it came up about 15 s in. |
 | UI doesn't wait for the expansion 5 V | `files/zeroos-power-perms` | Used to hold the home screen up to 10 s more; udev and ZeroShell already pick it up whenever it appears. |
 | Removed: armhf, nexmon, plymouth, desktop packages | `stage-zeroos/01-run.sh` | Smaller image, fewer things starting. |
 | ZeroShell instead of a desktop | `shell/` | One small C++ process (LVGL) with a fixed 512 KB UI memory pool. |
+
+## Started when needed
+
+The rule: a service runs while something uses it, and not otherwise. GPS,
+Tailscale, Sync, Mesh, the camera and Dock already worked that way. After
+0.9.0 so do sound and Bluetooth, and the status bar no longer starts programs
+to find out that nothing changed. None of this has been measured on a unit
+yet **(measure)**; the checks to run are in
+[HARDWARE-TEST.md](HARDWARE-TEST.md#started-when-needed).
+
+**The status bar.** Wi-Fi, address, Bluetooth and tethering used to be read by
+running `nmcli` (twice), `hostname`, `rfkill`, `bluetoothctl` and `ip` every
+2 seconds for as long as ZeroShell ran, screen on or off, so the CPU never
+rested. Now ZeroShell's status thread takes a fingerprint of `/sys` every 2
+seconds (radio switches, each network interface's state and carrier count,
+addresses, Bluetooth links: a few dozen small reads, no program started) and
+only runs `nmcli` and `bluetoothctl` when the fingerprint changed, when the UI
+itself just changed something, and every 30 seconds while the screen is on
+(for the signal strength, which changes with no event). Addresses and radio
+switches are read directly. The Wi-Fi look no longer starts a scan
+(`--rescan no`); the Wi-Fi page scans when it is opened. The mute icon asks
+PipeWire at most every 5 seconds instead of every second, and not at all
+while PipeWire is stopped.
+
+**Bluetooth.** `bluetoothd` runs while the Bluetooth radio is on, and for a
+minute after ZeroShell last asked it something (the list of paired devices
+with Bluetooth off). Switched off, in Settings or by "Turn off when unused",
+the daemon is stopped a minute later; switched on, it is started first.
+
+**Sound.** PipeWire (with WirePlumber and pipewire-pulse) no longer starts
+with the UI user's session. Its sockets do, so the first program that plays,
+records or sets the volume starts it. ZeroShell stops it when, for a minute:
+no sound device is open, ZeroShell itself is not playing or recording, the
+volume was not changed, Dock mode is off and Bluetooth is off (a headset or a
+phone needs PipeWire there before it connects, so with Bluetooth on it
+stays). Before stopping it ZeroShell asks PipeWire whether any program still
+has a stream open, even a silent one (a paused game), and leaves it running
+if so.
+
+While PipeWire is stopped, the volume and mute shown are the ones it had
+(kept in `settings.conf` as `audio.volume` and `audio.muted`). A volume or
+mute key starts PipeWire and sets the new value once the speaker is there,
+without holding up the UI.
+
+What it costs: the first sound after a quiet spell starts PipeWire first, so
+it comes later than it used to **(measure: expect one to three seconds)**.
+
+If something starts a stopped service again by itself (a script that asks
+BlueZ a question every few seconds), ZeroShell waits twice as long before
+stopping it the next time, up to half an hour, so nothing is stopped and
+started in a loop. The Car app up to 1.3.0 did exactly that
+(`zeroos-car-wifi`, every 5 seconds), so with it installed bluetoothd in
+effect stays; Car 1.3.1 only asks while Bluetooth is on.
+
+To turn either off, add a line to `~/.config/zeroos/settings.conf` and
+restart ZeroShell (`sudo systemctl restart zeroshell`):
+
+```
+audio.on_demand=0
+bluetooth.on_demand=0
+```
+
+With `audio.on_demand=0` PipeWire is never stopped. To have it start at boot
+again as well: `sudo systemctl --global enable pipewire.service pipewire-pulse.service`.
+
+To see what is running: `journalctl -u zeroshell -b | grep stopping`, and
+`zeroos-measure --quick` for the list of running services.
 
 ## Battery
 
@@ -148,7 +217,6 @@ simulator these are marked "simulated".
 ## Things to try once we have numbers
 
 - `RamMultiplier` 1.5 vs 2, and lz4 vs zstd (speed vs ratio).
-- Turn off Bluetooth and the audio stack until first used (saves ~15-20 MB).
 - CPU governor `schedutil` vs `ondemand`, and a lower max clock on battery.
 - Without the initramfs (`auto_initramfs=0`): the firmware wouldn't read and
   unpack it, likely 1-2 s. Needs a check that the root filesystem and the LCD
@@ -158,7 +226,8 @@ simulator these are marked "simulated".
 - The camera's drivers load on every boot (`dtoverlay=imx219`), also on
   devices without the Camera app. Loading them only when it is installed
   would save a few MB and some boot time.
-- PipeWire starts at boot for volume and Bluetooth audio (about 25-35 MB).
-  Starting it on first use would free that until sound is needed.
+- NetworkManager and wpa_supplicant while Wi-Fi is off, and the status
+  thread's `nmcli` every 30 s: reading the signal from `/proc/net/wireless`
+  would make that zero.
 - Splitting ZeroShell's hardware work into the `zerod` service (Phase 1), so
   apps outside the shell can share it.

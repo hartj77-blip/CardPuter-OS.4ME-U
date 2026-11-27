@@ -450,8 +450,9 @@ on a PC, in a browser and in CI, with simulated hardware behind them.
 3. systemd loads the LCD's driver chain first, in order (`/etc/modules-load.d/zeroos-lcd.conf`:
    I2C bus, M5's IO expander, backlight, SPI bus, M5's panel driver). Left to udev, the LCD came
    up about 15 seconds into the boot, behind every other device.
-4. `zeroshell.service` starts once the user session for uid 1000 is up (PipeWire runs there, and
-   volume and mute need it). Before ZeroShell itself, a small root script,
+4. `zeroshell.service` starts once the user session for uid 1000 is up (PipeWire's sockets are
+   there; PipeWire itself starts with the first sound, see
+   [Memory, CPU and battery](#memory-cpu-and-battery)). Before ZeroShell itself, a small root script,
    `/usr/lib/zeroos/power-perms`, lets the `video` group change the CPU governor and blank the
    panel. That's the only part of starting the UI that runs as root.
 5. ZeroShell starts as uid 1000, not root, on `tty1`. It puts the console into graphics mode with
@@ -703,8 +704,8 @@ ZeroOS:
 | Keyboard | TCA8418 | evdev, see above |
 | Motion sensor | BMI270 and BMM150 (not on the Lite) | iio, `/sys/bus/iio/devices/` |
 | Clock | RX8130CE | `/dev/rtc0`; set with `timedatectl` from Settings > Date & time |
-| Wi-Fi and Bluetooth | BCM43439 | `nmcli` (NetworkManager), `bluetoothctl`, `rfkill` |
-| Audio | ES8389 codec, 1 W speaker, mic | `wpctl` (PipeWire), falling back to `amixer`; sox `play` and `rec` |
+| Wi-Fi and Bluetooth | BCM43439 | `nmcli` (NetworkManager), `bluetoothctl`, `rfkill`; for the status bar, `/sys`, with the tools run only when it changed |
+| Audio | ES8389 codec, 1 W speaker, mic | `wpctl` (PipeWire); sox `play` and `rec` |
 | Infrared | GPIO transmitter and receiver | `ir-ctl` (rc-core), with codes encoded by `shell/src/ir/` |
 | Camera | IMX219 (not on the Lite) | libcamera, `rpicam-vid` for QR codes |
 | Expansion port | Grove (I2C, UART), 14-pin bus | i2c-dev, spidev, UART, gpsd, meshtasticd |
@@ -921,7 +922,7 @@ What that stage changes, with the reason for each written next to it in the scri
   M5's own image turns it off too, in a script ZeroOS doesn't use.
 - Masks the login prompt on `tty1`, which ZeroShell owns.
 - Loads M5's keymap system-wide, so the Sym layer works outside M5's launcher.
-- Lingers the UI user, so PipeWire runs without anyone logging in.
+- Lingers the UI user, so PipeWire can run without anyone logging in.
 - Adds the user to the hardware groups it needs (video, input, audio, i2c, gpio, spi, dialout,
   bluetooth and so on) and creates the `spi` group, without which `/dev/spidev*` is root-only.
 - Sets up the first-login password change (see [Security](#security-and-what-you-are-trusting)).
@@ -946,6 +947,8 @@ with each setting's file:
 | earlyoom at 4% RAM and 8% swap left (`files/earlyoom`) | Closes the biggest app before the system stalls. Never ZeroShell, SSH, systemd, networking, Tailscale or audio; browsers and media players first |
 | Logs on the card, capped at 24 MB (`files/journald.conf`) | Few card writes, but a failed boot can still be read |
 | Dock, Chromium and the HDMI desktop start only when asked | They cost nothing until used |
+| PipeWire runs while there is sound, bluetoothd while Bluetooth is on (`shell/src/hal/demand.h`) | Neither sits in memory unused. The first sound after a quiet spell comes a moment later |
+| The status bar reads `/sys` and starts `nmcli` and `bluetoothctl` only when something changed (`shell/src/hal/demand.h`) | It used to start about seven programs every 2 seconds, screen on or off |
 | Lists make widgets only for the lines on screen (`shell/src/ui/list_view.cpp`) | The 200-row Apps list costs about 36 UI objects instead of about 1,200, and opens as fast as a short one |
 | Word suggestions scan a 6 KB word list in read-only data on each key (`shell/src/ui/suggest.cpp`) | No index, no background work, nothing allocated for the built-in words. Learned words: 200 at most, about 6 KB, written to the card at most every 30 seconds |
 | New apps found with inotify in the main loop's `poll()` (`shell/src/ui/app_watch.cpp`) | No polling timer: nothing runs until a file in an app folder changes |

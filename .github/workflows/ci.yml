@@ -63,6 +63,12 @@ jobs:
       # machine with no Cardputer hardware and none of the apps' extras.
       - name: Open every app with the keyboard, with and without hardware
         run: python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so build/device-screens/apps
+      # The device's own hardware layer against a made-up /sys and /proc and
+      # stand-ins for systemctl, wpctl and nmcli: the status bar starts no
+      # programs while nothing changes, and bluetoothd and PipeWire are
+      # stopped when unused and started again when needed.
+      - name: Services run only while needed
+        run: python3 shell/tests/device/demand_test.py build/device-native/zeroshell build/fakedev.so
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: always()
         with:

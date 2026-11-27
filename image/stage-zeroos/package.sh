@@ -157,6 +157,26 @@ if [ -f "$CMDLINE" ] && ! grep -q 'simplefb_driver_init' "$CMDLINE"; then
     fi
     changed="$changed /boot/firmware/cmdline.txt"
 fi
+# PipeWire runs while there is sound, not from boot (docs/PERFORMANCE.md):
+# whatever plays, records or sets the volume starts it through its socket,
+# and ZeroShell stops it when nothing has used it for a while. So its
+# services come off the list of what the UI user's session starts, and their
+# sockets stay on it. Only with the socket there to start it again. Once:
+# someone who puts a service back on the list keeps it there.
+if [ ! -e "$ROOT/var/lib/zeroos/.audio-on-demand" ] && [ -e "$ROOT/usr/lib/systemd/user/pipewire.socket" ]; then
+    W=$ROOT/etc/systemd/user
+    for s in pipewire pipewire-pulse; do
+        [ -e "$ROOT/usr/lib/systemd/user/$s.socket" ] || continue
+        mkdir -p "$W/sockets.target.wants"
+        ln -sf "/usr/lib/systemd/user/$s.socket" "$W/sockets.target.wants/$s.socket"
+        if [ -L "$W/default.target.wants/$s.service" ]; then
+            rm -f "$W/default.target.wants/$s.service"
+            echo "zeroos: $s starts when something needs it, not at boot"
+        fi
+    done
+    mkdir -p "$ROOT/var/lib/zeroos"
+    touch "$ROOT/var/lib/zeroos/.audio-on-demand"
+fi
 if [ -n "$ROOT" ]; then echo "changed:$changed"; exit 0; fi
 if [ -d /run/systemd/system ]; then
     systemctl daemon-reload || true

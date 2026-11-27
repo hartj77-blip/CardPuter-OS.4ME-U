@@ -5,9 +5,9 @@
 //   IMU        /sys/bus/iio/devices/iio:deviceN/        (bmi270, bmm150)
 //   backlight  /sys/class/backlight/*/                  (pwm_bl_m5stack)
 //   key LEDs   /sys/class/leds/*                        (names matched by substring)
-//   Wi-Fi      nmcli (NetworkManager)
-//   Bluetooth  bluetoothctl / rfkill
-//   audio      wpctl (PipeWire), falls back to amixer
+//   Wi-Fi      nmcli (NetworkManager), run only when /sys says something changed
+//   Bluetooth  bluetoothctl / rfkill; bluetoothd runs only while it's on or used
+//   audio      wpctl (PipeWire, which runs only while there is sound; hal/demand.h)
 //   IR         ir-ctl (rc-core, gpio-ir-tx / gpio-ir-recv); codes encoded in ir/ir.cpp
 //   QR codes   rpicam-vid (preview frames on a pipe)
 //   tethering  /usr/bin/zeroos-tether (bluetoothctl + nmcli), run in the background
@@ -35,6 +35,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cerrno>
 #include <cmath>
@@ -53,6 +54,7 @@
 #include <thread>
 
 #include "hal/bt_player.h"
+#include "hal/demand.h"
 #include "hal/hal.h"
 #include "hal/lcd_fb.h"
 #include "hal/meshtastic.h"
@@ -299,9 +301,37 @@ public:
             if (mesh_wanted_) mesh_log_checks_ = 0;   // look for "no radio" as if it just started
         }
         find_ext5v();
+        demand_init();
 #ifndef __EMSCRIPTEN__
         net_thread_ = std::thread([this] { net_thread_main(); });
 #endif
+    }
+
+    // Services started when needed (hal/demand.h, docs/PERFORMANCE.md). Only
+    // on ZeroOS: the same program run on a PC must never stop that PC's sound
+    // or Bluetooth. Either can be turned off in settings.conf
+    // (bluetooth.on_demand=0, audio.on_demand=0): the service then stays as
+    // the system started it. ZS_SYSROOT, ZS_DEMAND and ZS_DEMAND_GRACE are for
+    // the tests (shell/tests/device/demand_test.py).
+    void demand_init() {
+        if (const char* r = std::getenv("ZS_SYSROOT")) sys_root_ = r;
+        const char* force = std::getenv("ZS_DEMAND");
+        bool zeroos = force ? std::atoi(force) != 0 : !os_release_version().empty();
+        demand_bt_ = zeroos && prefs::get_int("bluetooth.on_demand", 1) != 0;
+        demand_audio_ = zeroos && prefs::get_int("audio.on_demand", 1) != 0;
+        if (const char* g = std::getenv("ZS_DEMAND_GRACE")) demand_grace_s_ = std::max(1, std::atoi(g));
+        bt_keeper_ = demand::Keeper(demand_grace_s_);
+        audio_keeper_ = demand::Keeper(demand_grace_s_);
+        // What the volume was when PipeWire last ran: shown, and changed,
+        // without starting it. 60%: what a new image's speaker is set to.
+        vol_saved_ = std::clamp(prefs::get_int("audio.volume", 60), 0, 100);
+        mute_saved_ = prefs::get_int("audio.muted", 0) != 0;
+        vol_cache_ = vol_saved_;
+        mute_cache_ = mute_saved_;
+    }
+    static long steady_s() {
+        return long(std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count()) + 100000;   // never near 0
     }
 
     // Expansion 5 V: LED-class supplies (ext_5v_out on M5's image; the
@@ -332,27 +362,205 @@ public:
             if (net_new_) net_cache_ = net_shared_;
             net_new_ = false;
         }
+        // For the status thread: sound of ours that PipeWire must stay up for
+        // (music, also paused; a recording; the desktop on a monitor).
+        audio_hold_ = play_pid_ > 0 || rec_pid_ > 0 || dock_cache_;
+        audio_save();
+    }
+
+    // The volume as last seen goes to settings.conf, so it is known after a
+    // restart with PipeWire stopped. Once it has stood for 3 s: a held volume
+    // key is one write to the card, not twenty.
+    void audio_save() {
+        int v = vol_cache_;
+        bool m = mute_cache_;
+        if (v == vol_saved_ && m == mute_saved_) {
+            vol_changed_at_ = 0;
+            return;
+        }
+        time_t now = time(nullptr);
+        if (!vol_changed_at_ || v != vol_seen_ || m != mute_seen_) {
+            vol_changed_at_ = now;
+            vol_seen_ = v;
+            mute_seen_ = m;
+            return;
+        }
+        if (now - vol_changed_at_ < 3) return;
+        if (v != vol_saved_) prefs::set_int("audio.volume", v);
+        if (m != mute_saved_) prefs::set_int("audio.muted", m);
+        vol_saved_ = v;
+        mute_saved_ = m;
+        vol_changed_at_ = 0;
     }
 
     BatteryInfo battery() override { return bat_cache_; }
     ImuSample imu() override { return imu_cache_; }
     NetStatus net() override { return net_cache_; }
 
-    // read_net() runs nmcli, bluetoothctl and others (about 7 programs, up
-    // to a second or more together on this CPU). On the UI thread that froze
-    // the screen and the keyboard every 2 s, so it has its own thread;
-    // poll() picks up the result.
+    // The status thread. read_net() runs nmcli and bluetoothctl, up to a
+    // second together on this CPU: on the UI thread that froze the screen and
+    // the keyboard, so it has its own thread and poll() picks up the result.
+    //
+    // It used to run them every 2 s, screen on or off, which kept the CPU
+    // from ever resting. Now a fingerprint of /sys is taken every 2 s (a few
+    // dozen small reads, no program started), and read_net() runs when that
+    // changed, when the UI asks (it just changed something), twice more after
+    // either (a network takes a moment to settle), and every 30 s while the
+    // screen is on, for the signal strength, which changes with no event.
     void net_thread_main() {
+        using clock = std::chrono::steady_clock;
+        std::string last_fp;
+        clock::time_point last_read{};
+        int settle = 0;
+        bool asked = true;   // the first pass reads
         for (;;) {
-            NetStatus n = read_net();
+            // Services first: Bluetooth just switched on starts bluetoothd
+            // here, and the status read below already finds it.
+            bool acted = demand_step();
+            std::vector<demand::Addr> addrs = demand::addresses();
+            std::string fp = demand::net_fingerprint(sys_root_, addrs);
+            bool changed = asked || acted || fp != last_fp;
+            if (changed) settle = 2;
+            bool refresh = screen_on_ && clock::now() - last_read >= std::chrono::seconds(30);
+            if (changed || settle > 0 || refresh) {
+                if (!changed && settle > 0) --settle;
+                last_fp = fp;
+                NetStatus n = read_net(sys_root_, addrs);
+                last_read = clock::now();
+                std::lock_guard<std::mutex> lock(net_mu_);
+                net_shared_ = n;
+                net_new_ = true;
+            }
             std::unique_lock<std::mutex> lock(net_mu_);
-            net_shared_ = n;
-            net_new_ = true;
             net_cv_.wait_for(lock, std::chrono::seconds(2), [this] { return net_stop_ || net_now_; });
             if (net_stop_) return;
+            asked = net_now_;
             net_now_ = false;
         }
     }
+    // A pause on the status thread that ends at once when ZeroShell stops.
+    // False if it is stopping.
+    bool net_thread_pause(int ms) {
+        std::unique_lock<std::mutex> lock(net_mu_);
+        net_cv_.wait_for(lock, std::chrono::milliseconds(ms), [this] { return net_stop_; });
+        return !net_stop_;
+    }
+
+    // --- Services that run only while needed (hal/demand.h). On the status
+    // thread, every 2 s. True if bluetoothd was started or stopped (the
+    // status then shows other connections).
+    bool demand_step() {
+        if (!demand_bt_ && !demand_audio_) return false;
+        using Act = demand::Keeper::Act;
+        long now = steady_s();
+        bool acted = false;
+        bool bt_on = demand::rfkill_on(sys_root_, "bluetooth");
+        std::vector<bool> up = demand::procs_running(sys_root_, {"bluetoothd", "pipewire"});   // one look at /proc
+        if (demand_bt_) {
+            // bluetoothd: while the radio is on, and for a while after
+            // ZeroShell last asked it something (the paired list, with
+            // Bluetooth off).
+            bool running = up[0];
+            bool needed = bt_on || now - bt_used_ < demand_grace_s_;
+            Act a = bt_keeper_.step(now, running, needed, bt_on);
+            if (a == Act::Start) run("systemctl start bluetooth.service");
+            if (a == Act::Stop) {
+                std::fprintf(stderr, "zeroshell: Bluetooth is off: stopping bluetoothd\n");
+                run("systemctl stop bluetooth.service");
+            }
+            acted = a != Act::None;
+        }
+        if (demand_audio_) {
+            // PipeWire: while a sound device is open, while ZeroShell plays or
+            // records, for a while after the volume was set, and while
+            // Bluetooth is on (a headset or a phone finds no audio on this
+            // side unless WirePlumber is there before it connects). Anything
+            // that makes a sound starts it through its socket; only for
+            // Bluetooth and for a volume change do we start it ourselves.
+            bool running = up[1];
+            bool apply = audio_apply_;
+            bool needed = bt_on || apply || audio_hold_ || now - audio_used_ < demand_grace_s_ ||
+                          demand::pcm_open(sys_root_);
+            Act a = audio_keeper_.step(now, running, needed, bt_on || apply);
+            if (a == Act::Start && !apply) run("systemctl --user start pipewire.service");
+            if (apply) {
+                audio_apply();
+                running = true;
+            } else if (running && !audio_learned_) {
+                audio_learn(audio_seq_);   // running since before ZeroShell started: at what volume?
+            }
+            audio_learned_ = true;
+            if (a == Act::Stop) {
+                if (audio_stop()) running = false;
+                else audio_keeper_.keep();
+            }
+            audio_up_ = running;
+        }
+        return acted;
+    }
+    // The volume as PipeWire has it, into the cache, unless it was set here
+    // since `seq` (that one is newer). False if it was.
+    bool audio_learn(unsigned seq) {
+        int pct = 0;
+        bool muted = false;
+        bool known = demand::parse_wpctl_volume(run("wpctl get-volume @DEFAULT_AUDIO_SINK@"), pct, muted);
+        std::lock_guard<std::mutex> lock(audio_mu_);
+        if (audio_seq_ != seq) return false;
+        if (known) {
+            vol_cache_ = pct;
+            mute_cache_ = muted;
+        }
+        return true;
+    }
+    // The volume or mute was set while PipeWire was stopped: start it, wait
+    // until WirePlumber has found the speaker (a few seconds on this CPU),
+    // and set what was asked. The newest values are used, so presses made
+    // while this waited aren't lost.
+    void audio_apply() {
+        run("systemctl --user start pipewire.service");
+        int pct = 0;
+        bool muted = false;
+        for (int i = 0; i < 40; ++i) {
+            if (demand::parse_wpctl_volume(run("wpctl get-volume @DEFAULT_AUDIO_SINK@"), pct, muted)) break;
+            if (!net_thread_pause(300)) return;
+        }
+        for (int i = 0; i < 5 && audio_apply_.exchange(false); ++i) {
+            run("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + std::to_string(int(vol_cache_)) + "%");
+            run(std::string("wpctl set-mute @DEFAULT_AUDIO_SINK@ ") + (mute_cache_ ? "1" : "0"));
+        }
+        audio_used_ = steady_s();
+    }
+    // Nothing has used PipeWire for a while. Three last looks, then stop it;
+    // its sockets stay, and the next program that makes a sound starts it
+    // again. False if it is left running.
+    bool audio_stop() {
+        unsigned seq = audio_seq_;
+        // Its sockets must be systemd's, or nothing could start it again.
+        if (audio_no_socket_) return false;
+        if (run("systemctl --user is-active pipewire.socket").rfind("active", 0) != 0) {
+            std::fprintf(stderr, "zeroshell: pipewire.socket isn't active: PipeWire is left running\n");
+            audio_no_socket_ = true;
+            return false;
+        }
+        // A program with a stream open, even a silent one (a paused game),
+        // would lose its sound for good.
+        std::string nodes = run("pw-cli ls Node");
+        if (nodes.empty() || demand::has_streams(nodes)) return false;
+        // The volume it had, for volume() while it is stopped. Set just now:
+        // in use after all.
+        if (!audio_learn(seq)) return false;
+        std::fprintf(stderr, "zeroshell: no sound for a while: stopping PipeWire\n");
+        run("systemctl --user stop pipewire-pulse.service wireplumber.service pipewire.service");
+        audio_up_ = false;
+        // The volume was set while it stopped: that went to a PipeWire that
+        // was on its way out. Set it again (next pass, which starts it).
+        if (audio_seq_ != seq) {
+            audio_apply_ = true;
+            net_refresh_soon();
+        }
+        return true;
+    }
+
     void net_refresh_soon() {
         std::lock_guard<std::mutex> lock(net_mu_);
         net_now_ = true;
@@ -497,7 +705,10 @@ public:
         run(std::string("nmcli radio wifi ") + (on ? "on" : "off"));
         net_refresh_soon();
     }
-    void set_bt_enabled(bool on) override { run(std::string("rfkill ") + (on ? "unblock" : "block") + " bluetooth"); }
+    void set_bt_enabled(bool on) override {
+        run(std::string("rfkill ") + (on ? "unblock" : "block") + " bluetooth");
+        net_refresh_soon();   // bluetoothd and PipeWire start with it (demand_step)
+    }
 
     int brightness() override {
         long max = read_long(backlight_ + "max_brightness", 0);
@@ -515,6 +726,10 @@ public:
         // bl_power: 0 = on, 4 = off. fb blank 4 = powerdown (panel sleep).
         if (!backlight_.empty()) write_str(backlight_ + "bl_power", on ? "0" : "4");
         write_str("/sys/class/graphics/" + lcd_fb_sysfs_name() + "/blank", on ? "0" : "4");
+        // Screen off: the status thread stops refreshing what nobody sees
+        // (the signal strength). Back on: fresh at once.
+        screen_on_ = on;
+        if (on) net_refresh_soon();
     }
     void set_cpu_mode(CpuMode mode) override {
         // All four cores share one policy. zeroshell.service makes these
@@ -538,17 +753,60 @@ public:
         write_str(p + "scaling_governor", gov);
     }
 
+    // Volume and mute. With PipeWire stopped (it only runs while there is
+    // sound: demand_step), asking would start it, so the answer is what it
+    // was when it last ran, and a change is set by the status thread, which
+    // starts PipeWire and waits for the speaker without holding up the UI.
+    bool audio_live() { return !demand_audio_ || (audio_up_ && !audio_apply_); }
+    // Asks PipeWire, at most every 5 s: the status bar wants to know about
+    // mute every second, and each answer is a program started on the UI
+    // thread. What is set here is known at once; only a change made
+    // elsewhere (a headset's own buttons, the desktop) shows up to 5 s late.
+    void audio_read() {
+        auto now = std::chrono::steady_clock::now();
+        if (now - vol_read_at_ < std::chrono::seconds(5)) return;
+        vol_read_at_ = now;
+        int pct = 0;
+        bool muted = false;
+        if (!demand::parse_wpctl_volume(run("wpctl get-volume @DEFAULT_AUDIO_SINK@"), pct, muted)) return;
+        std::lock_guard<std::mutex> lock(audio_mu_);
+        vol_cache_ = pct;   // "Volume: 0.60 [MUTED]"
+        mute_cache_ = muted;
+        vol_known_ = true;
+    }
+    // vol_cache_ or mute_cache_ was just given a new value: make it so.
+    void audio_set(int pct, int mute, const std::string& now_cmd) {
+        {
+            std::lock_guard<std::mutex> lock(audio_mu_);
+            if (pct >= 0) vol_cache_ = pct;
+            if (mute >= 0) mute_cache_ = mute != 0;
+            ++audio_seq_;
+        }
+        audio_used_ = steady_s();
+        if (audio_live()) {
+            run(now_cmd);
+            vol_read_at_ = std::chrono::steady_clock::now();   // it is what was just set
+            return;
+        }
+        audio_apply_ = true;
+        net_refresh_soon();
+    }
     int volume() override {
-        std::string o = run("wpctl get-volume @DEFAULT_AUDIO_SINK@");  // "Volume: 0.60 [MUTED]"
-        auto p = o.find("Volume:");
-        if (p != std::string::npos) return int(std::strtod(o.c_str() + p + 7, nullptr) * 100 + 0.5);
-        return 50;
+        if (audio_live()) audio_read();
+        // No PipeWire and no wpctl (a PC): 50, as before.
+        return demand_audio_ || vol_known_ ? int(vol_cache_) : 50;
     }
     void set_volume(int pct) override {
-        run("wpctl set-volume @DEFAULT_AUDIO_SINK@ " + std::to_string(pct) + "%");
+        pct = std::clamp(pct, 0, 100);
+        audio_set(pct, -1, "wpctl set-volume @DEFAULT_AUDIO_SINK@ " + std::to_string(pct) + "%");
     }
-    bool muted() override { return run("wpctl get-volume @DEFAULT_AUDIO_SINK@").find("MUTED") != std::string::npos; }
-    void set_muted(bool m) override { run(std::string("wpctl set-mute @DEFAULT_AUDIO_SINK@ ") + (m ? "1" : "0")); }
+    bool muted() override {
+        if (audio_live()) audio_read();
+        return (demand_audio_ || vol_known_) && mute_cache_;
+    }
+    void set_muted(bool m) override {
+        audio_set(-1, m, std::string("wpctl set-mute @DEFAULT_AUDIO_SINK@ ") + (m ? "1" : "0"));
+    }
 
     // --- media
     std::vector<Track> music_library() override {
@@ -1260,6 +1518,7 @@ private:
 
     void tether_run(const std::string& busy, std::vector<std::string> args, const std::string& mac) {
         tether_end();
+        bt_daemon();   // zeroos-tether asks BlueZ whether Bluetooth is on
         args.insert(args.begin(), "zeroos-tether");
         tether_pid_ = spawn_pipe(args, tether_fd_);
         tether_status_job_ = args[1] == "status";
@@ -1636,8 +1895,25 @@ private:
             d->connected = d->connected || connected;
         }
     }
+    // bluetoothd only runs while Bluetooth is on, or for a while after it
+    // was last asked something (demand_step). bluetoothctl waits for ever for
+    // a bluetoothd that isn't there, so every use starts it first. False if
+    // it can't be started: then there is nothing to ask.
+    bool bt_daemon() {
+        bt_used_ = steady_s();
+        if (!demand_bt_ || demand::proc_running(sys_root_, "bluetoothd")) return true;
+        run("systemctl start bluetooth.service");   // back once BlueZ is on the bus
+        return demand::proc_running(sys_root_, "bluetoothd");
+    }
+    // Radio on, and bluetoothd there to make it so.
+    void bt_power_on() {
+        run("rfkill unblock bluetooth");
+        if (bt_daemon()) run("bluetoothctl power on");
+        net_refresh_soon();
+    }
     std::vector<BtDevice> bt_devices() override {
         std::vector<BtDevice> v;
+        if (!bt_daemon()) return v;
         parse_bt(run("bluetoothctl devices Connected"), v, true, true);
         parse_bt(run("bluetoothctl devices Paired"), v, true, false);
         parse_bt(run("bluetoothctl devices"), v, false, false);
@@ -1649,6 +1925,7 @@ private:
     // Addresses of the paired devices.
     std::vector<std::string> bt_paired() {
         std::vector<std::string> v;
+        if (!bt_daemon()) return v;
         std::istringstream in(run("bluetoothctl devices Paired"));
         for (std::string l; std::getline(in, l);)
             if (l.rfind("Device ", 0) == 0 && l.size() >= 24 && is_address(l.substr(7, 17))) v.push_back(l.substr(7, 17));
@@ -1702,23 +1979,25 @@ private:
         if (pair_pid_ <= 0) return;
         kill_child(pair_pid_, SIGTERM);
         pair_pid_ = -1;
-        run("bluetoothctl pairable off");
+        if (bt_daemon()) run("bluetoothctl pairable off");
 #endif
     }
     void bt_scan() override {
-        run("rfkill unblock bluetooth");
-        run("bluetoothctl power on");
+        bt_power_on();
         // No pairing window here: nothing pairs until a device is picked
         // (bt_connect), and then only that one.
-        run("bluetoothctl --timeout 8 scan on");
+        if (bt_daemon()) run("bluetoothctl --timeout 8 scan on");
     }
     bool bt_connect(const std::string& address, std::string& error) override {
         if (!is_address(address)) {
             error = "Not a Bluetooth address";
             return false;
         }
-        run("rfkill unblock bluetooth");
-        run("bluetoothctl power on");
+        bt_power_on();
+        if (!bt_daemon()) {
+            error = "Bluetooth didn't start";
+            return false;
+        }
         std::string info = run("bluetoothctl info " + address);
         std::vector<std::string> before;
         bool windowed = false;
@@ -1758,10 +2037,10 @@ private:
         return true;
     }
     void bt_disconnect(const std::string& address) override {
-        if (is_address(address)) run("bluetoothctl --timeout 8 disconnect " + address);
+        if (is_address(address) && bt_daemon()) run("bluetoothctl --timeout 8 disconnect " + address);
     }
     void bt_forget(const std::string& address) override {
-        if (is_address(address)) run("bluetoothctl remove " + address);
+        if (is_address(address) && bt_daemon()) run("bluetoothctl remove " + address);
     }
     void bt_set_visible(int seconds) override {
 #ifndef __EMSCRIPTEN__
@@ -1771,12 +2050,14 @@ private:
             // paired in it was trusted (or dropped) as it happened.
             kill_child(visible_pid_, SIGTERM);
             visible_pid_ = -1;
-            run("bluetoothctl discoverable off");
-            run("bluetoothctl pairable off");
+            if (bt_daemon()) {
+                run("bluetoothctl discoverable off");
+                run("bluetoothctl pairable off");
+            }
         }
         if (seconds <= 0) return;
-        run("rfkill unblock bluetooth");
-        run("bluetoothctl power on");
+        bt_power_on();
+        if (!bt_daemon()) return;
         // Visible and taking pairings for `seconds`, or until the first
         // device (the car) has paired: one device per "Be found".
         visible_pid_ = spawn({"sh", "-c", pairing_window_cmd(seconds, bt_paired(), "", true)});
@@ -1861,6 +2142,10 @@ private:
 #ifndef __EMSCRIPTEN__
     // The first connected phone's player and what it says it's doing, or "".
     std::string phone_player(btplayer::Info& info) {
+        // Bluetooth off: no phone. (Asking BlueZ over D-Bus would start
+        // bluetoothd just to hear that.)
+        if (!demand::rfkill_on(sys_root_, "bluetooth")) return "";
+        bt_used_ = steady_s();
         for (const std::string& path : btplayer::player_paths(run("busctl --list tree org.bluez"))) {
             std::string addr = btplayer::address_of(path);
             if (!is_address(addr) || !btplayer::is_music_source(run("bluetoothctl info " + addr))) continue;
@@ -2153,11 +2438,15 @@ private:
         return s;
     }
 
-    // Runs on the network thread: must not touch any member.
-    static NetStatus read_net() {
+    // Runs on the status thread: must not touch any member. Three programs
+    // at most (it was seven): addresses and radio switches are read directly.
+    static NetStatus read_net(const std::string& root, const std::vector<demand::Addr>& addrs) {
         NetStatus n;
         n.wifi_enabled = run("nmcli radio wifi").find("enabled") != std::string::npos;
-        std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi"));
+        // --rescan no: the list as NetworkManager has it. Without it every
+        // look older than 30 s started a scan, which costs power and briefly
+        // stalls the connection; the Wi-Fi page scans when it is opened.
+        std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi list --rescan no"));
         std::string line;
         while (std::getline(in, line)) {
             std::vector<std::string> f = nmcli_fields(line);   // unescapes "\:" in the SSID
@@ -2167,10 +2456,10 @@ private:
                 n.wifi_signal = std::atoi(f[2].c_str());
             }
         }
-        std::string ip = run("hostname -I");
-        n.ip = ip.substr(0, ip.find(' '));
-        n.bt_enabled = run("rfkill list bluetooth").find("Soft blocked: no") != std::string::npos;
-        if (n.bt_enabled) {
+        n.ip = demand::primary_address(addrs);
+        n.bt_enabled = demand::rfkill_on(root, "bluetooth");
+        // Not while bluetoothd is still starting: bluetoothctl would wait for it.
+        if (n.bt_enabled && demand::proc_running(root, "bluetoothd")) {
             std::istringstream bt(run("bluetoothctl devices Connected 2>/dev/null"));
             for (std::string l; std::getline(bt, l);)
                 if (l.rfind("Device ", 0) == 0) ++n.bt_connected;
@@ -2196,11 +2485,7 @@ private:
             if (read_str(base + "/carrier") == "1") n.tether = "usb";
         }
         n.usb_gadget = usb_phone != "usb0" && read_str("/sys/class/net/usb0/operstate") == "up";
-        if (access("/sys/class/net/tailscale0", F_OK) == 0) {
-            std::string a = run("ip -4 -o addr show dev tailscale0 2>/dev/null");   // "... inet 100.x.y.z/32 ..."
-            auto i = a.find("inet ");
-            if (i != std::string::npos) n.tailscale_ip = a.substr(i + 5, a.find('/', i) - i - 5);
-        }
+        n.tailscale_ip = demand::ipv4_of(addrs, "tailscale0");
         return n;
     }
 
@@ -2255,6 +2540,29 @@ private:
     std::mutex net_mu_;
     std::condition_variable net_cv_;
     std::thread net_thread_;
+    std::atomic<bool> screen_on_{true};
+    // Services started when needed (demand_step). Set once, in the constructor:
+    std::string sys_root_;   // "" on the device; the tests' made-up /sys and /proc
+    bool demand_bt_ = false, demand_audio_ = false;
+    long demand_grace_s_ = 60;   // unneeded this long: stopped
+    // The status thread's own:
+    demand::Keeper bt_keeper_{60}, audio_keeper_{60};
+    bool audio_learned_ = false, audio_no_socket_ = false;
+    // Shared between the UI and the status thread:
+    std::atomic<long> bt_used_{0}, audio_used_{0};   // steady_s() of the last use
+    std::atomic<bool> audio_hold_{false};            // ZeroShell is playing or recording
+    std::atomic<bool> audio_up_{false};              // PipeWire is running
+    std::atomic<bool> audio_apply_{false};           // the cached volume is to be set
+    std::mutex audio_mu_;                            // writes of the three below
+    std::atomic<int> vol_cache_{60};
+    std::atomic<bool> mute_cache_{false};
+    std::atomic<unsigned> audio_seq_{0};             // counts set_volume and set_muted
+    // The UI thread's own:
+    bool vol_known_ = false;                         // wpctl answered at least once
+    int vol_saved_ = 60, vol_seen_ = 60;             // in settings.conf; last looked at
+    bool mute_saved_ = false, mute_seen_ = false;
+    time_t vol_changed_at_ = 0;
+    std::chrono::steady_clock::time_point vol_read_at_{};   // PipeWire was last asked then
 };
 
 }  // namespace
