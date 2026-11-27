@@ -10,7 +10,7 @@ installable apps follow.
 ## The welcome tour
 
 The first time ZeroOS starts it shows a short tour of these keys instead of the home screen. Type
-`tour` on the home screen to see it again.
+`tour` on the home screen to see it again. [Every page of it](ux/welcome-tour.png).
 
 | Key | What it does in the tour |
 | --- | --- |
