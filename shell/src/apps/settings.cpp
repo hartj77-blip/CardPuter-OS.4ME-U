@@ -1,12 +1,14 @@
 // Settings: one numbered list of sections (docs/UX.md), each a list of its
-// own. Values change with Left/Right (or Enter); sections that are apps of
-// their own (Wi-Fi, Update, About) open them, and Esc there comes back here.
+// own. Values change with Left/Right (or Enter). Wi-Fi and Bluetooth are
+// sections with a file of their own (apps/settings_sections.h); the sections
+// that are apps (Update, About) open them, and Esc there comes back here.
 #include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
 
 #include "apps/common.h"
+#include "apps/settings_sections.h"
 #include "ui/list_view.h"
 #include "ui/power.h"
 #include "ui/remote.h"
@@ -17,7 +19,7 @@ namespace zs {
 namespace {
 using namespace theme;
 
-enum class Page { Root, Bluetooth, Display, Sound, Battery, Remote, Running, Power };
+enum class Page { Root, Wifi, Bluetooth, Display, Sound, Battery, Remote, Running, Power };
 
 // A value row's choices: what it shows and what it stores.
 struct Choice {
@@ -33,9 +35,9 @@ public:
         root_ = root;
         // Opened at a section (home search: "Brightness" opens Display).
         static const std::pair<const char*, Page> kSections[] = {
-            {"bluetooth", Page::Bluetooth}, {"display", Page::Display}, {"sound", Page::Sound},
-            {"battery", Page::Battery},     {"remote", Page::Remote},   {"running", Page::Running},
-            {"power", Page::Power}};
+            {"wifi", Page::Wifi},       {"bluetooth", Page::Bluetooth}, {"display", Page::Display},
+            {"sound", Page::Sound},     {"battery", Page::Battery},     {"remote", Page::Remote},
+            {"running", Page::Running}, {"power", Page::Power}};
         std::string arg = shell_app_arg();
         for (auto& [name, page] : kSections)
             if (arg == name) {
@@ -46,13 +48,15 @@ public:
         show(Page::Root);
     }
 
-    bool on_key(uint32_t key) override { return list_.key(key); }
+    bool on_key(uint32_t key) override { return section_ ? section_->on_key(key) : list_.key(key); }
 
     void tick() override {
+        if (section_) section_->tick();
         if (page_ == Page::Running && ++ticks_ % 20 == 0) refresh_running();   // every ~2 s
     }
 
     bool on_back() override {
+        if (section_ && section_->on_back()) return true;   // Wi-Fi: from the password to the networks
         if (page_ == Page::Root || direct_) return false;   // opened at a section: Esc leaves
         Page from = page_;
         show(Page::Root);
@@ -65,21 +69,30 @@ private:
         page_ = p;
         has_values_ = false;
         free_ = nullptr;
+        section_.reset();   // while its widgets still exist, as the shell closes an app
+        list_.reset();
         lv_obj_clean(root_);
         lv_group_remove_all_objs(group);
-        static const char* const kNames[] = {"", "Bluetooth", "Display", "Sound", "Battery & power",
+        if (p == Page::Wifi || p == Page::Bluetooth) {
+            // The section draws the screen and sets its own actions.
+            const char* back = direct_ ? "Back" : "Settings";
+            section_ = p == Page::Wifi ? make_wifi_section(back) : make_bluetooth_section(back);
+            section_->group = group;
+            section_->build(root_);
+            return;
+        }
+        static const char* const kNames[] = {"", "", "", "Display", "Sound", "Battery & power",
                                              "Remote & sync", "Running programs", "Restart or shut down"};
         if (p == Page::Root) {
             list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 4);
         } else {
-            lv_obj_t* h = label(root_, (std::string("Settings  " LV_SYMBOL_RIGHT "  ") + kNames[int(p)]).c_str(),
-                                &zs_font_12, kMuted);
-            lv_obj_set_pos(h, 8, 2);
+            settings_heading(root_, kNames[int(p)]);
             list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);
         }
         switch (p) {
             case Page::Root: root_page(); break;
-            case Page::Bluetooth: bluetooth_page(); break;
+            case Page::Wifi:
+            case Page::Bluetooth: break;   // sections, above
             case Page::Display: display_page(); break;
             case Page::Sound: sound_page(); break;
             case Page::Battery: battery_page(); break;
@@ -106,10 +119,10 @@ private:
 
     // Back on the root page: focus the section we came from.
     void focus_section(Page from) {
-        // Rows on the root page, as root_page() adds them; 0 is Wi-Fi.
-        static const std::pair<Page, int> kRows[] = {{Page::Bluetooth, 1}, {Page::Display, 2}, {Page::Sound, 3},
-                                                     {Page::Battery, 4},   {Page::Remote, 5},  {Page::Power, 9},
-                                                     {Page::Running, 10}};
+        // Rows on the root page, as root_page() adds them.
+        static const std::pair<Page, int> kRows[] = {{Page::Wifi, 0},    {Page::Bluetooth, 1}, {Page::Display, 2},
+                                                     {Page::Sound, 3},   {Page::Battery, 4},   {Page::Remote, 5},
+                                                     {Page::Power, 9},   {Page::Running, 10}};
         int row = 0;
         for (auto& [page, r] : kRows)
             if (page == from) row = r;
@@ -126,7 +139,7 @@ private:
         static const char* const kProfiles[] = {"Saver", "Balanced", "Performance"};
         std::string version = h.update().current;
 
-        list_.add(LV_SYMBOL_WIFI, "Wi-Fi", wifi, [] { shell_open_app("wifi"); });
+        list_.add(LV_SYMBOL_WIFI, "Wi-Fi", wifi, [this] { open(Page::Wifi); });
         list_.add(LV_SYMBOL_BLUETOOTH, "Bluetooth", n.bt_enabled ? "On" : "Off", [this] { open(Page::Bluetooth); });
         list_.add(LV_SYMBOL_EYE_OPEN, "Display", fmt("%d%%, dim %s", p.user_brightness(), secs(p.dim_after_s()).c_str()),
                   [this] { open(Page::Display); });
@@ -147,15 +160,6 @@ private:
     }
 
     // ---- Sections -------------------------------------------------------
-
-    void bluetooth_page() {
-        NetStatus n = hal().net();
-        toggle(LV_SYMBOL_BLUETOOTH, "Bluetooth", n.bt_enabled, [](bool on) { hal().set_bt_enabled(on); });
-        choice(LV_SYMBOL_CLOSE, "Turn off when unused",
-               {{"5 min", 5}, {"10 min", 10}, {"30 min", 30}, {"Never", 0}}, power().bt_auto_off_min(),
-               [](int v) { power().set_bt_auto_off_min(v); });
-        list_.add(LV_SYMBOL_LIST, "Devices", "", [] { shell_open_app("bluetooth"); });
-    }
 
     void display_page() {
         auto& p = power();
@@ -327,15 +331,30 @@ private:
 
     lv_obj_t* root_ = nullptr;
     Page page_ = Page::Root;
-    bool has_values_ = false;
+    bool has_values_ = false;   // the page has value rows (the bar says Left/Right change them)
     std::vector<ProcInfo> procs_;   // Running programs, in list order
     lv_obj_t* free_ = nullptr;      // its "N MB free" label
     int ticks_ = 0;
-    bool direct_ = false;       // opened straight at a section (from search)   // the page has value rows (the bar says Left/Right change them)
+    bool direct_ = false;            // opened straight at a section (from search)
+    std::unique_ptr<App> section_;   // Wi-Fi or Bluetooth, while it has the screen
     ListView list_;
 };
 }  // namespace
 
 std::unique_ptr<App> make_settings_app() { return std::make_unique<SettingsApp>(); }
+
+void settings_heading(lv_obj_t* root, const char* section, const std::string& state, uint32_t color) {
+    using namespace theme;
+    lv_obj_t* h = label(root, (std::string("Settings  " LV_SYMBOL_RIGHT "  ") + section).c_str(), &zs_font_12, kMuted);
+    lv_obj_set_pos(h, 8, 2);
+    if (state.empty()) return;
+    // What is left of the line, so a long network name ends in dots.
+    lv_obj_update_layout(h);
+    lv_obj_t* s = label(root, state.c_str(), &zs_font_12, color);
+    lv_obj_set_size(s, kScreenW - 26 - lv_obj_get_width(h), 14);
+    lv_label_set_long_mode(s, LV_LABEL_LONG_DOT);
+    lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_RIGHT, 0);
+    lv_obj_align(s, LV_ALIGN_TOP_RIGHT, -8, 2);
+}
 
 }  // namespace zs

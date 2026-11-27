@@ -4,7 +4,7 @@ ZeroOS is five layers. Each one only talks to the layer below it, so apps never 
 
 | Layer | What it is | Where |
 | --- | --- | --- |
-| 5. Apps | C++/LVGL apps: four built in (Apps, Settings, Update, Wi-Fi), the rest installable modules from the Apps app ([APPS.md](APPS.md)) | `shell/src/apps/`, `image/apps/` |
+| 5. Apps | C++/LVGL apps: three built in (Apps, Settings, Update; Wi-Fi and Bluetooth are sections of Settings), the rest installable modules from the Apps app ([APPS.md](APPS.md)) | `shell/src/apps/`, `image/apps/` |
 | 4. ZeroShell | Status bar, launcher, app switching, toasts, key routing | `shell/src/ui/` |
 | 3. Hardware layer | One interface (`zs::Hal`) for battery, IMU, radios, audio, IR, LEDs, power | `shell/src/hal/` |
 | 2. Linux services | NetworkManager, BlueZ, PipeWire, libcamera, systemd | Debian packages |

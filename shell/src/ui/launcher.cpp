@@ -150,8 +150,6 @@ const std::map<std::string, const char*> kAppWords = {
     {"notes", "text write memo editor"},
     {"settings", "preferences options config setup"},
     {"apps", "store install download add remove"},
-    {"wifi", "wireless internet network"},
-    {"bluetooth", "bt pair headphones speaker"},
     {"update", "upgrade version software"},
     {"sysmon", "system memory cpu task processes about"},
     {"battery", "power charge"},
@@ -184,9 +182,9 @@ struct SettingEntry {
     const char* icon;
 };
 const SettingEntry kSettings[] = {
-    {"Wi-Fi networks", "wireless internet join", "wifi", "", LV_SYMBOL_WIFI},
-    {"Bluetooth", "bt", "settings", "bluetooth", LV_SYMBOL_BLUETOOTH},
-    {"Bluetooth devices", "bt pair keyboard gamepad speaker headphones", "bluetooth", "", LV_SYMBOL_BLUETOOTH},
+    {"Wi-Fi", "wireless internet network networks join", "settings", "wifi", LV_SYMBOL_WIFI},
+    {"Bluetooth", "bt pair devices keyboard gamepad speaker headphones", "settings", "bluetooth",
+     LV_SYMBOL_BLUETOOTH},
     {"Display", "screen brightness dim", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Brightness", "screen display", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Dim screen after", "display sleep timeout", "settings", "display", LV_SYMBOL_EYE_CLOSE},
@@ -218,7 +216,7 @@ std::vector<Result> search(const std::string& q) {
         auto w = kAppWords.find(a.id);
         std::string kw = a.id + " " + (w == kAppWords.end() ? "" : w->second);
         int sc = search_score(a.name, kw, q);
-        // "dev" finds Code ahead of "Bluetooth devices": an app's own word
+        // "dev" finds Code ahead of "About this device": an app's own word
         // beats the same letters inside a setting's name.
         if (sc && sc < 70 && search_keyword_starts(kw, q)) sc = 70;
         if (sc) {

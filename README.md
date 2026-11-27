@@ -7,7 +7,7 @@ the pocket computer with a keyboard, a 320x170 screen and a Raspberry Pi CM0 ins
 
 Under the hood it's Debian Linux (Raspberry Pi OS trixie, arm64). On top is a home screen built
 for that tiny screen and keyboard: no mouse, no touch, everything from the keys. It comes with the
-basics (Wi-Fi, Settings, Update, Apps, plus Terminal, Files and Dock) and you install the rest
+basics (Settings, Update, Apps, plus Terminal, Files and Dock) and you install the rest
 from the device when you want them.
 
 It only runs on the Cardputer Zero. The original Cardputer and the Cardputer ADV have an ESP32
@@ -24,7 +24,7 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
 
 | Repository | What's in it |
 | --- | --- |
-| This one | The OS: the home screen (ZeroShell), the four built-in apps, the hardware layer, the SD card image, OS updates |
+| This one | The OS: the home screen (ZeroShell), the three built-in apps, the hardware layer, the SD card image, OS updates |
 | [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U) | Every other ZeroOS app, the packages the Apps app downloads, and the index that lists them |
 | [emu-cardputer-os.4me-u](https://github.com/hartj77-blip/emu-cardputer-os.4me-u) | The browser emulator: the real home screen and apps compiled to WebAssembly, [running here](https://hartj77-blip.github.io/emu-cardputer-os.4me-u/) |
 | [M5Stack's app store](https://github.com/CardputerZero/packages) | Not ours: about 180 community apps made for M5's own launcher, which ZeroOS can install too. [Which ones work on ZeroOS](docs/M5-APPS.md) |
@@ -114,7 +114,8 @@ the device afterwards.
 
 ### Getting online
 
-- On the device: open Wi-Fi, pick your network, type the password and press Enter.
+- On the device: open Settings, then Wi-Fi (or type `wifi` on the home screen), pick your network,
+  type the password and press Enter.
 - Before the first boot: in Raspberry Pi Imager, fill in your Wi-Fi name and password in its
   settings before writing the card. ZeroOS picks them up on first boot.
 - Through your phone: use the [Tether](docs/TETHER.md) app (Wi-Fi hotspot, USB or Bluetooth).
@@ -260,15 +261,15 @@ Run `zeroos-measure` in a terminal for a memory, CPU and battery report. The det
 
 ### Built in
 
-These four are part of ZeroOS itself and can't be removed, so a device can always get online,
-update and install apps. Bluetooth is also built in, but lives inside Settings.
+These three are part of ZeroOS itself and can't be removed, so a device can always get online,
+update and install apps. Wi-Fi and Bluetooth are not apps: they are the first two sections of
+Settings, and typing `wifi` or `bluetooth` on the home screen opens Settings there.
 
 | App | What it does |
 | --- | --- |
 | Apps | Browse, install, update and remove apps ([guide](docs/APPS.md)) |
-| Settings | Wi-Fi, Bluetooth, brightness, volume, power saving, running programs, restart, shut down |
+| Settings | Wi-Fi (find and join networks), Bluetooth (pair and connect devices), brightness, volume, power saving, running programs, restart, shut down |
 | Update | Install a newer ZeroOS over the network ([guide](docs/UPDATE.md)) |
-| Wi-Fi | Find and join networks |
 
 ### Installable
 
@@ -351,9 +352,10 @@ the new builds back; if Wi-Fi was down at that moment, they stay off. Run
 `sudo zeroos-apps upgrade` from the Terminal or SSH, which puts them back. From 0.6.0, **Update all** in Apps counts them too and does the same.
 
 The Wi-Fi list says "No networks found" and nothing connects. Wi-Fi may be off: with **Wi-Fi off
-with screen** on (Settings), a restart while the screen was off used to leave it off. Press
-**Tab > W** in the Wi-Fi list (from 0.6.0 the list says when Wi-Fi is off, and
-it comes back on by itself after a restart). Over SSH, `nmcli radio wifi on` does the same.
+with screen** on (Settings), a restart while the screen was off used to leave it off. Open
+**Settings > Wi-Fi** and switch its first row, **Wi-Fi**, to On (up to 0.8.4: **Tab > W** in the
+Wi-Fi app). From 0.6.0 it comes back on by itself after a restart. Over SSH,
+`nmcli radio wifi on` does the same.
 
 The screen stays black. ZeroShell logs why it couldn't start. Over SSH:
 
@@ -579,7 +581,7 @@ boxes; they match as you type already), and the Terminal (a real console, outsid
 
 ### How long lists stay fast
 
-The list screens (Apps, All apps, search results, Settings, Wi-Fi, Bluetooth, and the tool lists
+The list screens (Apps, All apps, search results, Settings with its Wi-Fi and Bluetooth sections, and the tool lists
 in Net Tools and RF Tools) all use one class, `ListView` (`shell/src/ui/list_view.h` and
 `list_view.cpp`). With M5Stack's store added, the Apps list has around 200 rows, and it keeps
 growing.

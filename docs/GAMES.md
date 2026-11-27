@@ -84,13 +84,13 @@ On a full-size keyboard, X and Z are A and B too. Hold several keys at once: Gam
 keyboard directly, so you can run and jump.
 
 **Gamepads** work as well: USB, or Bluetooth. Pair a Bluetooth one once: put it in pairing mode,
-open **Bluetooth** (type "bluetooth" on the home screen, or Settings > Bluetooth > Devices), press **Ctrl + S** to scan and
+open **Settings > Bluetooth** (or type "bluetooth" on the home screen), press **Ctrl + S** to scan and
 **Enter** on the gamepad. It reconnects by itself after that. Buttons follow the usual
 layout, the d-pad or left stick moves, and Home/Guide opens the menu. A gamepad that connects
 mid-game is picked up within a couple of seconds.
 
 **Xbox Wireless Controller** (Xbox One S / Series, Bluetooth): turn it on, hold the small pair
-button on top until the Xbox logo flashes fast, then **Ctrl + S** and **Enter** in **Bluetooth**. The logo
+button on top until the Xbox logo flashes fast, then **Ctrl + S** and **Enter** in **Settings > Bluetooth**. The logo
 goes solid when it's paired. Pairing only works for 2 minutes after a scan (anything nearby could
 pair while it's open). If the logo keeps blinking after pairing, update the controller (Xbox
 Accessories app on Windows, or an Xbox), then **X** (forget) and pair again. ZeroOS sets BlueZ up

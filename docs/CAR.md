@@ -56,7 +56,7 @@ pause, next and previous buttons drive the play queue, also with the screen
 off. Pressing play with nothing queued starts `~/Music` from the top.
 
 A paired car reconnects by itself when it starts, as long as the Cardputer's
-Bluetooth is on. **Settings > Bluetooth auto-off** turns Bluetooth off after
+Bluetooth is on. **Settings > Bluetooth > Turn off when unused** turns Bluetooth off after
 a while with nothing connected, so set it to **Never** if the Cardputer lives
 in the car.
 

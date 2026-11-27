@@ -1,7 +1,7 @@
 # Apps
 
-ZeroOS itself is small: it comes with **Apps**, **Settings**, **Update** and **Wi-Fi**, which are
-what a device needs to get online, update itself and install apps. Everything else is an app you
+ZeroOS itself is small: it comes with **Apps**, **Settings** (Wi-Fi and Bluetooth are sections of
+it) and **Update**, which are what a device needs to get online, update itself and install apps. Everything else is an app you
 install from the **Apps** app, downloaded from the apps repository,
 [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U): Battery, Camera, Car,
 Clock, Compass, Dock, Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, System, Terminal,

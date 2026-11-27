@@ -1,25 +1,35 @@
-// Wi-Fi: scan, pick a network, type the password, connect (NetworkManager).
+// Settings > Wi-Fi: turn it on or off, scan, pick a network, type the
+// password, connect (NetworkManager). A section of Settings
+// (apps/settings_sections.h), not an app of its own.
+//
+//   Left/Right on the first row  Wi-Fi on or off
+//   Enter  join the network in focus.       Tab: R rescan
+//   Typing finds a network (ui/list_view.h).
 #include "apps/common.h"
+#include "apps/settings_sections.h"
 #include "ui/list_view.h"
 
 namespace zs {
 namespace {
 using namespace theme;
 
-class WifiApp : public App {
+class WifiSection : public App {
 public:
+    explicit WifiSection(const char* back) : back_(back) {}
+
     void build(lv_obj_t* root) override {
         root_ = root;
         show_list();
     }
 
-    ~WifiApp() override {   // left before a deferred step ran: don't run it on a freed app
+    ~WifiSection() override {   // left before a deferred step ran: don't run it on a freed section
         lv_async_call_cancel(connect_cb, this);
+        lv_async_call_cancel(switched_cb, this);
     }
 
     bool on_back() override {
         if (pw_page_) {
-            show_list();
+            show_list(pick_ + 1);   // on the network it was for
             return true;
         }
         return false;
@@ -37,18 +47,24 @@ private:
         pw_page_ = nullptr;
     }
 
-    void show_list() {
+    // The switch, then the networks. `focus`: the row to start on.
+    void show_list(int focus = 0) {
         clear();
-        nets_ = hal().wifi_scan();
         NetStatus st = hal().net();
+        bool on = st.wifi_enabled;
+        nets_.clear();
+        if (on) nets_ = hal().wifi_scan();
 
-        lv_obj_t* hdr = label(root_, st.wifi_connected ? ("Connected to " + st.wifi_ssid).c_str() : "Not connected",
-                              &zs_font_12, st.wifi_connected ? kGood : kMuted);
-        lv_obj_set_pos(hdr, 8, 4);
+        settings_heading(root_, "Wi-Fi", !on ? "" : st.wifi_connected ? "Connected to " + st.wifi_ssid : "Not connected",
+                         st.wifi_connected ? kGood : kMuted);
 
-        list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 21);
-        list_.set_empty_text(st.wifi_enabled ? "No networks found. Tab > R rescans."
-                                             : "Wi-Fi is off. Tab > W turns it on.");
+        list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);
+        list_.add_choice(LV_SYMBOL_WIFI, "Wi-Fi", {"Off", "On"}, on ? 1 : 0, [this](int i) {
+            // Not now: the list this row is in is drawn again.
+            want_on_ = i == 1;
+            lv_async_call_cancel(switched_cb, this);
+            lv_async_call(switched_cb, this);
+        });
         for (size_t i = 0; i < nets_.size(); ++i) {
             auto& n = nets_[i];
             std::string value = fmt("%d%%", n.signal) + (n.secure ? "" : "  open");
@@ -58,22 +74,29 @@ private:
             });
         }
         list_.finish();
+        if (focus > 0 && focus < list_.size()) list_.focus(focus);
+        if (on && nets_.empty()) {
+            lv_obj_t* tip = label(root_, "No networks found. Tab > R rescans.", &zs_font_12, kMuted);
+            lv_obj_set_pos(tip, 10, 48);
+        }
 
-        bool on = st.wifi_enabled;
         std::vector<Action> acts;
-        acts.push_back({"Join", 0, "Enter", nullptr});
-        acts.push_back({"Rescan", 'r', nullptr, [this] { rescan(); }});
-        acts.push_back({on ? "Turn Wi-Fi off" : "Turn Wi-Fi on", 'w', nullptr, [this, on] {
-                            hal().set_wifi_enabled(!on);
-                            shell_toast(on ? "Wi-Fi off" : "Wi-Fi on");
-                            show_list();
-                        }});
+        acts.push_back({on ? "Join" : "Turn on", 0, "Enter", nullptr});
+        acts.push_back({"Rescan", 'r', nullptr, [this] { rescan(); }, on});
+        acts.push_back({back_, 0, "Esc", nullptr});
         shell_set_actions(std::move(acts));
     }
 
     void rescan() {
-        show_list();
+        show_list(list_.focused());
         shell_toast("Rescanned");
+    }
+
+    static void switched_cb(void* p) {
+        auto* s = static_cast<WifiSection*>(p);
+        hal().set_wifi_enabled(s->want_on_);
+        shell_toast(s->want_on_ ? "Wi-Fi on" : "Wi-Fi off");
+        s->show_list();
     }
 
     void show_password() {
@@ -140,7 +163,7 @@ private:
     }
 
     static void connect_cb(void* p) {
-        auto* s = static_cast<WifiApp*>(p);
+        auto* s = static_cast<WifiSection*>(p);
         if (s->pick_ >= 0 && s->pick_ < int(s->nets_.size())) s->connect(s->nets_[size_t(s->pick_)].ssid, s->pw_);
     }
 
@@ -158,9 +181,11 @@ private:
     ListView list_;
     int pick_ = -1;
     std::string pw_;
+    const char* back_;        // what Esc is called in the bar ("Settings" or "Back")
+    bool want_on_ = false;    // the switch, until switched_cb() acts on it
 };
 }  // namespace
 
-std::unique_ptr<App> make_wifi_app() { return std::make_unique<WifiApp>(); }
+std::unique_ptr<App> make_wifi_section(const char* back) { return std::make_unique<WifiSection>(back); }
 
 }  // namespace zs

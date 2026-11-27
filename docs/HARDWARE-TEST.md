@@ -13,12 +13,12 @@ override afterwards with `sudo systemctl revert zeroshell`.
 
 ## Already on the SD card image
 
-- [ ] **Home screen**: typing "wi" lists Wi-Fi, Turn Wi-Fi off and Wi-Fi networks; Enter opens the first; Esc clears. 1 to 7 open the pinned apps. Up from the pinned apps reaches All apps, where typing finds an app. Tab > P pins or unpins the app in focus. Type fast in Notes later to check no keys are dropped.
-- [ ] **Keys** ([KEYS.md](KEYS.md)): Fn+S/D change the volume and Fn+U/I the brightness (a message says the new level); in any app Fn+S/D and Fn+U/I do the same, and Fn+Q plays or pauses music. Ctrl + Space opens the taskbar panel, and 1 there turns Wi-Fi off and on. In Settings, 0 shows numbers and 2 switches Bluetooth. Holding Esc goes home from anywhere. In Notes, numbers still type.
-- [ ] **New keys** ([UX.md](UX.md)): in Notes, type something, then Ctrl + Space opens the taskbar panel and nothing extra is typed; Ctrl + Space again closes it. Try it both ways: Ctrl held down, and Ctrl tapped (the status bar shows Ctrl) then Space. In Wi-Fi, open a network's password box and hold Esc for a second: you land on the home screen. A quick Esc there only goes back to the list.
+- [ ] **Home screen**: typing "wi" lists Wi-Fi (a setting) and Turn Wi-Fi off; Enter opens the first, Settings at Wi-Fi; Esc clears. All apps has no Wi-Fi or Bluetooth: they are in Settings. 1 to 7 open the pinned apps. Up from the pinned apps reaches All apps, where typing finds an app. Tab > P pins or unpins the app in focus. Type fast in Notes later to check no keys are dropped.
+- [ ] **Keys** ([KEYS.md](KEYS.md)): Fn+S/D change the volume and Fn+U/I the brightness (a message says the new level); in any app Fn+S/D and Fn+U/I do the same, and Fn+Q plays or pauses music. Ctrl + Space opens the taskbar panel, and 1 there turns Wi-Fi off and on. In Settings, 0 shows numbers and 2 opens Bluetooth. Holding Esc goes home from anywhere. In Notes, numbers still type.
+- [ ] **New keys** ([UX.md](UX.md)): in Notes, type something, then Ctrl + Space opens the taskbar panel and nothing extra is typed; Ctrl + Space again closes it. Try it both ways: Ctrl held down, and Ctrl tapped (the status bar shows Ctrl) then Space. In Settings > Wi-Fi, open a network's password box and hold Esc for a second: you land on the home screen. A quick Esc there only goes back to the list.
 - [ ] **Sticker keys** ([KEYS.md](KEYS.md)): Fn+J (PRSC) says "Screenshot saved"; the PNG in ~/Pictures/Screenshots (open it in Files, or copy it off) shows the screen as it was. Fn+J in the Terminal beeps and saves the console. Fn+H (HELP) shows the keys for the screen. Hold Tab (LOCK) for a second: the screen goes off; the next key only turns it back on, on the same screen. Also note: does Fn+J in the Terminal do anything else there (it shouldn't quit the program running)?
-- [ ] **Wi-Fi**: the list of networks shows; the password shows as you type it; Enter joins. The password now reaches NetworkManager through a private file, not nmcli's command line: after joining, restart, and check it reconnects by itself (the password was saved). A wrong password says so and leaves an already-saved network working. Try a WPA3-only network if you have one.
-- [ ] **Settings**: brightness and volume change, Bluetooth toggles.
+- [ ] **Wi-Fi** (Settings > Wi-Fi): Left/Right on the first row turns Wi-Fi off and on; Esc goes back to Settings. The list of networks shows; the password shows as you type it; Enter joins. The password now reaches NetworkManager through a private file, not nmcli's command line: after joining, restart, and check it reconnects by itself (the password was saved). A wrong password says so and leaves an already-saved network working. Try a WPA3-only network if you have one.
+- [ ] **Settings**: brightness and volume change. In Bluetooth, Left/Right on the first row turns it off and on; the paired devices and Scan for devices are in the same list.
 - [ ] **Files**: browse ~, open a .txt (opens in Notes once Notes is installed), Esc goes up a folder.
 - [ ] **Terminal**: Enter opens a console; type `ls`; Ctrl+Q or `exit` comes back to the home screen.
 - [ ] **Update**: says you're on the newest version.
@@ -46,7 +46,7 @@ override afterwards with `sudo systemctl revert zeroshell`.
 - [ ] **Bluetooth pairing**: pairing a keyboard, headphones and an Xbox pad from Settings still works (the pairing window is now only open for the device you picked, and scanning no longer opens one).
 - [ ] **Remote with an auth key**: signing in to Tailscale with an auth key still works (the key goes to `tailscale up` as a file now).
 - [ ] **Jellyfin**: signing in with a bare server name uses https when the server has it; an `http://` address warns that it's unencrypted and still works; videos and music still play (the token goes to mpv in a file now).
-- [ ] **Bluetooth re-pairing**: a gamepad that lost its pairing pairs again from the Bluetooth app (re-pairing now needs that OK on the device).
+- [ ] **Bluetooth re-pairing**: a gamepad that lost its pairing pairs again from Settings > Bluetooth (re-pairing now needs that OK on the device).
 
 ## Remove
 
