@@ -14,7 +14,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | Keyboard | TCA8418 (I2C 0x34) | evdev input device. M5's driver handles Shift, Fn and Sym itself (tap = next key only, double tap = lock) and sends a different key code per layer; Ctrl and Alt are plain keys, and ZeroShell makes a tapped Ctrl apply to the next key; `shell/src/platform/keys.cpp` turns those into characters | All input |
 | Key LEDs | Shift, Fn, Sym, 3 status | `/sys/class/leds/*` | `Hal::set_led` (modifier state, alerts: Phase 1) |
 | Fuel gauge | BQ27220 | `/sys/class/power_supply/bq27220-0/` | Status bar, Settings > Battery & power |
-| RTC | RX8130CE | `/dev/rtc0` | Offline time, Clock app |
+| RTC | RX8130CE | `/dev/rtc0` | Offline time, Clock app; set in Settings > Date & time |
 | IMU* | BMI270 + BMM150 | iio (`in_accel_*`, `in_anglvel_*`, `in_magn_*`) | Compass, level |
 | IR | TX + RX on GPIO | rc-core: `ir-ctl` sends our own encoded timings and learns raw (docs/IR.md) | IR Remote |
 | Audio | ES8389 codec, AW8737A amp, 1 W speaker, mic, TRRS | ALSA/PipeWire; sox `play`/`rec` | Media app (music), Recorder app (voice notes), volume, mute |

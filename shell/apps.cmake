@@ -24,7 +24,7 @@ zs_app(sysmon   "System"    ZS_ICON_GAUGE        0x5e6c7b make_sysmon_app   SOUR
 # base apps keep the places they had when those were listed here (ORDER), so
 # they stay where they were among the installed apps on the home screen.
 zs_app(settings "Settings"  LV_SYMBOL_SETTINGS   0x77767b make_settings_app BASE ORDER 210
-       SOURCES src/apps/settings.cpp src/apps/wifi.cpp src/apps/bluetooth.cpp)
+       SOURCES src/apps/settings.cpp src/apps/wifi.cpp src/apps/bluetooth.cpp src/apps/datetime.cpp)
 zs_app(update   "Update"    LV_SYMBOL_DOWNLOAD   0xc66a00 make_update_app   BASE ORDER 220
        SOURCES src/apps/update.cpp)
 zs_app(apps     "Apps"      ZS_ICON_GRID         0x9141ac make_store_app    BASE ORDER 230

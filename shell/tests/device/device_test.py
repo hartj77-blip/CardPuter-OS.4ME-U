@@ -213,7 +213,7 @@ def main():
         time.sleep(0.4)
         check("esc closes the panel", d.frame()[body] == home_body)
 
-        # Lists number their rows like a phone menu: Settings' 7th row (off
+        # Lists number their rows like a phone menu: Settings' 8th row (off
         # the screen) is Software update. Esc there comes back to Settings,
         # and Esc in Settings goes home.
         def opened_since(mark):
@@ -224,7 +224,7 @@ def main():
         d.nav("enter")
         time.sleep(0.6)
         d.shot("8-settings")
-        d.type("7")
+        d.type("8")
         time.sleep(0.6)
         d.shot("9-update-from-settings")
         d.nav("esc")
@@ -232,7 +232,7 @@ def main():
         d.nav("esc")
         time.sleep(0.6)
         got = opened_since(mark)
-        check("search opens Settings, 7 opens its 7th row, Esc goes back, then home",
+        check("search opens Settings, 8 opens its 8th row, Esc goes back, then home",
               got == ["settings", "update", "settings", "home"], str(got))
         # The stickers' own keys. PRSC (Fn + J; M5's driver sends SysRq):
         # a PNG of the screen in ~/Pictures/Screenshots.

@@ -2040,6 +2040,48 @@ private:
 #endif
     }
 
+    // Date and time: systemd's timedated does the work (timedatectl), which
+    // also sets the hardware clock. The polkit rule lets the UI user ask
+    // (image/stage-zeroos/files/90-zeroos.rules).
+    TimeSettings time_settings() override {
+        // The zone may have been changed elsewhere (timedatectl over SSH):
+        // with TZ unset, tzset() reads /etc/localtime again if it changed.
+        tzset();
+        TimeSettings t;
+        std::istringstream in(run("timedatectl show -p Timezone -p CanNTP -p NTP -p NTPSynchronized"));
+        for (std::string l; std::getline(in, l);) {
+            size_t eq = l.find('=');
+            if (eq == std::string::npos) continue;
+            std::string k = l.substr(0, eq), v = l.substr(eq + 1);
+            if (k == "Timezone") t.zone = v;
+            else if (k == "CanNTP") t.can_automatic = v == "yes";
+            else if (k == "NTP") t.automatic = v == "yes";
+            else if (k == "NTPSynchronized") t.synced = v == "yes";
+        }
+        return t;
+    }
+    static bool timedatectl(const std::string& args) {
+        return run("timedatectl --no-ask-password " + args + " && echo OK").find("OK") != std::string::npos;
+    }
+    bool set_time_automatic(bool on) override { return timedatectl(on ? "set-ntp true" : "set-ntp false"); }
+    bool set_time(int year, int month, int day, int hour, int minute, int second) override {
+        char when[32];
+        std::snprintf(when, sizeof when, "%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second);
+        return timedatectl("set-time " + shell_quote(when));
+    }
+    std::vector<std::string> time_zones() override {
+        std::vector<std::string> v;
+        std::istringstream in(run("timedatectl list-timezones"));
+        for (std::string l; std::getline(in, l);)
+            if (!l.empty()) v.push_back(l);
+        return v;
+    }
+    bool set_time_zone(const std::string& zone) override {
+        bool ok = timedatectl("set-timezone " + shell_quote(zone));
+        tzset();   // our own clock (the status bar) follows now
+        return ok;
+    }
+
     static std::string json_str(const std::string& js, const std::string& key) {
         // Enough for tailscale's flat top-level string fields: "Key": "value"
         auto k = js.find("\"" + key + "\"");
