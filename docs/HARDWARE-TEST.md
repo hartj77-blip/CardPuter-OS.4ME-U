@@ -65,6 +65,9 @@ New after 0.9.1 and not yet checked on a unit ([PERFORMANCE.md](PERFORMANCE.md#s
 - [ ] **Remote with an auth key**: signing in to Tailscale with an auth key still works (the key goes to `tailscale up` as a file now).
 - [ ] **Jellyfin**: signing in with a bare server name uses https when the server has it; an `http://` address warns that it's unencrypted and still works; videos and music still play (the token goes to mpv in a file now).
 - [ ] **Bluetooth re-pairing**: a gamepad that lost its pairing pairs again from Settings > Bluetooth (re-pairing now needs that OK on the device).
+- [ ] **DOOM Zero** (M5Stack's store): after installing it, **DOOM (1993)** in its list is no longer MISSING GAME DATA and starts (ZeroOS installs the shareware episode with it). On a device that already had it: after **Apps > Tab > U**.
+- [ ] **AdvanceWebUI** (M5Stack's store): it opens and asks for the password, where before it closed at once. `journalctl -u zeroshell -b | grep 'DRM cards swapped'` should show a line; `ls /sys/class/drm` shows which card is the LCD's (`cardN-SPI-1`).
+- [ ] **RaspyJack** (M5Stack's store), if you ever installed it: after it is removed (or after updating ZeroOS, if it was removed earlier), no `raspyjack-*` lines in the boot text or in `systemctl list-units 'raspyjack*'`, `/var/swap.raspyjack` is gone and `swapon --show` doesn't list it; after **Apps > Tab > U**, `dpkg -l kismet` says it isn't installed.
 
 ## Remove
 

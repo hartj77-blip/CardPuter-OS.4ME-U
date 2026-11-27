@@ -49,7 +49,10 @@ DEB=$T/a/zeroos-app-gps_1.0.0_arm64.deb
 [ "$(dpkg-deb -f "$DEB" Package)" = zeroos-app-gps ] && ok "package is zeroos-app-<id>" || bad "package name"
 dpkg-deb -f "$DEB" Depends | grep -q "^zeroos, zeroos-app-abi-$ABI, gpsd (>= 3), gpsd-clients$" &&
     ok "package depends on ZeroOS's app ABI and its extras" || bad "Depends: $(dpkg-deb -f "$DEB" Depends)"
-dpkg-deb -c "$DEB" | grep -q './usr/lib/zeroos/apps/gps.so$' && ok "package holds the module" || bad "no module"
+# (Into a variable first: grep -q stops reading at the first match, and with
+# pipefail dpkg-deb's broken pipe then failed this check now and again.)
+listing=$(dpkg-deb -c "$DEB")
+grep -q './usr/lib/zeroos/apps/gps.so$' <<< "$listing" && ok "package holds the module" || bad "no module"
 dpkg-deb -e "$DEB" "$T/ctl"
 sh -n "$T/ctl/postinst" && sh -n "$T/ctl/prerm" && ok "maintainer scripts parse" || bad "maintainer scripts"
 grep -q 'enable --now "$u"' "$T/ctl/postinst" && grep -q 'for u in gpsd.socket' "$T/ctl/postinst" &&
@@ -134,6 +137,11 @@ while read -r p v; do
     case \$p in "\$pat"*) case "\$*" in *Package*) echo "ii \$p \$v" ;; *) echo "ii \$v" ;; esac ;; esac
 done < "$T/installed"
 STUB
+# m5-fixups (its own tests: m5-fixups-test.sh): log, in the same file, to check the order.
+cat > "$T/bin/m5-fixups" <<STUB
+#!/bin/sh
+echo "m5-fixups \$*" >> "$T/apt.log"
+STUB
 printf '#!/bin/sh\necho %s\n' "$ABI" > "$T/zeroshell"
 chmod +x "$T/bin"/* "$T/zeroshell"
 : > "$T/installed"
@@ -144,6 +152,7 @@ apps() {
         ZEROOS_APPS_RUN=$T/run ZEROOS_APPS_ZEROSHELL=$T/zeroshell ZEROOS_APPS_ROOT=$T/root \
         ZEROOS_APPS_ALLOW_FILE=1 ZEROOS_APPS_ARCH=arm64 \
         ZEROOS_APPS_M5_REGISTRY=$ROOT/image/stage-zeroos/files/apps/m5-registry \
+        ZEROOS_APPS_M5_FIXUPS=$T/bin/m5-fixups \
         "$ROOT/image/stage-zeroos/files/apps/zeroos-apps" "$@" 2>>"$T/log"
 }
 cat_has() { grep -qx "$1" "$T/state/catalog"; }
@@ -434,6 +443,8 @@ grep -qx 'package=hello-zero' "$T/state/m5/m5-hello-zero" &&
     grep -qx 'desktop=/usr/share/APPLaunch/applications/hello-zero.desktop' "$T/state/m5/m5-hello-zero" &&
     ok "m5 install: notes the package and its launcher entry for ZeroShell" || bad "m5 install: note"
 echo "hello-zero 1.0.0" >> "$T/installed"
+grep -qx 'm5-fixups installed hello-zero' "$T/apt.log" && ok "m5 install: m5-fixups told, by package name" ||
+    bad "m5 install: m5-fixups not run"
 apps list > "$T/list"; grep -qE '^m5-hello-zero +1\.0\.0' "$T/list" && ok "m5 list: shown installed" || bad "m5 list: $(cat "$T/list")"
 # A newer version in the store: Update all takes it.
 m5deb hello-zero 1.1.0 arm64
@@ -442,11 +453,18 @@ printf '{"apps":[%s]}' "$(m5entry hello-zero 1.1.0 arm64)" > "$T/m5/registry.jso
 apps run upgrade
 grep -q "apt-get install .*hello-zero_1.1.0_arm64.deb" "$T/apt.log" && ok "m5 upgrade: newer version installed" ||
     bad "m5 upgrade: $(cat "$T/apt.log")"
+[ "$(tail -n 1 "$T/apt.log")" = "m5-fixups sweep --apt" ] && ok "update all: ends with m5-fixups' sweep" ||
+    bad "update all: no sweep: $(tail -n 2 "$T/apt.log")"
 : > "$T/apt.log"
 apps run remove:m5-hello-zero
 expect "m5 remove: done" state done
 grep -q 'apt-get purge -y hello-zero$' "$T/apt.log" && ok "m5 remove: purges its package" || bad "m5 remove: $(cat "$T/apt.log")"
 [ ! -e "$T/state/m5/m5-hello-zero" ] && ok "m5 remove: note gone" || bad "m5 remove: note left"
+# m5-fixups: before the package goes (to stop what it runs), after (to clean
+# up), and both before apt's autoremove, which takes what a fix-up let go.
+[ "$(grep -nE '^(m5-fixups remov|apt-get purge -y hello-zero$|apt-get autoremove)' "$T/apt.log" | tail -n 4 | cut -d: -f2- | tr '\n' '|')" = \
+    "m5-fixups removing hello-zero|apt-get purge -y hello-zero|m5-fixups removed hello-zero|apt-get autoremove --purge -y|" ] &&
+    ok "m5 remove: m5-fixups runs before and after, ahead of autoremove" || bad "m5 remove: order: $(tail -n 6 "$T/apt.log")"
 : > "$T/installed"
 # A package of M5's copied over by hand.
 apps install-file "$T/m5/hello-zero_1.0.0_arm64.deb"

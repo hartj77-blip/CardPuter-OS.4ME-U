@@ -185,6 +185,10 @@ if [ -d /run/systemd/system ]; then
     udevadm trigger --subsystem-match=misc --sysname-match=rfkill || true
     # M5Stack's apps find the LCD at /dev/fb0 now, not at the next reboot.
     [ -x /usr/lib/zeroos/m5-fb0-link ] && /usr/lib/zeroos/m5-fb0-link || true
+    # An M5Stack app removed before this version left boot services behind
+    # (RaspyJack): they go now. Its packages go with the next "Update all"
+    # in Apps: apt can't run from here.
+    [ -x /usr/lib/zeroos/m5-fixups ] && /usr/lib/zeroos/m5-fixups sweep || true
     # Memory tuning (docs/PERFORMANCE.md) applies now, not at the next reboot.
     sysctl -q -p /etc/sysctl.d/90-zeroos-memory.conf || true
     systemd-tmpfiles --create /etc/tmpfiles.d/zeroos-memory.conf 2>/dev/null || true

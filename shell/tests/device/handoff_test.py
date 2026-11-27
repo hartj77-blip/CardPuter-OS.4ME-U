@@ -14,6 +14,11 @@ open, and after the app closed the screen stayed black until a restart, with
 the keys still working. And the other way round: after the screen has dimmed
 on the home screen, ZeroShell must not draw over an app that has the screen.
 Last, the app closing while the screen is off.
+
+And an app that opens the LCD's DRM card by the number it has on M5's system
+(/dev/dri/card1; AdvanceWebUI crashed on ZeroOS, where that is HDMI's): the app
+gets the LCD's card under that name (hal/lcd_drm.h, platform/m5_drm_shim.c).
+Two plain files stand in for the cards.
 """
 import os
 import re
@@ -39,6 +44,12 @@ def black():
     with open(os.environ["LV_LINUX_FBDEV_DEVICE"], "r+b") as fb:
         fb.write(bytes(%d))
 black()
+# On M5's system this app opens "/dev/dri/card1" for the LCD: having that name
+# in it is what makes ZeroShell swap the cards for it. Which one does each
+# name give? (The test's two files stand in for /dev/dri.)
+for name in ("card1", "card0"):
+    with open(os.path.join(here, name)) as card, open(os.path.join(here, name + ".was"), "w") as out:
+        out.write(card.read())
 open(os.path.join(here, "started"), "w").close()
 while not os.path.exists(os.path.join(here, "stop")):
     time.sleep(0.05)
@@ -72,9 +83,16 @@ def main():
         with open(os.path.join(entries, "standin.desktop"), "w") as f:
             f.write(f"[Desktop Entry]\nType=Application\nName=Standin\nExec={sys.executable} {app}\n")
         started, stop = os.path.join(tmp, "started"), os.path.join(tmp, "stop")
+        # On ZeroOS card1 is HDMI's and card0 the LCD's; on M5's system, the
+        # other way round.
+        card1, card0 = os.path.join(tmp, "card1"), os.path.join(tmp, "card0")
+        for path, text in ((card1, "hdmi"), (card0, "lcd")):
+            with open(path, "w") as f:
+                f.write(text)
         bindir, _ = bare_path(tmp)
         d = Device(binary, shim, shots, hal="--real-hal",
-                   env_extra={"HOME": home, "PATH": bindir, "ZS_M5_APP_DIR": entries, "ZS_M5_STATE_DIR": notes})
+                   env_extra={"HOME": home, "PATH": bindir, "ZS_M5_APP_DIR": entries, "ZS_M5_STATE_DIR": notes,
+                              "ZS_M5_DRM_SWAP": f"{card1}:{card0}"})
         seen = 0   # how much of the log has been read
 
         def new_log():
@@ -110,8 +128,24 @@ def main():
                 time.sleep(0.05)
             return False
 
+        def read(path):
+            try:
+                with open(path) as f:
+                    return f.read()
+            except OSError as e:
+                return f"<{e.strerror}>"
+
         try:
             scenario(d, check, new_log, open_app, close_app)
+            # Every time it ran (three), the app asked for card1 and card0.
+            check("an app that opens /dev/dri/card1 gets the LCD's card", read(card1 + ".was") == "lcd",
+                  f"it read {read(card1 + '.was')!r}")
+            check("...and the LCD's own number gives it the other card", read(card0 + ".was") == "hdmi",
+                  f"it read {read(card0 + '.was')!r}")
+            check("ZeroShell says so in its log", "DRM cards swapped for it" in d.read_log())
+            check("the swap library is in ~/.cache/zeroos",
+                  os.path.getsize(os.path.join(home, ".cache", "zeroos", "m5-drm-shim.so")) > 1000
+                  if os.path.exists(os.path.join(home, ".cache", "zeroos", "m5-drm-shim.so")) else False)
         finally:
             rc = d.stop()
         check("stops cleanly on SIGTERM", rc == 0, f"exit {rc}")

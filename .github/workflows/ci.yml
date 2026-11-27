@@ -54,6 +54,10 @@ jobs:
       # built for this machine: start it, press keys, check what was typed.
       - name: Build device backend (native)
         run: cmake -S shell -B build/device-native -DZS_BACKEND=device && cmake --build build/device-native -j"$(nproc)"
+      # Finding the LCD's DRM card, and the preload library that swaps two
+      # cards for an M5Stack app (only the device build has it).
+      - name: DRM card tests
+        run: ctest --test-dir build/device-native -R lcd_drm_test --output-on-failure
       - name: Start, navigate and type
         run: |
           gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
@@ -70,7 +74,8 @@ jobs:
       - name: Services run only while needed
         run: python3 shell/tests/device/demand_test.py build/device-native/zeroshell build/fakedev.so
       # An M5Stack app has the screen, the screen dims or goes off, the app
-      # closes: the home screen is drawn again, and never over the app.
+      # closes: the home screen is drawn again, and never over the app. And
+      # an app that opens /dev/dri/card1 gets the LCD's card under that name.
       - name: Home comes back after an M5Stack app
         run: python3 shell/tests/device/handoff_test.py build/device-native/zeroshell build/fakedev.so build/device-screens/handoff
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
@@ -153,6 +158,10 @@ jobs:
         run: image/tests/update-test.sh
       - name: App install tests
         run: image/tests/apps-test.sh
+      # What ZeroOS does around single M5Stack apps: game data for DOOM Zero,
+      # cleaning up what RaspyJack's install script leaves.
+      - name: M5Stack app fix-up tests
+        run: image/tests/m5-fixups-test.sh
       - name: Bluetooth config tests
         run: image/tests/bluetooth-conf-test.sh
       - name: Polkit rule tests

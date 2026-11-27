@@ -56,6 +56,7 @@
 #include "hal/bt_player.h"
 #include "hal/demand.h"
 #include "hal/hal.h"
+#include "hal/lcd_drm.h"
 #include "hal/lcd_fb.h"
 #include "hal/meshtastic.h"
 #include "hal/play_clock.h"
@@ -92,6 +93,41 @@ bool write_str(const std::string& path, const std::string& v) {
     if (!f) return false;
     f << v;
     return bool(f);
+}
+
+#if ZS_BACKEND_DEVICE
+// platform/m5_drm_shim.c as built for this machine (cmake/embed.cmake).
+extern "C" {
+extern const unsigned char zs_m5_drm_shim[];
+extern const unsigned long zs_m5_drm_shim_len;
+}
+#endif
+
+// The preload library that swaps two DRM cards for an M5Stack app
+// (hal/lcd_drm.h), written out of this binary to ~/.cache/zeroos; "" if that
+// didn't work, and the app then runs without it, as it did before.
+[[maybe_unused]] std::string m5_drm_shim_file() {
+#if ZS_BACKEND_DEVICE
+    const char* home = std::getenv("HOME");
+    std::string cache = std::string(home && *home ? home : "/home/pi") + "/.cache";
+    std::string path = cache + "/zeroos/m5-drm-shim.so";
+    std::string want(reinterpret_cast<const char*>(zs_m5_drm_shim), zs_m5_drm_shim_len);
+    if (lcd_fb_read(path) == want) return path;   // already there, from this build
+    ::mkdir(cache.c_str(), 0755);
+    ::mkdir((cache + "/zeroos").c_str(), 0755);
+    std::string tmp = path + ".tmp";
+    {
+        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+        f.write(want.data(), std::streamsize(want.size()));
+        f.flush();
+        if (!f) return "";
+    }
+    // Renamed into place: an app that is starting never loads half a file.
+    if (::rename(tmp.c_str(), path.c_str()) != 0) return "";
+    return path;
+#else
+    return "";
+#endif
 }
 
 // The command may take a while (bluetoothctl pair: up to 25 s); run_command
@@ -2247,6 +2283,9 @@ private:
     // starts them: sh -c <Exec> in /usr/share/APPLaunch, as our user, in a
     // process group of its own, the keyboard shared (not grabbed), drawing
     // on the LCD's framebuffer, which M5's LVGL apps find in these variables.
+    // One that opens the LCD's DRM card by name instead finds it at
+    // /dev/dri/card1, its number on M5's system, whatever number it has here
+    // (hal/lcd_drm.h).
     bool external_open(const std::string& command) override {
 #ifdef __EMSCRIPTEN__
         (void)command;
@@ -2256,18 +2295,30 @@ private:
         if (command.empty()) return false;
         scan_stop();   // a QR reader left running would hold the camera
         std::string fb = lcd_framebuffer();
+        std::string swap;
+        if (m5_opens_card1(command, kM5AppRoot)) swap = m5_drm_swap(lcd_drm_card(sys_root_ + "/sys", lcd_fb_sysfs_name()));
+        std::string shim = swap.empty() ? "" : m5_drm_shim_file();
         // Everything is built before fork (see spawn()).
         std::vector<std::string> env_s;
+        std::string preload;   // what is preloaded already (the tests' fake devices)
         for (char** e = environ; e && *e; ++e) {
             std::string v = *e;
             if (v.rfind("LV_LINUX_FBDEV_DEVICE=", 0) == 0 || v.rfind("APPLAUNCH_LINUX_FBDEV_DEVICE=", 0) == 0 ||
-                v.rfind("SDL_FBDEV=", 0) == 0)
+                v.rfind("SDL_FBDEV=", 0) == 0 || v.rfind("ZEROOS_DRM_SWAP=", 0) == 0)
                 continue;
+            if (!shim.empty() && v.rfind("LD_PRELOAD=", 0) == 0) {
+                preload = v.substr(11);
+                continue;
+            }
             env_s.push_back(v);
         }
         env_s.push_back("LV_LINUX_FBDEV_DEVICE=" + fb);
         env_s.push_back("APPLAUNCH_LINUX_FBDEV_DEVICE=" + fb);
         env_s.push_back("SDL_FBDEV=" + fb);
+        if (!shim.empty()) {
+            env_s.push_back("ZEROOS_DRM_SWAP=" + swap);
+            env_s.push_back("LD_PRELOAD=" + (preload.empty() ? shim : shim + ":" + preload));
+        }
         std::vector<char*> envp;
         for (auto& v : env_s) envp.push_back(const_cast<char*>(v.c_str()));
         envp.push_back(nullptr);
@@ -2292,6 +2343,7 @@ private:
         }
         ext_pid_ = pid;
         if (pid > 0) std::fprintf(stderr, "zeroshell: M5Stack app started (%d): %s\n", int(pid), command.c_str());
+        if (pid > 0 && !shim.empty()) std::fprintf(stderr, "zeroshell: DRM cards swapped for it: %s\n", swap.c_str());
         return pid > 0;
 #endif
     }

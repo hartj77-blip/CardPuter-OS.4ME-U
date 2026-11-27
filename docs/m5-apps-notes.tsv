@@ -17,7 +17,7 @@ czcam	likely	yes	yes		yes	0.7.1	2026-11-25	Install script tries to restart M5's 
 czmail	likely	yes	yes		yes	0.7.1	2026-11-25	Tk code is only its desktop preview
 czproxy	likely	yes	yes		yes	0.7.1	2026-11-25	Shares a lock file name with M5's launcher; harmless here
 czweather	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here
-doom-zero-dev0	check	yes	yes	yes	part	0.7.1	2026-11-25	Runs the game in its own X display and copies it to the LCD; heavy; Needs Esc held twice (or Ctrl+Q) to leave
+doom-zero-dev0	check	yes	yes	yes	part	0.7.1	2026-11-25	Runs the game in its own X display and copies it to the LCD; heavy; Needs Esc held twice (or Ctrl+Q) to leave; Comes with no game (every entry said MISSING GAME DATA): ZeroOS after 0.9.2 installs the shareware episode of DOOM with it, not tried on a device yet
 dx-zero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Install script tries to restart M5's launcher; harmless here
 five	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tk code is only its desktop preview
 flint	check	yes	yes	yes	yes	0.7.1	2026-11-25	Adds boot services that take over the text console (fbcon) before login
@@ -30,7 +30,7 @@ meshtandem	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Runs its own meshtasticd: don
 meshterm	likely	yes	yes		yes	0.7.1	2026-11-25	Tk code is only its desktop emulator
 meshzero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Runs its own meshtasticd: don't use it alongside ZeroOS's Mesh app
 nook-cardputerzero	check	yes	yes	yes	yes	0.7.1	2026-11-25	Wants to be started by M5's launcher; without it, runs in its standalone mode
-raspyjack	check	yes	yes	yes	no	0.7.1	2026-11-25	Big install: web UI, Caddy, turns Apache off, and its scripts swap out M5's launcher (nothing to swap here); Hold Esc doesn't leave it; only restarting ZeroShell does; Removing it doesn't undo its setup: its web services keep running (ports 8080 and 8765), and a 4 GB swap file (with its /etc/fstab line), 4 boot services and the Kismet suite (36 packages) stay. Clean up by hand after removing it
+raspyjack	check	yes	yes	yes	no	0.7.1	2026-11-25	Big install: web UI, Caddy, turns Apache off, and its scripts swap out M5's launcher (nothing to swap here); Hold Esc doesn't leave it; only restarting ZeroShell does; Its package has no removal script: on 0.7.1 its web services kept running (ports 8080 and 8765), and a 4 GB swap file (with its /etc/fstab line), 4 boot services (failing at every boot) and the Kismet suite (36 packages) stayed. ZeroOS after 0.9.2 takes those off when it is removed, and after an update for one removed earlier; not tried on a device yet
 rfid	likely	yes	yes	yes	part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Removing it leaves /usr/share/APPLaunch/apps/rfid behind
 seesay	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Qt and Tk are only inside bundled Python wheels
 tailzero	likely	yes	yes	yes	yes	0.7.1	2026-11-25	Tailscale, like ZeroOS's Remote app: use one or the other
@@ -48,7 +48,7 @@ battleship		yes	yes	yes	yes	0.7.1	2026-11-25
 zerochord		yes	yes		yes	0.7.1	2026-11-25	
 wanwu-desktop		yes	yes		part	0.7.1	2026-11-25	Needs Esc held twice (or Ctrl+Q) to leave; Opens to "can't find the desktop (lightdm/labwc not running?)": it needs M5's desktop, not ZeroOS's Dock
 acidzero		yes	yes		yes	0.7.1	2026-11-25	
-advancewebui		yes	no		yes	0.7.1	2026-11-25	Crashes at launch (segmentation fault)
+advancewebui		yes	no		yes	0.7.1	2026-11-25	Crashed at launch on 0.7.1 (segmentation fault): it opens /dev/dri/card1, the LCD on M5's system and HDMI on ZeroOS. ZeroOS after 0.9.2 gives it the LCD under that name; not tried on a device yet
 airfiles		yes	yes		yes	0.7.1	2026-11-25	Needs ZeroOS with the LCD as fb0 (PR #90): before that it stopped at launch
 ai-wars		yes	yes	yes	yes	0.7.1	2026-11-25	
 amiibo-sim		yes	yes		yes	0.7.1	2026-11-25	

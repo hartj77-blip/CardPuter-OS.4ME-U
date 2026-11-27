@@ -148,9 +148,10 @@ What's different from ZeroOS's own apps:
   does a dry run, and if it would remove anything but another M5 app, nothing is installed. (Every
   relation in M5's list today is between M5 apps: an app's old name.)
 - **Some may not work.** They were tested on M5's system with M5's launcher running. An app that
-  talks to that launcher, expects its services, or draws somewhere other than the LCD's
-  framebuffer won't work here. Most apps (Python with pygame or Pillow, LVGL, SDL) only need the
-  screen and keyboard, which ZeroOS hands over.
+  talks to that launcher or expects its services won't work here. Most apps (Python with pygame
+  or Pillow, LVGL, SDL) only need the screen and keyboard, which ZeroOS hands over: the LCD's
+  framebuffer, and for an app that opens the LCD as a DRM card by name instead, that card under
+  the name it has on M5's system (`/dev/dri/card1`).
   The [compatibility checklist](M5-APPS.md) goes through all of them: two can't install (they
   need M5's launcher), and a few more need a closer look.
 - **No real icons yet**: on the home screen each shows its first letter.
@@ -173,7 +174,32 @@ ZeroShell                one app per launcher entry (/usr/share/APPLaunch/applic
 udev (m5-fb0-link)       /dev/fb0 -> the LCD when nothing else is fb0: many apps open /dev/fb0
                          directly, and here the LCD is usually fb1 (the firmware's boot
                          framebuffer took fb0, then went away). A real fb0 (HDMI) is left alone
+ZeroShell (DRM swap)     /dev/dri/card1 is the LCD on M5's system; here the LCD's driver starts
+                         before HDMI's and is card0. An app whose program (or the script its
+                         Exec line names) has "/dev/dri/card1" in it is started, when the LCD
+                         isn't card1, with ZEROOS_DRM_SWAP=/dev/dri/card1:/dev/dri/<the LCD's>
+                         and a preload library (shell/src/platform/m5_drm_shim.c, carried inside
+                         zeroshell and written to ~/.cache/zeroos/m5-drm-shim.so) that opens
+                         each of the two when the other is asked for. Other apps never get it
+zeroos-apps (m5-fixups)  image/stage-zeroos/files/apps/m5-fixups runs after an M5 app is
+                         installed, and before and after it is removed: see below
 ```
+
+### Fix-ups for single apps
+
+A few apps need something on ZeroOS that their own packages don't do. `m5-fixups` holds those,
+by package name; every other app is left exactly as its package leaves it.
+
+| App | What was wrong | What ZeroOS does |
+| --- | --- | --- |
+| DOOM Zero (`doom-zero-dev0`) | It is a launcher with no game in it: every entry said MISSING GAME DATA until WAD files were copied over by hand | Installing it also installs Debian's `doom-wad-shareware` (the first episode of DOOM, free to pass on; in Debian's non-free section), which puts its file where the launcher also looks (`/usr/share/games/doom`). **DOOM (1993)** in its list then starts. Where that package can't be had, `freedoom` (a whole free game; its entries ask the launcher's question first) with `chocolate-doom`. Nothing is added when game data is already there, yours included (`~/.local/share/doom-zero-dev0/wads`), and removing DOOM Zero takes off only what it brought |
+| RaspyJack (`raspyjack`) | Its install script makes four boot services (`raspyjack-device`, `-webui`, `-caddy-autoconfig`, `-provision`), a 4 GB swap file with an `/etc/fstab` line, and through one of those services adds Kismet's apt repository and installs Kismet. The package has no removal script, so all of that stayed, and the services failed in the boot text at every start | Removing it stops those services first, then deletes them, the swap file and its `/etc/fstab` line, Kismet's repository and Kismet (only a Kismet that RaspyJack installed), and the certificate it made for Caddy. Not removed: what RaspyJack collected (`/usr/share/APPLaunch/apps/raspyjack`), the other tools its provisioning installed by hand (`mpv`, `tshark`, `john`, `rtl-sdr`, Python packages from pip, `/usr/local/bin/dump1090`), and Apache's "masked" state if it turned Apache off |
+| AdvanceWebUI (`advancewebui`) | It crashed at launch: it opens `/dev/dri/card1`, HDMI's card on ZeroOS | No fix-up of its own: the DRM swap above, which any app that names `/dev/dri/card1` gets |
+
+For an app installed or removed before ZeroOS had its fix-up, the next ZeroOS update clears
+RaspyJack's services and swap file by itself, and **Apps > Tab > U** (Update all) does the part
+that needs apt: Kismet off, game data for a DOOM Zero that has none.
+
 
 An M5 package copied over by hand installs with `sudo zeroos-apps install-file <file>.deb`. M5's
 camera program's own launcher entry is hidden: the Camera app already opens it.
@@ -290,6 +316,6 @@ text screen still gets it whenever no suggestion is showing.
   Dock mode reachable through Settings' "On HDMI" option.
 - The store shows an app's real icon only once it's installed (until then, a grid). Apps from
   M5Stack's store show a letter, not their icon.
-- Apps from M5Stack's store haven't been tried on a Cardputer running ZeroOS yet. The
-  [compatibility checklist](M5-APPS.md) is where results go.
+- The fix-ups for DOOM Zero and RaspyJack and the DRM swap for AdvanceWebUI haven't been tried
+  on a Cardputer yet. The [compatibility checklist](M5-APPS.md) is where results go.
 - An app's page doesn't show screenshots.
