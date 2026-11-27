@@ -216,10 +216,11 @@ Bluetooth, Volume, Brightness, Battery, Clock, Settings. Esc or Ctrl + Space clo
 One app, one tree. The separate Wi-Fi, Battery, Clock and Update apps become sections of it (the
 apps stay in search and All apps as shortcuts into their section).
 
-Wi-Fi and Bluetooth are there already, and went one step further: they are settings, not apps, so
-they are sections of Settings only. All apps doesn't list them; search finds them as settings and
-opens Settings at the section. The old app ids (`wifi`, `bluetooth`) still open them, for apps
-that link there (Tether).
+Wi-Fi, Bluetooth and Battery are there already, and went one step further: they are settings, not
+apps, so they are sections of Settings only. All apps doesn't list them; search finds them as
+settings and opens Settings at the section. The old app ids (`wifi`, `bluetooth`, `battery`) still
+open them, for apps that link there (Tether). Battery & power lists the settings first, then the
+fuel gauge's readings as rows of the same list.
 
 ```
 Settings
@@ -363,8 +364,8 @@ Done so far:
   `ListView` (numbered rows, type to filter, value rows), `shell_confirm()`. 1 to 9 pick.
 - Esc goes back to the app that opened this one (a back stack); hold Esc goes home.
 - Home: search (apps, settings, actions), pinned apps, Recent, All apps.
-- Settings as one numbered tree, with Wi-Fi and Bluetooth as sections of it (no longer apps); Apps
-  and Update on the kit.
+- Settings as one numbered tree, with Wi-Fi, Bluetooth and Battery as sections of it (no longer
+  apps); Apps and Update on the kit.
 
 Still to do: the installable apps (CardPuter-Apps.4ME-U), with the app-level bump; Tabs (Media,
 Mesh, System); apps adding their own search results and Recent entries (search providers,

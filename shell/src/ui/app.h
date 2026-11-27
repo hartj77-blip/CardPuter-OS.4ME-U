@@ -45,6 +45,11 @@ const std::vector<AppInfo>& app_registry();
 void app_registry_reload();
 // The entry for an app id, or nullptr if it isn't on this device.
 const AppInfo* app_find(const std::string& id);
+// Wi-Fi, Bluetooth and Battery were apps once and are sections of Settings
+// now: true for their old ids ("wifi", "bluetooth", "battery"). Such an id
+// is never an app, even if an old module for it is still installed, and
+// shell_open_app() with it opens Settings there.
+bool app_is_settings_section(const std::string& id);
 // True if the open app came from a module that has since been replaced
 // on disk (an upgrade): ZeroShell must restart to run the new code.
 bool app_modules_stale();

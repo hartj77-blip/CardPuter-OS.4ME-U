@@ -41,7 +41,7 @@ by doing less while awake and almost nothing while the screen is off.
 | Dim the backlight to 10% | after 30 s idle | Settings → Dim screen after |
 | Backlight and panel off, CPU to lowest speed, UI stops drawing | after 1 min idle, on battery only | Settings → Screen off after |
 | First key after screen-off only wakes the screen | always | `ui/power.cpp` |
-| Power profile: Saver (on-demand, capped near 70% speed), Balanced (on-demand to full speed), Performance (full speed) | Balanced | Settings, or P in the Battery app |
+| Power profile: Saver (on-demand, capped near 70% speed), Balanced (on-demand to full speed), Performance (full speed) | Balanced | Settings → Battery & power → Power profile |
 | Low battery: Saver turns on by itself | 15% | `ui/power.cpp` |
 | Clean shutdown | 3% | `ui/power.cpp` |
 | Bluetooth off when nothing is connected | after 10 min | Settings → Bluetooth → Turn off when unused |
@@ -53,7 +53,7 @@ by doing less while awake and almost nothing while the screen is off.
 | Screen on when picked up and tilted toward you; off again after 8 s with no key; paused for 15 min after 3 such wakes in 5 min (a bag or pocket) | on | Settings → Wake on pickup |
 | Small log cap, background jobs off | always | step 1 |
 
-**Time left** in the top bar and the Battery app comes from our own average of
+**Time left** in the top bar and in Settings → Battery & power comes from our own average of
 the gauge's voltage x current with a 3-minute time constant, divided into the
 gauge's remaining charge. The gauge's own estimate is used for the first 30 s
 and while charging. Turn it off in Settings → Time left in top bar.

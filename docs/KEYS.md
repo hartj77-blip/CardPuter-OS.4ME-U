@@ -88,7 +88,7 @@ Press Ctrl + Space to open a row of tiles under the status bar. Each tile has a 
 | 2 | Bluetooth | Turns Bluetooth on or off |
 | 3 | Volume | Up/Down change it. Enter mutes |
 | 4 | Brightness | Up/Down change it |
-| 5 | Battery | Opens Battery |
+| 5 | Battery | Opens Settings > Battery & power |
 | 6 | Clock | Opens Clock |
 | 7 | More | Opens Settings |
 
