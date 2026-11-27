@@ -109,7 +109,7 @@ Other checks on every install:
 
 ## M5Stack's app store
 
-M5Stack runs an app store for the Cardputer Zero: about 180 apps by the community, listed in
+M5Stack runs an app store for the Cardputer Zero: about 190 apps by the community, listed in
 [CardputerZero/packages](https://github.com/CardputerZero/packages) and reviewed there before they
 are published. They are made for M5's own launcher (APPLaunch), which ZeroOS replaces, but they
 are ordinary Debian packages, so ZeroOS installs them too and opens them its own way.
