@@ -63,6 +63,12 @@ jobs:
       # machine with no Cardputer hardware and none of the apps' extras.
       - name: Open every app with the keyboard, with and without hardware
         run: python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so build/device-screens/apps
+      # The device's own hardware layer against a made-up /sys and /proc and
+      # stand-ins for systemctl, wpctl and nmcli: the status bar starts no
+      # programs while nothing changes, and bluetoothd and PipeWire are
+      # stopped when unused and started again when needed.
+      - name: Services run only while needed
+        run: python3 shell/tests/device/demand_test.py build/device-native/zeroshell build/fakedev.so
       # An M5Stack app has the screen, the screen dims or goes off, the app
       # closes: the home screen is drawn again, and never over the app.
       - name: Home comes back after an M5Stack app

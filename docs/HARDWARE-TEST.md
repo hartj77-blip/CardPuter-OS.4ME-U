@@ -28,6 +28,23 @@ override afterwards with `sudo systemctl revert zeroshell`.
 - [ ] **First login and SSH**: on a fresh card, `ssh pi@cardputer.local` with `raspberry` is refused (keys only). The Terminal app asks for a new password; after it, `ssh` with the new password works. Ctrl+C at the password prompt on a console ends the login.
 - [ ] **Adding a source**: Apps > Tab > P > Add a GitHub repo asks for your password; a wrong one says "Wrong password" and adds nothing; the right one adds it. Installing and removing apps still needs no password.
 
+## Started when needed
+
+New after 0.9.1 and not yet checked on a unit ([PERFORMANCE.md](PERFORMANCE.md#started-when-needed)). Over SSH, `pgrep -l 'pipewire|wireplumber|bluetoothd'` shows what is running.
+
+- [ ] **After boot, Bluetooth off, nothing playing**: two minutes after the home screen appears, `pgrep -l 'pipewire|wireplumber|bluetoothd'` prints nothing. `journalctl -u zeroshell -b | grep stopping` shows why.
+- [ ] **First sound**: with PipeWire stopped, play a song in Media. It plays; note how long the start takes. `pgrep pipewire` now finds it. Stop the song: about a minute later PipeWire is gone again.
+- [ ] **Volume while stopped**: with PipeWire stopped, Fn+S and Fn+D show the new volume at once, with no pause. Play a song: it plays at that volume. Mute (taskbar panel), play: silent; unmute: back.
+- [ ] **Volume survives a restart**: set the volume to 30%, wait a minute, `sudo reboot`. Settings > Sound says 30%, and a song plays at 30%.
+- [ ] **Paused music**: pause a song in Media and leave it five minutes. Play: it carries on (PipeWire was not stopped under it).
+- [ ] **A game**: in Libretro, pause a game for five minutes, then carry on: it still has sound.
+- [ ] **Recorder**: with PipeWire stopped, record a voice note. The start of the recording isn't cut off by more than a second or two.
+- [ ] **Bluetooth on**: turn Bluetooth on in Settings. Within a few seconds `pgrep -l 'pipewire|bluetoothd'` shows both. Paired devices are listed; a paired headset or speaker connects and plays.
+- [ ] **Bluetooth off**: turn it off (or let "Turn off when unused" do it). A minute later bluetoothd is gone, and PipeWire too if nothing plays. Settings > Bluetooth still opens at once and can be turned on again.
+- [ ] **Status bar**: unplug the Wi-Fi router, or walk out of range: the Wi-Fi icon changes within about 5 s. Come back: it shows connected, with the address in System, within about 5 s of joining. Plug in Ethernet: shown within about 5 s.
+- [ ] **Idle CPU**: `zeroos-measure` on the home screen, Wi-Fi connected, before and after this update: idle CPU should be clearly lower. `sudo perf top` or `top` should no longer show `nmcli` coming and going.
+- [ ] **Car and Tether** (if installed): a phone's music still plays through the Cardputer, and Tether's status page still shows whether Bluetooth is on.
+
 ## Installed from Apps
 
 - [ ] **Notes**: type a paragraph quickly, Esc, reopen: every letter is there.

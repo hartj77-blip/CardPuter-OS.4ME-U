@@ -98,6 +98,31 @@ ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.4.1 > /dev/null
 ! grep -qx m5stack "$S" && ok "postinst: M5Stack's store by its address is not added again" || bad "postinst: M5Stack's store twice"
 grep -v '^#' "$T/x/etc/zeroos/apps.sources" | head -1 | grep -qx 'hartj77-blip/CardPuter-Apps.4ME-U' &&
     ok "a new install reads the apps repository first" || bad "apps.sources: the apps repository is not first"
+# PipeWire starts through its sockets, not at boot (docs/PERFORMANCE.md), once.
+U=$R/etc/systemd/user
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.9.0 > /dev/null
+[ ! -e "$R/var/lib/zeroos/.audio-on-demand" ] && [ ! -e "$U/sockets.target.wants" ] &&
+    ok "postinst: without PipeWire, its start list is left alone" || bad "postinst: touched PipeWire's units without PipeWire"
+mkdir -p "$R/usr/lib/systemd/user" "$U/default.target.wants" "$U/pipewire.service.wants"
+for u in pipewire.socket pipewire.service pipewire-pulse.socket pipewire-pulse.service wireplumber.service; do
+    touch "$R/usr/lib/systemd/user/$u"
+done
+ln -s /usr/lib/systemd/user/pipewire.service "$U/default.target.wants/pipewire.service"
+ln -s /usr/lib/systemd/user/pipewire-pulse.service "$U/default.target.wants/pipewire-pulse.service"
+ln -s /usr/lib/systemd/user/wireplumber.service "$U/pipewire.service.wants/wireplumber.service"
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.9.0 > /dev/null
+[ ! -e "$U/default.target.wants/pipewire.service" ] && [ ! -L "$U/default.target.wants/pipewire.service" ] &&
+    [ ! -L "$U/default.target.wants/pipewire-pulse.service" ] &&
+    ok "postinst: PipeWire's services are off the session's start list" || bad "postinst: PipeWire still starts at boot"
+[ "$(readlink "$U/sockets.target.wants/pipewire.socket")" = /usr/lib/systemd/user/pipewire.socket ] &&
+    [ "$(readlink "$U/sockets.target.wants/pipewire-pulse.socket")" = /usr/lib/systemd/user/pipewire-pulse.socket ] &&
+    ok "postinst: PipeWire's sockets are on it" || bad "postinst: PipeWire's sockets are not enabled"
+[ -L "$U/pipewire.service.wants/wireplumber.service" ] &&
+    ok "postinst: WirePlumber still starts with PipeWire" || bad "postinst: WirePlumber no longer follows PipeWire"
+ln -s /usr/lib/systemd/user/pipewire.service "$U/default.target.wants/pipewire.service"
+ZEROOS_POSTINST_ROOT=$R sh "$T/ctl/postinst" configure 0.9.1 > /dev/null
+[ -L "$U/default.target.wants/pipewire.service" ] &&
+    ok "postinst: PipeWire put back on the list by hand stays" || bad "postinst: took PipeWire off the list again"
 
 # --- the Terminal's console goes on the LCD ---------------------------------
 # Whichever framebuffer the LCD is (fb1 with a monitor at boot), and with or
