@@ -473,7 +473,16 @@ void Shell::switch_to(std::unique_ptr<App> app, const std::string& title) {
     update_statusbar();
 }
 
+// Wi-Fi and Bluetooth were apps of their own once; they are sections of
+// Settings now. Their ids still open them: installed apps use them (Tether's
+// "pick it in Wi-Fi"), and so do scripts.
+static bool settings_section(const std::string& id) { return id == "wifi" || id == "bluetooth"; }
+
 void Shell::open_app(const std::string& id) {
+    if (settings_section(id)) {
+        open_app("settings", id);
+        return;
+    }
     // Deferred: apps often call this from their own on_key(), and switching
     // destroys the calling app. apply_pending() runs once the call returns.
     pending_ = id;
@@ -482,12 +491,16 @@ void Shell::open_app(const std::string& id) {
 }
 
 void Shell::open_app(const std::string& id, const std::string& arg) {
+    if (settings_section(id)) {
+        open_app("settings", id);
+        return;
+    }
     pending_ = id;
     app_arg_ = arg;
     remember_back(id);
 }
 
-// One app opening another (Settings > Wi-Fi, Files > Notes): Esc at the new
+// One app opening another (Settings > Software update, Files > Notes): Esc at the new
 // one's first screen comes back here, not home. Home itself isn't kept: it's
 // where an empty stack goes anyway.
 void Shell::remember_back(const std::string& id) {

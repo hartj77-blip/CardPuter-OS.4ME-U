@@ -12,8 +12,6 @@ zs_app(ai    "AI"     ZS_ICON_CHIP         0xd97757 make_ai_app    SOURCES src/a
 zs_app(media    "Media"     LV_SYMBOL_AUDIO      0xd6336c make_media_app    SOURCES src/apps/media.cpp)
 zs_app(camera   "Camera"    ZS_ICON_CAMERA       0x2f6f8f make_camera_app   SOURCES src/apps/camera.cpp)
 zs_app(car      "Car"       ZS_ICON_CAR          0x1e88a8 make_car_app      SOURCES src/apps/car.cpp)
-zs_app(wifi     "Wi-Fi"     LV_SYMBOL_WIFI       0x0073e5 make_wifi_app     SOURCES src/apps/wifi.cpp BASE)
-zs_app(bluetooth "Bluetooth" LV_SYMBOL_BLUETOOTH 0x0082fc make_bluetooth_app SOURCES src/apps/bluetooth.cpp BASE)
 zs_app(tether   "Tether"    ZS_ICON_PHONE        0x26a269 make_tether_app   SOURCES src/apps/tether.cpp)
 zs_app(ir       "IR Remote" LV_SYMBOL_POWER      0xc7162b make_ir_app       SOURCES src/apps/ir_remote.cpp)
 zs_app(gps      "GPS"       ZS_ICON_PIN          0x0e8420 make_gps_app      SOURCES src/apps/gps.cpp)
@@ -23,9 +21,15 @@ zs_app(battery  "Battery"   LV_SYMBOL_BATTERY_3  0x3aa655 make_battery_app  SOUR
 zs_app(clock    "Clock"     ZS_ICON_CLOCK        0x4a5bd6 make_clock_app    SOURCES src/apps/clock.cpp)
 zs_app(dock     "Dock"      ZS_ICON_DESKTOP      0x1c71d8 make_dock_app     SOURCES src/apps/dock.cpp)
 zs_app(sysmon   "System"    ZS_ICON_GAUGE        0x5e6c7b make_sysmon_app   SOURCES src/apps/sysmon.cpp)
-zs_app(settings "Settings"  LV_SYMBOL_SETTINGS   0x77767b make_settings_app SOURCES src/apps/settings.cpp BASE)
-zs_app(update   "Update"    LV_SYMBOL_DOWNLOAD   0xc66a00 make_update_app   SOURCES src/apps/update.cpp BASE)
-zs_app(apps     "Apps"      ZS_ICON_GRID         0x9141ac make_store_app    SOURCES src/apps/store.cpp BASE)
+# Wi-Fi and Bluetooth are sections of Settings, not apps. The three base apps
+# keep the places they had when those two were listed here (ORDER), so they
+# stay where they were among the installed apps on the home screen.
+zs_app(settings "Settings"  LV_SYMBOL_SETTINGS   0x77767b make_settings_app BASE ORDER 210
+       SOURCES src/apps/settings.cpp src/apps/wifi.cpp src/apps/bluetooth.cpp)
+zs_app(update   "Update"    LV_SYMBOL_DOWNLOAD   0xc66a00 make_update_app   BASE ORDER 220
+       SOURCES src/apps/update.cpp)
+zs_app(apps     "Apps"      ZS_ICON_GRID         0x9141ac make_store_app    BASE ORDER 230
+       SOURCES src/apps/store.cpp)
 
 # Dev Tools: one installable pack (module "dev", docs/DEV.md). Write, run and
 # ship code from the keyboard: projects, REPLs, Git and a serial monitor.

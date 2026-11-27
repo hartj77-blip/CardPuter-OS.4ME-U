@@ -44,7 +44,7 @@ by doing less while awake and almost nothing while the screen is off.
 | Power profile: Saver (on-demand, capped near 70% speed), Balanced (on-demand to full speed), Performance (full speed) | Balanced | Settings, or P in the Battery app |
 | Low battery: Saver turns on by itself | 15% | `ui/power.cpp` |
 | Clean shutdown | 3% | `ui/power.cpp` |
-| Bluetooth off when nothing is connected | after 10 min | Settings → Bluetooth auto-off |
+| Bluetooth off when nothing is connected | after 10 min | Settings → Bluetooth → Turn off when unused |
 | Wi-Fi off while the screen is off | off by default (after 10 min when on) | Settings → Wi-Fi off with screen |
 | Wi-Fi chip power save between beacons | on | `files/nm-wifi-powersave.conf` |
 | Main loop sleeps until the next timer or key, instead of waking every 5 ms | always | `platform.cpp` |

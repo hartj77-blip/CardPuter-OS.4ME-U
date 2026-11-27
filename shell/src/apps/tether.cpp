@@ -124,8 +124,8 @@ private:
         lv_label_set_long_mode(h, LV_LABEL_LONG_DOT);
 
         list_ = make_list(root_, 4, 22, kScreenW - 8, kContentH - 26);
-        list_button(list_, LV_SYMBOL_WIFI, "Wi-Fi hotspot: pick it in Wi-Fi",
-                    [](lv_event_t*) { shell_open_app("wifi"); }, nullptr);
+        list_button(list_, LV_SYMBOL_WIFI, "Wi-Fi hotspot: pick it in Settings",
+                    [](lv_event_t*) { shell_open_app("settings", "wifi"); }, nullptr);
         list_button(list_, ZS_ICON_CAMERA, "Wi-Fi hotspot: scan its QR code",
                     [](lv_event_t*) { shell_open_app("camera", "scan"); }, nullptr);
 

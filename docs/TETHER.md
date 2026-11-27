@@ -16,7 +16,7 @@ NetworkManager usually recognises phone hotspots and USB as metered by itself.
 
 Turn on the hotspot on the phone, then either:
 
-- open **Wi-Fi** and pick it, or
+- open **Settings > Wi-Fi** and pick it, or
 - in **Tether**, choose **Wi-Fi hotspot: scan its QR code**, point the
   camera at the code (Android: hotspot settings, QR icon) and press **Enter**.
   See [CAMERA.md](CAMERA.md).

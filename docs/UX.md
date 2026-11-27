@@ -184,8 +184,7 @@ track playing (or paused), the time and the date. It replaces the app grid and t
 
 ```
 › wi
-  APPS      Wi-Fi
-  SETTINGS  Wi-Fi › Saved networks
+  SETTINGS  Wi-Fi
   ACTIONS   Turn Wi-Fi off
   WI-FI     HomeNet · connected
             Workshop-5G
@@ -216,6 +215,11 @@ Bluetooth, Volume, Brightness, Battery, Clock, Settings. Esc or Ctrl + Space clo
 
 One app, one tree. The separate Wi-Fi, Battery, Clock and Update apps become sections of it (the
 apps stay in search and All apps as shortcuts into their section).
+
+Wi-Fi and Bluetooth are there already, and went one step further: they are settings, not apps, so
+they are sections of Settings only. All apps doesn't list them; search finds them as settings and
+opens Settings at the section. The old app ids (`wifi`, `bluetooth`) still open them, for apps
+that link there (Tether).
 
 ```
 Settings
@@ -310,7 +314,7 @@ letter, and Ctrl + the letter runs it straight away.
 | --- | --- | --- |
 | Home | 2D grid, dock on 3-9, Fn layer, Shift + letter jumps | Search + pinned (1-9) + recent; All apps list |
 | Settings | Rows, Left / Right change values | Becomes the tree above; absorbs Wi-Fi, Battery, Clock, Update |
-| Wi-Fi | `R` rescan, Del forgets | List. Menu: R Rescan, D Forget, I Details, N Hidden network |
+| Wi-Fi | `R` rescan, Del forgets | Settings › Wi-Fi, a List. Menu: R Rescan, D Forget, I Details, N Hidden network |
 | Battery | `P` power profile | Settings › Battery & power; the profile is a ValueRow |
 | Clock | Space start/stop, `R` reset | Control: ␣ Start/stop, R Reset, L Lap. Alarms and timers as a List tab |
 | Update | Enter does whatever the screen says | Settings › Update; one main action on Enter, as now |
@@ -359,7 +363,8 @@ Done so far:
   `ListView` (numbered rows, type to filter, value rows), `shell_confirm()`. 1 to 9 pick.
 - Esc goes back to the app that opened this one (a back stack); hold Esc goes home.
 - Home: search (apps, settings, actions), pinned apps, Recent, All apps.
-- Settings as one numbered tree; Wi-Fi, Bluetooth, Apps and Update on the kit.
+- Settings as one numbered tree, with Wi-Fi and Bluetooth as sections of it (no longer apps); Apps
+  and Update on the kit.
 
 Still to do: the installable apps (CardPuter-Apps.4ME-U), with the app-level bump; Tabs (Media,
 Mesh, System); apps adding their own search results and Recent entries (search providers,

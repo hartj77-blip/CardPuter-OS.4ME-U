@@ -49,7 +49,7 @@ home search. "Forget learned words" in the home search wipes what it has learned
 
 ## Screens moved to the new design
 
-Home, Settings, Wi-Fi, Bluetooth, Apps and Update so far. A line along the bottom of the screen says what the keys do, and:
+Home, Settings (Wi-Fi and Bluetooth are sections of it), Apps and Update so far. A line along the bottom of the screen says what the keys do, and:
 
 | Key | What it does |
 | --- | --- |
@@ -58,7 +58,7 @@ Home, Settings, Wi-Fi, Bluetooth, Apps and Update so far. A line along the botto
 | Letters | In a list, type to find: only the rows that match stay, best match first. Backspace or Esc undoes it |
 
 Every row shows its number key: 1 to 9 are the first nine rows of a list, like a phone menu.
-Esc in an app opened from another one (Settings > Wi-Fi) goes back to that one. Something that can't be undone (forgetting, removing) asks first:
+Esc in an app opened from another one (Settings > Software update) goes back to that one. Something that can't be undone (forgetting, removing) asks first:
 Enter does it, Esc doesn't.
 
 ## Home screen

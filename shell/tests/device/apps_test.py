@@ -18,9 +18,10 @@ Runs ZeroShell twice, with the fake LCD and keyboard from device_test.py:
      hardware or its extras are missing.
 
 For each app: from the home screen, open All apps, arrow to it and press Enter, check it
-opened and drew something, press a few keys, then Esc back home. Fails if
-ZeroShell exits, an app doesn't open, the screen goes black, or Esc doesn't
-lead home.
+opened and drew something, press a few keys, then Esc back home. Then the
+same for Wi-Fi and Bluetooth, which are sections of Settings and not on the
+home screen: each is found with the home search. Fails if ZeroShell exits,
+an app doesn't open, the screen goes black, or Esc doesn't lead home.
 """
 import os
 import re
@@ -32,7 +33,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from device_test import Device  # noqa: E402
 
-BASE_APPS = ["wifi", "settings", "update", "apps"]
+BASE_APPS = ["settings", "update", "apps"]
 
 # What a bare Raspberry Pi OS has; everything else is "not installed".
 TOOLS = """sh bash dash cat grep egrep sed awk mawk gawk head tail tr cut ls sleep date id stat test [ printf
@@ -141,6 +142,43 @@ def run(binary, shim, shots, hal, expect, apps_dir, settle, env_extra=None):
             time.sleep(0.4)
         missing = [a for a in want if a not in visited]
         check(f"every app opened ({len(visited)})", not missing, "not reached: " + " ".join(missing))
+
+        # Wi-Fi and Bluetooth are sections of Settings, not apps: type the
+        # name on the home screen and Enter opens Settings at that section.
+        def esc_home():
+            for _ in range(6):
+                d.nav("esc")
+                time.sleep(0.35)
+                if "home" in opened(new_log()):
+                    return True
+            return False
+        esc_home()   # the loop above ends with the first app open again
+        time.sleep(0.4)
+        for section in ("wifi", "bluetooth"):
+            if d.proc.poll() is not None:
+                break
+            new_log()
+            d.type(section)
+            time.sleep(0.4)
+            d.nav("enter")
+            time.sleep(settle)
+            ids = opened(new_log())
+            if not check(f"settings > {section}: found by search, opens in Settings",
+                         ids == ["settings"] and d.proc.poll() is None, f"opened {ids}\n" + d.read_log()[-2000:]):
+                break
+            check(f"settings > {section}: draws", any(d.frame()), "screen is black")
+            d.shot(f"settings-{section}")
+            # Off the switch, onto the first network or device (or the next
+            # value row), and Enter: join it, connect it, or step the value.
+            d.nav("down")
+            d.nav("enter")
+            time.sleep(0.6)
+            if not check(f"settings > {section}: takes keys", d.proc.poll() is None, d.read_log()[-2000:]):
+                break
+            d.shot(f"settings-{section}-keys")
+            if not check(f"settings > {section}: Esc leads home", esc_home()):
+                break
+            time.sleep(0.4)
     finally:
         rc = d.stop()
     check("stops cleanly on SIGTERM", rc == 0, f"exit {rc}")

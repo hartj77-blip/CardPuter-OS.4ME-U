@@ -1,6 +1,9 @@
-// Bluetooth: find, pair, connect and forget devices - keyboards, gamepads,
-// speakers, headphones (BlueZ). Opened from Settings or the home screen.
+// Settings > Bluetooth: turn it on or off, and find, pair, connect and forget
+// devices - keyboards, gamepads, speakers, headphones (BlueZ). A section of
+// Settings (apps/settings_sections.h), not an app of its own.
 //
+//   Left/Right on the first two rows  Bluetooth on or off; when it turns
+//                                     itself off with nothing connected
 //   Enter  pair and connect / disconnect.  Tab: S scan (8 s), D forget
 //   Typing finds a device (ui/list_view.h).
 //
@@ -11,14 +14,22 @@
 #include <unistd.h>
 
 #include "apps/common.h"
+#include "apps/settings_sections.h"
 #include "ui/list_view.h"
+#include "ui/power.h"
 
 namespace zs {
 namespace {
 using namespace theme;
 
-class BluetoothApp : public App {
+class BluetoothSection : public App {
 public:
+    explicit BluetoothSection(const char* back) : back_(back) {}
+
+    ~BluetoothSection() override {   // left before the switch was acted on
+        lv_async_call_cancel(switched_cb, this);
+    }
+
     void build(lv_obj_t* root) override {
         root_ = root;
         devices_ = hal().bt_devices();
@@ -40,13 +51,14 @@ public:
         show();
     }
 
-    // Connections change by themselves (a keyboard switched off): look every
-    // few seconds while the list is open.
+    // Connections change by themselves (a keyboard switched off), and so
+    // does Bluetooth (off with nothing connected): look every few seconds
+    // while the list is open.
     void tick() override {
         if (++n_ < 30) return;   // tick() runs about every 100 ms
         n_ = 0;
         std::vector<BtDevice> now = hal().bt_devices();
-        bool same = now.size() == devices_.size();
+        bool same = now.size() == devices_.size() && bt_on() == on_;
         for (size_t i = 0; same && i < now.size(); ++i)
             same = now[i].address == devices_[i].address && now[i].connected == devices_[i].connected &&
                    now[i].paired == devices_[i].paired;
@@ -62,28 +74,37 @@ private:
         int keep = list_.focused();
         lv_obj_clean(root_);
         lv_group_remove_all_objs(group);
-        bool on = bt_on();
+        bool on = on_ = bt_on();
 
         Action forget_act{"Forget", 'd', nullptr, [this] { forget(); }, on};
         forget_act.danger = true;
         forget_act.confirm = "Forget this device?";
         shell_set_actions({{on ? "Connect" : "Turn on", 0, "Enter", nullptr},
                            {"Scan for devices", 's', nullptr, [this] { scan(); }},
-                           forget_act});
+                           forget_act,
+                           {back_, 0, "Esc", nullptr}});
 
         int connected = 0;
-        for (auto& d : devices_) connected += d.connected;
-        std::string head = !on ? "Bluetooth is off"
-                           : connected ? fmt("%d connected", connected)
-                                       : "Bluetooth is on";
-        lv_obj_t* hdr = label(root_, head.c_str(), &zs_font_12, on ? kGood : kMuted);
-        lv_obj_set_pos(hdr, 8, 4);
+        for (auto& d : devices_) connected += on && d.connected;
+        settings_heading(root_, "Bluetooth", connected ? fmt("%d connected", connected) : "", kGood);
 
-        list_.build(root_, 2, 20, kScreenW - 4, kBodyH - 21);
+        list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);
         rows_.clear();
-        if (!on) {
-            add_row(LV_SYMBOL_BLUETOOTH, "Turn on Bluetooth", "", kTurnOn);
-        } else {
+        list_.add_choice(LV_SYMBOL_BLUETOOTH, "Bluetooth", {"Off", "On"}, on ? 1 : 0, [this](int i) {
+            // Not now: the list this row is in is drawn again.
+            want_on_ = i == 1;
+            lv_async_call_cancel(switched_cb, this);
+            lv_async_call(switched_cb, this);
+        });
+        rows_.push_back(kValue);
+        static const int kAutoOff[] = {5, 10, 30, 0};   // minutes; 0: never
+        int at = 1;
+        for (int i = 0; i < 4; ++i)
+            if (kAutoOff[i] == power().bt_auto_off_min()) at = i;
+        list_.add_choice(LV_SYMBOL_CLOSE, "Turn off when unused", {"5 min", "10 min", "30 min", "Never"}, at,
+                         [](int i) { power().set_bt_auto_off_min(kAutoOff[i]); });
+        rows_.push_back(kValue);
+        if (on) {
             for (size_t i = 0; i < devices_.size(); ++i) {
                 const BtDevice& d = devices_[i];
                 add_row(d.connected ? LV_SYMBOL_OK : LV_SYMBOL_BLUETOOTH, d.name,
@@ -97,12 +118,13 @@ private:
                                   &zs_font_12, kMuted);
             lv_obj_set_width(tip, kScreenW - 20);
             lv_label_set_long_mode(tip, LV_LABEL_LONG_WRAP);
-            lv_obj_set_pos(tip, 10, 50);
+            lv_obj_set_pos(tip, 10, 96);   // under the three rows
         }
-        if (keep >= 0) list_.focus(keep);
+        if (keep > 0 && keep < list_.size()) list_.focus(keep);
     }
 
-    static constexpr int kTurnOn = -1, kScan = -2;
+    // What a row is, when it isn't a device: one of the two value rows, or Scan.
+    static constexpr int kValue = -1, kScan = -2;
 
     void add_row(const char* icon, const std::string& text, const std::string& value, int what) {
         int row = int(rows_.size());
@@ -132,14 +154,21 @@ private:
         show();
     }
 
+    static void switched_cb(void* p) {
+        auto* s = static_cast<BluetoothSection*>(p);
+        hal().set_bt_enabled(s->want_on_);
+        if (s->want_on_) {
+            s->busy("Turning on Bluetooth...");
+            usleep(1500 * 1000);   // bluetoothd powers the adapter a moment after
+        }
+        s->devices_ = hal().bt_devices();
+        s->show();
+    }
+
     void activate(int row) {
         if (row < 0 || row >= int(rows_.size())) return;
         int what = rows_[size_t(row)];
-        if (what == kTurnOn) {
-            hal().set_bt_enabled(true);
-            busy("Turning on Bluetooth...");
-            usleep(1500 * 1000);   // bluetoothd powers the adapter a moment after
-        } else if (what == kScan) {
+        if (what == kScan) {
             scan();
             return;
         } else if (what >= 0 && what < int(devices_.size())) {
@@ -161,12 +190,15 @@ private:
 
     lv_obj_t* root_ = nullptr;
     std::vector<BtDevice> devices_;
-    std::vector<int> rows_;   // per list row: a device index, kTurnOn or kScan
+    std::vector<int> rows_;   // per list row: a device index, kValue or kScan
     ListView list_;
     int n_ = 0;
+    const char* back_;        // what Esc is called in the bar ("Settings" or "Back")
+    bool on_ = false;         // Bluetooth, as the list was last drawn
+    bool want_on_ = false;    // the switch, until switched_cb() acts on it
 };
 }  // namespace
 
-std::unique_ptr<App> make_bluetooth_app() { return std::make_unique<BluetoothApp>(); }
+std::unique_ptr<App> make_bluetooth_section(const char* back) { return std::make_unique<BluetoothSection>(back); }
 
 }  // namespace zs
