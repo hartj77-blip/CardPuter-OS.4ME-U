@@ -59,6 +59,22 @@ apt-get install -y -qq --no-install-recommends curl ca-certificates file dbus sy
 zeroos-apps refresh 2>/dev/null && ok "catalog read" || bad "zeroos-apps refresh"
 ids=${*:-$(awk -F= '$1 == "app" {print $2}' "$APPS/zeroos-apps.index")}
 offered=$(awk -v RS= '{ split($0, l, "\n"); print substr(l[1], 5) }' /var/lib/zeroos/apps/catalog)
+# Apps that are part of ZeroOS now (RETIRED in zeroos-apps; Battery is in
+# Settings). The apps repository still builds them, for devices on an older
+# ZeroOS, so they may be in the index: this ZeroOS must not offer them, and
+# they are not among the apps to install below.
+retired=$(sed -n 's/^RETIRED="\(.*\)"$/\1/p' "$ROOT/image/stage-zeroos/files/apps/zeroos-apps")
+wanted=""
+for id in $ids; do
+    case " $retired " in
+        *" $id "*)
+            echo "$offered" | grep -qx "$id" && bad "$id is part of ZeroOS now, but it is still offered" ||
+                ok "$id is part of ZeroOS now: not offered"
+            continue ;;
+    esac
+    wanted="$wanted $id"
+done
+ids=$wanted
 for id in $ids; do
     echo "$offered" | grep -qx "$id" || bad "$id is in the index but not offered (wrong ABI or a bad entry?)"
 done
