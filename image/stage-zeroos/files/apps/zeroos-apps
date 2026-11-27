@@ -537,6 +537,37 @@ note_brought() {
         mv -f "$STATE_DIR/brought.new" "$STATE_DIR/brought"
 }
 
+# needed_by <pkg...>: every installed package they need, through Depends and
+# Pre-Depends, every alternative, and every installed provider of a virtual
+# one (apt-cache depends --installed leaves virtual ones out).
+needed_by() {
+    dpkg-query -W -f '${db:Status-Abbrev}\t${Package}\t${Provides}\t${Pre-Depends}, ${Depends}\n' 2>/dev/null |
+        awk -F'\t' -v start="$*" '
+            function names(s, out,   n, i, a, t) {
+                n = split(s, a, /[,|]/); out[0] = 0
+                for (i = 1; i <= n; i++) {
+                    t = a[i]; sub(/\(.*/, "", t); sub(/:.*/, "", t); gsub(/[[:space:]]/, "", t)
+                    if (t != "") out[++out[0]] = t
+                }
+            }
+            $1 ~ /^ii/ {
+                inst[$2] = 1; deps[$2] = $4
+                names($3, p); for (i = 1; i <= p[0]; i++) prov[p[i]] = prov[p[i]] " " $2
+            }
+            END {
+                n = split(start, q, " "); head = 1
+                for (i = 1; i <= n; i++) seen[q[i]] = 1
+                while (head <= n) {
+                    names(deps[q[head++]], d)
+                    for (i = 1; i <= d[0]; i++) {
+                        m = split((d[i] in inst ? d[i] : "") prov[d[i]], c, " ")
+                        for (j = 1; j <= m; j++) if (!(c[j] in seen)) { seen[c[j]] = 1; q[++n] = c[j] }
+                    }
+                }
+                for (k in seen) print k
+            }' | sort -u
+}
+
 # After an autoremove: purge what apps brought in that apt keeps only because
 # it also satisfies a dependency something else already has met another way
 # (Dock's desktop brings pinentry-gnome3, which provides gpg-agent's pinentry,
@@ -578,8 +609,7 @@ take_brought() {
         fi
         # Something else needs some of them: keep all those it depends on.
         # shellcheck disable=SC2086
-        keep=$(apt-cache depends --installed --recurse --no-recommends --no-suggests --no-conflicts \
-                   --no-breaks --no-replaces --no-enhances $outside 2>/dev/null | grep -v '^[[:space:]<]' | sort -u)
+        keep=$(needed_by $outside)
         cands=$(comm -23 <(echo "$cands") <(sort -u <(echo "$keep") <(echo "$outside")))
         log "left behind: $(echo "$outside" | grep -c .) others need some ($(echo "$outside" | head -3 | tr '\n' ' ')), $(echo "$cands" | grep -c .) left to try"
     done
