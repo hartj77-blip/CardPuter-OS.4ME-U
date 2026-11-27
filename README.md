@@ -317,7 +317,7 @@ separate package with its own version, so updating one app never touches another
 | Tether | Get online through your phone over Wi-Fi, USB or Bluetooth ([guide](docs/TETHER.md)) |
 | Router | Plug in a laptop and send its traffic through a Tailscale exit node |
 | Net Tools | Find devices, scan ports, trace routes, look up DNS, capture packets, share Ethernet |
-| Car | Music in the car, as a USB stick or over Bluetooth ([guide](docs/CAR.md)) |
+| Car | Music in the car, over one USB cable that also charges (as a USB stick or an iPod) or over Bluetooth ([guide](docs/CAR.md)) |
 | AI | Chat with Claude, ChatGPT, Gemini, OpenRouter, Groq, Mistral or a local Ollama server, using your own API key ([guide](docs/AI.md)) |
 | Dev Tools | Code editor and runner, REPL, Git, and a serial monitor for Arduino and ESP32 boards ([guide](docs/DEV.md)) |
 | Libretro | NES, Game Boy and GBA, plus SNES, Mega Drive, PlayStation and more with libretro cores. Bring your own games ([guide](docs/GAMES.md)) |
