@@ -107,25 +107,6 @@ dpkg --remove-architecture armhf 2>/dev/null || true
 apt-get purge -y brcmfmac-nexmon-dkms 2>/dev/null || true
 apt-get purge -y plymouth 2>/dev/null || true
 
-# Dock mode's desktop: the stock Raspberry Pi desktop (labwc-pi, wf-panel-pi,
-# pcmanfm-pi) on the HDMI monitor; dock-session uses it when it's here. Its
-# packages bring a login screen, a boot splash and background services that
-# would fight ZeroShell for the screen or cost RAM (446 MB): mask them first,
-# so their install scripts can't start or enable them. Plymouth comes back
-# (rpd-common needs it) but stays masked, and there's no "splash" on the
-# kernel command line. Tested on a Cardputer Zero (2026-11-25): about 300 MB
-# of disk; about 155-205 MB of RAM left while docked.
-systemctl mask lightdm.service plymouth-start.service plymouth-read-write.service \
-    plymouth-quit.service plymouth-quit-wait.service plymouth-halt.service \
-    plymouth-reboot.service plymouth-poweroff.service plymouth-kexec.service \
-    packagekit.service packagekit-offline-update.service rpcbind.service rpcbind.socket \
-    nfs-client.target accounts-daemon.service
-apt-get install -y --no-install-recommends rpd-wayland-core wf-panel-pi pcmanfm-pi lxterminal \
-    rpd-common pixflat-icons pixflat-theme rpd-wallpaper-trixie lxpolkit \
-    wfplug-netman wfplug-volumepulse wfplug-batt wfplug-clock wfplug-menu wfplug-power
-# lightdm's install makes itself the display manager: ZeroShell is the UI here.
-rm -f /etc/systemd/system/display-manager.service
-
 # ZeroShell owns tty1's screen; stop keys leaking into a login prompt behind it.
 systemctl mask getty@tty1.service
 systemctl enable zeroshell.service NetworkManager.service bluetooth.service earlyoom.service

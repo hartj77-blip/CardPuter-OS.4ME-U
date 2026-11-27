@@ -12,13 +12,8 @@ pkexec
 fonts-noto-cjk
 i2c-tools
 python3-smbus2
-labwc
 foot
-fuzzel
-waybar
-swaybg
 wlr-randr
-chromium
 mpv
 mc
 curl

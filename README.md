@@ -272,8 +272,9 @@ update and install apps. Bluetooth is also built in, but lives inside Settings.
 
 ### Installable
 
-Everything else comes from the Apps app. Terminal, Files and Dock are already on the SD card
-image, but you can remove them like anything else. The code for these lives in
+Everything else comes from the Apps app. Terminal and Files are already on the SD card
+image, but you can remove them like anything else. Dock isn't: it brings the Raspberry Pi
+desktop and Chromium (about 300 MB), so install it from Apps if you use a monitor. The code for these lives in
 [CardPuter-Apps.4ME-U](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U). Each one is a
 separate package with its own version, so updating one app never touches another.
 

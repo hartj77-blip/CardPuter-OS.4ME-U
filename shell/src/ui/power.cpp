@@ -296,7 +296,10 @@ void Power::watch_dock(uint32_t now_ms) {
     DisplayStatus d = h.display();
     if (d.hdmi_connected && !hdmi_was_ && !d.dock_running && !hdmi_claimed_by_app()) {
         std::string mode = prefs::get_str("dock.on_hdmi", "ask");
-        if (mode == "auto") {
+        if (mode == "auto" && !app_find("dock")) {
+            // The desktop comes with the Dock app: nothing to start yet.
+            shell_toast("Monitor connected: get Dock from Apps to use it");
+        } else if (mode == "auto") {
             h.dock_start();
             shell_toast("Monitor connected: starting Dock mode");
         } else if (mode == "ask") {

@@ -4,7 +4,9 @@
 #   zeroos-dock open terminal | browser [URL] | files | video [FILE] | rdp HOST
 uid=$(id -u pi 2>/dev/null || echo 1000)
 case "$1" in
-    start)  exec systemctl --no-block start zeroos-dock.service ;;
+    start)  # The desktop comes with the Dock app (Apps).
+            [ -x /usr/bin/labwc-pi ] || { echo "No desktop: install Dock from Apps" >&2; exit 1; }
+            exec systemctl --no-block start zeroos-dock.service ;;
     stop)   exec systemctl --no-block stop zeroos-dock.service ;;
     status) systemctl is-active zeroos-dock.service ;;
     open)

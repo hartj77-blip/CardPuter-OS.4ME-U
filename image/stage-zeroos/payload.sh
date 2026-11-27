@@ -10,7 +10,7 @@ set -euo pipefail
 umask 022
 F=$1 D=$2 VERSION=$3 BIN=$4
 
-install -d "$D/usr/bin" "$D/usr/lib/zeroos" "$D/etc/zeroos/dock" "$D/etc/systemd/system" \
+install -d "$D/usr/bin" "$D/usr/lib/zeroos" "$D/etc/zeroos" "$D/etc/systemd/system" \
            "$D/etc/polkit-1/rules.d" "$D/etc/udev/rules.d" "$D/etc/sysctl.d" "$D/etc/modules-load.d" \
            "$D/etc/rpi/swap.conf.d" "$D/etc/systemd/zram-generator.conf.d" "$D/etc/systemd/journald.conf.d"
 
@@ -32,9 +32,18 @@ install -m 0755 "$F/zeroos-measure"            "$D/usr/bin/zeroos-measure"
 install -m 0755 "$F/zeroos-power-perms"        "$D/usr/lib/zeroos/power-perms"
 # BlueZ options for Bluetooth LE gamepads; the postinst applies them.
 install -m 0755 "$F/bluetooth/zeroos-bluetooth-conf" "$D/usr/lib/zeroos/bluetooth-conf"
-# Dock mode: labwc desktop on the HDMI monitor (docs/DOCK.md).
-install -m 0644 "$F/dock/rc.xml" "$F/dock/menu.xml" "$F/dock/autostart" "$F/dock/environment" \
-                "$F/dock/waybar.json" "$F/dock/waybar.css" "$D/etc/zeroos/dock/"
+# Dock mode: the stock Raspberry Pi desktop on the HDMI monitor (docs/DOCK.md).
+# The desktop itself comes with the Dock app (Apps). It brings a login screen,
+# a boot splash and background services that would fight ZeroShell for the
+# screen or cost RAM: masked here, in the base, so they're masked before Dock
+# can ever be installed and their install scripts can't start them.
+for u in lightdm.service plymouth-start.service plymouth-read-write.service \
+         plymouth-quit.service plymouth-quit-wait.service plymouth-halt.service \
+         plymouth-reboot.service plymouth-poweroff.service plymouth-kexec.service \
+         packagekit.service packagekit-offline-update.service rpcbind.service \
+         rpcbind.socket nfs-client.target accounts-daemon.service; do
+    ln -sf /dev/null "$D/etc/systemd/system/$u"
+done
 install -m 0755 "$F/dock/dock-session"         "$D/usr/lib/zeroos/dock-session"
 install -m 0755 "$F/dock/dock-resolution" "$F/dock/vt-switch" "$F/dock/dock-keys" "$D/usr/lib/zeroos/"
 install -m 0644 "$F/dock/zeroos-dock-keys.service" "$D/etc/systemd/system/"

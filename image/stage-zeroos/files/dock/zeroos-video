@@ -1,16 +1,13 @@
 #!/bin/sh
 # Video player for Dock mode. H.264 is decoded by the VideoCore hardware
-# (V4L2 M2M); other formats fall back to the CPU. With no file given, pick
-# one from ~/Videos.
+# (V4L2 M2M); other formats fall back to the CPU. With no file given, show
+# ~/Videos in the file manager.
 #   zeroos-video [FILE|URL]
 if [ $# -eq 0 ]; then
+    # No file: show ~/Videos in the desktop's file manager (double-click plays).
     dir="$HOME/Videos"
     [ -d "$dir" ] || dir="$HOME"
-    f=$(cd "$dir" && find . -maxdepth 3 -type f \( -iname '*.mp4' -o -iname '*.mkv' -o -iname '*.webm' \
-            -o -iname '*.mov' -o -iname '*.avi' -o -iname '*.m4v' \) | sed 's|^\./||' | sort |
-        fuzzel --dmenu --prompt "Video: ")
-    [ -n "$f" ] || exit 0
-    set -- "$dir/$f"
+    exec pcmanfm "$dir"
 fi
 # A Jellyfin stream from the Media app: its sign-in header (and where to
 # start) are in a file only we can read, not on the command line.

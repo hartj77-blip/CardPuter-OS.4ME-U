@@ -20,7 +20,7 @@ on:
         # image has them ready, as it did when they were built in.
         type: string
         required: false
-        default: 'terminal files dock'
+        default: 'terminal files'
   pull_request:
     paths:
       - image/**
@@ -37,7 +37,7 @@ on:
         required: false
       apps:
         description: Apps to preinstall, space-separated (e.g. "notes media"); empty for the bare OS
-        default: 'terminal files dock'
+        default: 'terminal files'
         required: false
 
 concurrency:

@@ -8,7 +8,8 @@ Clock, Compass, Dock, Files, GPS, IR Remote, Media, Mesh, Notes, Remote, Sync, S
 Tether and AI, the [Dev Tools](DEV.md) pack (Code, REPL, Git and Serial) and [Games](GAMES.md).
 
 Terminal, Files and Dock were built in up to ZeroOS 0.1.x. The release SD card image still comes
-with them installed. A device updated from 0.1.x gets them back the first time you open **Apps**
+with Terminal and Files installed; Dock is in Apps, since it brings the Raspberry Pi desktop
+and Chromium (about 300 MB). A device updated from 0.1.x gets them back the first time you open **Apps**
 and press **Tab > U** (which that update needs anyway, for the new app ABI). Their system parts stay
 in ZeroOS: the desktop on the monitor (`zeroos-dock`), which Files, Camera, Mesh and Remote also
 use, and the console service behind Terminal. Remote's SSH and mosh need the Terminal app.

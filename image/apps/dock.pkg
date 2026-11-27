@@ -1,6 +1,13 @@
-# Dock (docs/DOCK.md): start the desktop on an HDMI monitor. The desktop
-# itself (zeroos-dock, labwc, waybar) stays in the zeroos package: Files,
-# Camera, Mesh and Remote open things on the monitor with it, and the
-# Settings option "On HDMI: start Dock mode" works without this app.
+# Dock (docs/DOCK.md): the stock Raspberry Pi desktop on an HDMI monitor.
+# This app brings the desktop itself (about 300 MB with Chromium), so the SD
+# card image stays small for people who never dock. zeroos-dock, its service
+# and the masks that keep the desktop's login screen, boot splash and
+# background services off stay in the zeroos package (0.8.5 or newer has the
+# masks): Files, Camera, Mesh and Remote open things on the monitor with it.
 NAME="Dock"
-SUMMARY="Desktop on an HDMI monitor: browser, video, terminal, files"
+SUMMARY="Desktop on an HDMI monitor: the Raspberry Pi desktop with browser, terminal and files (about 300 MB)"
+DEPENDS="zeroos (>= 0.8.5), rpd-wayland-core, wf-panel-pi, pcmanfm-pi, lxterminal, rpd-common, pixflat-icons, pixflat-theme, rpd-wallpaper-trixie, lxpolkit, wfplug-netman, wfplug-volumepulse, wfplug-batt, wfplug-clock, wfplug-menu, wfplug-power, chromium"
+NEEDS="Raspberry Pi desktop, Chromium"
+# lightdm's install makes itself the display manager (it's masked by zeroos):
+# disabling it takes that link away again. ZeroShell is the UI here.
+DISABLE_DEPS="lightdm.service"
