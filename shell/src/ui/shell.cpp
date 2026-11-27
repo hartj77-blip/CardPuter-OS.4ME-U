@@ -844,8 +844,18 @@ void Shell::screen_changed() {
     bool off = power().screen_off();
     bool idle = off || handoff_;   // nothing of ours on screen
     platform_set_low_power(idle);
+    // LVGL counts these calls: two "off" need two "on". This runs again each
+    // time the screen dims, goes off or wakes while an app has the screen, so
+    // switch only on a change. Otherwise the count goes below zero and home
+    // is never drawn again after the app (a black screen, keys still working),
+    // or stays above zero and a toast is drawn over the app.
+    auto set_drawing = [&](bool on) {
+        if (on == drawing_) return;
+        drawing_ = on;
+        lv_display_enable_invalidation(disp, on);
+    };
     if (!idle) {
-        lv_display_enable_invalidation(disp, true);
+        set_drawing(true);
         lv_timer_set_period(tick_timer_, 100);
     }
     if (!hal().has_backlight()) {
@@ -859,8 +869,16 @@ void Shell::screen_changed() {
     }
     if (idle) {
         // Draw the last frame (not over the console), then stop drawing.
-        if (!handoff_) lv_refr_now(disp);
-        lv_display_enable_invalidation(disp, false);
+        if (!handoff_) {
+            // An app closed while the screen was off: nothing of ours was
+            // drawn since it opened, so draw all of it over its last picture.
+            if (!drawing_) {
+                set_drawing(true);
+                lv_obj_invalidate(screen_);
+            }
+            lv_refr_now(disp);
+        }
+        set_drawing(false);
         lv_timer_set_period(tick_timer_, 500);
     } else {
         update_statusbar();
