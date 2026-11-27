@@ -12,8 +12,8 @@
 namespace zs::games {
 
 const std::vector<CoreDef>& cores() {
-    // The Debian ones come with the Games pack (image/apps/games.pkg); the rest
-    // download from libretro's nightly builds in the Games app (C).
+    // The Debian ones come with the Libretro pack (image/apps/games.pkg); the rest
+    // download from libretro's nightly builds in the Libretro app (C).
     static const std::vector<CoreDef> v = {
         {"nestopia", "Nestopia", "libretro-nestopia", "nestopia", 1900},
         {"fceumm", "FCEUmm", nullptr, "fceumm", 1500},

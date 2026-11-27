@@ -45,8 +45,8 @@ zs_app(git      "Git"       LV_SYMBOL_SHUFFLE  0xf05033 make_git_app      MODULE
 zs_app(serial   "Serial"    LV_SYMBOL_USB      0x8a5cd6 make_serial_app   MODULE dev ORDER 330
        SOURCES src/apps/dev/serial.cpp)
 
-# Games: one installable app (module "games", docs/GAMES.md) that plays games
+# Libretro: one installable app (module "games", docs/GAMES.md) that plays games
 # for classic consoles with libretro cores, on the built-in screen.
-zs_app(games    "Games"     LV_SYMBOL_PLAY     0xd9480f make_games_app    ORDER 400
+zs_app(games    "Libretro"  LV_SYMBOL_PLAY     0xd9480f make_games_app    ORDER 400
        SOURCES src/apps/games/games.cpp src/apps/games/emu.cpp src/apps/games/pad.cpp
                src/apps/games/systems.cpp src/apps/kit/run.cpp src/apps/kit/ui.cpp)

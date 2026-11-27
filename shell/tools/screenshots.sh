@@ -19,7 +19,7 @@ python3 -I "$ROOT/tools/irdb/build_irdb.py" --src "$ROOT/tools/irdb/sample" --ou
 mkdir -p "$DEMO/IR"
 cp "$DEMO/irdb/TVs/Samsung/Samsung_TV.ir" "$DEMO/IR/Living room TV.ir"
 export ZEROOS_IR_DB="$DEMO/irdb"
-# Dev Tools: a project that is a Git repository. Games: the test-pattern
+# Dev Tools: a project that is a Git repository. Libretro: the test-pattern
 # core built next to the binary (tests/games/testcore.c), a game for it, and
 # a game for a console with no core yet.
 mkdir -p "$DEMO/Code/weather-station/.git" "$DEMO/Games/test" "$DEMO/Games/gba"

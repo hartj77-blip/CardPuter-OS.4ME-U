@@ -32,7 +32,7 @@ constexpr uint32_t kFalseWakeWindowMs = 5 * 60 * 1000;
 constexpr uint32_t kPickupPauseMs = 15 * 60 * 1000;   // 3 false wakes (a bag, a pocket): pause
 constexpr uint32_t kLockPickupPauseMs = 5000;   // LOCK (Tab held): no pickup wake while still in hand
 
-// An open app that drives the HDMI port itself (Games puts the game on a TV)
+// An open app that drives the HDMI port itself (Libretro puts the game on a TV)
 // says so in $XDG_RUNTIME_DIR/zeroos-hdmi-app: "<pid> <app id>". A monitor
 // plugged in then is for that app, so Dock isn't opened over it. Apps run in
 // this process, so the pid is ours while the file is current; one left by a
@@ -287,7 +287,7 @@ void Power::set_docked(bool docked, uint32_t now_ms) {
 }
 
 // HDMI plugged in: open the Dock app, or start Dock mode (dock.on_hdmi =
-// ask | auto | off), unless the open app uses HDMI itself (Games on a TV).
+// ask | auto | off), unless the open app uses HDMI itself (Libretro on a TV).
 // Monitor unplugged for 3 s: stop Dock mode.
 void Power::watch_dock(uint32_t now_ms) {
     if (now_ms - last_dock_check_ < 1000) return;

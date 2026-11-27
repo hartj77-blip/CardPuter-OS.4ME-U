@@ -1,4 +1,4 @@
-/* A tiny libretro core for testing the Games app without a real emulator or
+/* A tiny libretro core for testing the Libretro app without a real emulator or
  * game: colour bars and a square you move with the d-pad (A makes it orange
  * and beeps). It keeps its position in save states and counts A presses in
  * its battery save, so both can be checked. Plays files named *.zstest.

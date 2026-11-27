@@ -1,4 +1,4 @@
-// UI pieces shared by the app packs (Dev Tools, Games): a one-line "type
+// UI pieces shared by the app packs (Dev Tools, Libretro): a one-line "type
 // something" screen, a scrolling text panel for streamed command output, a
 // title row with key hints, and running a command in the Terminal app.
 #pragma once

@@ -114,7 +114,7 @@ const MockApp kMockApps[] = {
     {"sysmon", "System", "CPU, memory and what uses it", "", 50, nullptr},
     {"dev", "Dev Tools", "Projects with one-key run, micro editor, REPLs, Git and a serial monitor",
      "git, micro, make, gcc, libc6-dev, python3, lua5.4, bc, sqlite3", 180, nullptr},
-    {"games", "Games", "Play NES, Game Boy and GBA games (more consoles with downloadable cores)",
+    {"games", "Libretro", "Play NES, Game Boy and GBA games (more consoles with downloadable cores)",
      "libretro-nestopia, libretro-gambatte, libretro-mgba, curl, unzip", 140, nullptr},
     // A few from M5Stack's app store, as its registry.json lists them.
     {"m5-acidzero", "AcidZero", "Acid bass synth with a 16-step sequencer and MIDI CC control",

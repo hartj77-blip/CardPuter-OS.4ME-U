@@ -333,7 +333,7 @@ letter, and Ctrl + the letter runs it straight away.
 | Mesh | `Tab: info`, Tab switches Chat / Info | Tabs on Left / Right; chat is Text. Menu: I Node info, C Channel, P Radio settings |
 | AI | `Tab: settings`, Up / Down history | Chat is Text; Up / Down history in an empty box. Menu: N New chat, H History, M Model, P Settings |
 | Dev Tools | Code: `G` `N` `R` `T`; Git: `C` `D` `F` `L` `P` `S` `T` `U` `V`; Serial: `E`, Tab | Projects and files are Lists; every letter moves to the menu with the same letter (Git: C Commit, P Push, U Pull, L Log, D Changes…) |
-| Games | `C` cores, pad uses most letters | Library is a List. Menu: C Cores, D Delete save. In a game: Game screen, hold Esc = pause menu |
+| Libretro | `C` cores, pad uses most letters | Library is a List. Menu: C Cores, D Delete save. In a game: Game screen, hold Esc = pause menu |
 | System | Left / Right switch pages | Tabs on Left / Right |
 | Compass, Dock | Mostly Enter / Esc | Kit screens; nothing to move |
 

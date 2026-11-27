@@ -88,7 +88,7 @@ bool Emulator::load(const std::string& core_path, const std::string& game, int m
                     std::string& error) {
 #ifdef __EMSCRIPTEN__
     (void)core_path; (void)game; (void)max_w; (void)max_h;
-    error = "Games can't run in the browser simulator.";
+    error = "Libretro can't run in the browser simulator.";
     return false;
 #else
     stop();

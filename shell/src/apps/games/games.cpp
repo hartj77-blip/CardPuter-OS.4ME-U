@@ -1,4 +1,4 @@
-// Games: play your own games for classic consoles on the built-in screen, with
+// Libretro: play your own games for classic consoles on the built-in screen, with
 // libretro emulator cores (the ones RetroArch uses). See docs/GAMES.md.
 //
 //   Library   Enter a system      C cores
@@ -120,7 +120,7 @@ private:
     void show_library() {
         page_ = Page::Library;
         clear();
-        kit::title_row(root_, "Games", "C cores");
+        kit::title_row(root_, "Libretro", "C cores");
         std::vector<const System*> have;
         for (auto& s : systems())
             if (!games_for(s).empty()) have.push_back(&s);
