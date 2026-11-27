@@ -30,13 +30,15 @@ bad() { echo "FAIL $1"; fails=$((fails + 1)); }
 ABI=$("$ZS" --app-abi) || { echo "zeroshell --app-abi failed" >&2; exit 1; }
 
 # --- a stand-in for the zeroos package: ZeroShell and the app ABI ------------
+# Its version is newer than any release, so an app that needs a newer ZeroOS
+# (Depends: zeroos (>= x.y.z)) installs against this tree's ZeroShell.
 P=$(mktemp -d)
 install -D -m 0755 "$ZS" "$P/usr/bin/zeroshell"
 install -D -m 0755 "$ROOT/image/stage-zeroos/files/apps/zeroos-apps" "$P/usr/bin/zeroos-apps"
 mkdir -p "$P/DEBIAN"
 cat > "$P/DEBIAN/control" <<EOF
 Package: zeroos
-Version: 0.0.0-test
+Version: 999.0.0-test
 Architecture: $(dpkg --print-architecture)
 Maintainer: test <noreply@github.com>
 Provides: zeroos-app-abi-$ABI
