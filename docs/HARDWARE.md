@@ -46,7 +46,7 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | nexmon breaks onboard Wi-Fi | Purge `brcmfmac-nexmon-dkms` |
 | Wi-Fi region hard-coded to AE | `cfg80211.ieee80211_regdom` from `WIFI_COUNTRY` (default US) |
 | `/dev/spidev*` root-only | Create the `spi` group |
-| Volume and mute need PipeWire, which only runs in a login session | Linger for `pi`; ZeroShell starts after `user@1000`; `pipewire-alsa` so sox plays through it. After 0.9.0 only PipeWire's sockets start with the session: PipeWire itself starts with the first sound and is stopped when unused (PERFORMANCE.md, "Started when needed") |
+| Volume and mute need PipeWire, which only runs in a login session | Linger for `pi`; ZeroShell starts after `user@1000`; `pipewire-alsa` so sox plays through it. After 0.9.1 only PipeWire's sockets start with the session: PipeWire itself starts with the first sound and is stopped when unused (PERFORMANCE.md, "Started when needed") |
 | Speaker close to silent on first boot (WirePlumber default 0.064) | Default sink volume 0.216 (60%), as M5 ships |
 | Wrong Wi-Fi password stays saved and is retried | ZeroShell deletes the profile when a connect with a typed password fails |
 | `/dev/i2c-*` missing (M5 loads `i2c-dev` in a script we drop) | `/etc/modules-load.d/zeroos.conf` |

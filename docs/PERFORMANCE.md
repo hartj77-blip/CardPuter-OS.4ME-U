@@ -36,7 +36,7 @@ as they come in.
 
 The rule: a service runs while something uses it, and not otherwise. GPS,
 Tailscale, Sync, Mesh, the camera and Dock already worked that way. After
-0.9.0 so do sound and Bluetooth, and the status bar no longer starts programs
+0.9.1 so do sound and Bluetooth, and the status bar no longer starts programs
 to find out that nothing changed. None of this has been measured on a unit
 yet **(measure)**; the checks to run are in
 [HARDWARE-TEST.md](HARDWARE-TEST.md#started-when-needed).

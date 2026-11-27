@@ -30,7 +30,7 @@ override afterwards with `sudo systemctl revert zeroshell`.
 
 ## Started when needed
 
-New after 0.9.0 and not yet checked on a unit ([PERFORMANCE.md](PERFORMANCE.md#started-when-needed)). Over SSH, `pgrep -l 'pipewire|wireplumber|bluetoothd'` shows what is running.
+New after 0.9.1 and not yet checked on a unit ([PERFORMANCE.md](PERFORMANCE.md#started-when-needed)). Over SSH, `pgrep -l 'pipewire|wireplumber|bluetoothd'` shows what is running.
 
 - [ ] **After boot, Bluetooth off, nothing playing**: two minutes after the home screen appears, `pgrep -l 'pipewire|wireplumber|bluetoothd'` prints nothing. `journalctl -u zeroshell -b | grep stopping` shows why.
 - [ ] **First sound**: with PipeWire stopped, play a song in Media. It plays; note how long the start takes. `pgrep pipewire` now finds it. Stop the song: about a minute later PipeWire is gone again.
