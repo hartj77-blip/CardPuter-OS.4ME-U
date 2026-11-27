@@ -13,11 +13,15 @@ class Shell {
 public:
     // Builds the status bar and home screen on the active display, and hooks
     // the keypad so the shell sees every key before LVGL does.
-    void start(lv_indev_t* keypad);
+    // `tour`: open the welcome tour first, if it is due (ui/welcome.h).
+    void start(lv_indev_t* keypad, bool tour = true);
 
     void open_app(const std::string& id);
     void open_app(const std::string& id, const std::string& arg);
     std::string take_app_arg();
+    // What the open app comes back with when one it opens is closed (Esc).
+    // The welcome tour: its last page.
+    void set_open_arg(const std::string& arg) { app_open_arg_ = arg; }
     void go_home();
     // Esc held down (keypad hook): close the panel and go home now.
     void hold_home();

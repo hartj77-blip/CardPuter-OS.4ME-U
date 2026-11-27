@@ -36,7 +36,10 @@ class Device:
         with open(self.fb, "wb") as f:
             f.write(bytes(W * H * 2))
         os.mkfifo(self.kb)
-        env = dict(os.environ, LD_PRELOAD=shim, ZS_FRAMEBUFFER=self.fb, ZS_KEYBOARD=self.kb, HOME=self.dir)
+        # ZS_WELCOME=0: start at Home, not the welcome tour a new user gets
+        # (welcome_test() turns it back on).
+        env = dict(os.environ, LD_PRELOAD=shim, ZS_FRAMEBUFFER=self.fb, ZS_KEYBOARD=self.kb, HOME=self.dir,
+                   ZS_WELCOME="0")
         env.update(env_extra or {})
         # A device build makes the installable apps (Notes among them) as modules
         # next to the binary; load them from there, as if they were installed.
@@ -305,7 +308,50 @@ def main():
     if failures:
         print(d.read_log())
         sys.exit(1)
+    welcome_test(binary, shim, shots, check)
+    if failures:
+        sys.exit(1)
     print("device_test: all passed")
+
+
+def welcome_test(binary, shim, shots, check):
+    """A new user gets the welcome tour (ui/welcome.h) once, and Esc skips it."""
+    d = Device(binary, shim, shots, env_extra={"ZS_WELCOME": "1"})
+    opened = lambda: re.findall(r"^zeroshell: open (\S+)$", d.read_log(), re.M)
+    try:
+        time.sleep(1.0)
+        check("a new user starts in the welcome tour", opened()[:1] == ["welcome"], str(opened()))
+        d.shot("6-welcome")
+        body = slice(W * 2 * 20, None)   # under the status bar, whose clock moves
+        first = d.frame()[body]
+        d.nav("enter")
+        time.sleep(0.3)
+        check("enter turns the page", d.frame()[body] != first)
+        d.nav("left")    # the arrows page: Left lights its key, it doesn't turn back
+        time.sleep(0.3)
+        d.shot("6b-welcome-arrows")
+        d.tap(KEY["esc"])   # back to the first page
+        time.sleep(0.3)
+        check("esc goes back a page", d.frame()[body] == first)
+        d.tap(KEY["esc"])   # there, Esc asks to skip; Enter skips
+        time.sleep(0.3)
+        d.nav("enter")
+        time.sleep(0.6)
+        check("skipping it goes home", opened()[-1:] == ["home"], str(opened()))
+    finally:
+        rc = d.stop()
+    conf = os.path.join(d.dir, ".config", "zeroos", "settings.conf")
+    saved = open(conf).read() if os.path.exists(conf) else ""
+    check("it is remembered as seen", "welcome.done=1" in saved, saved)
+    check("stops cleanly after the tour", rc == 0, f"exit {rc}")
+    # The same user again: straight to Home.
+    again = Device(binary, shim, None, env_extra={"ZS_WELCOME": "1", "HOME": d.dir})
+    try:
+        time.sleep(1.0)
+        log = again.read_log()
+    finally:
+        again.stop()
+    check("the next start goes straight home", "zeroshell: open welcome" not in log, log)
 
 
 if __name__ == "__main__":

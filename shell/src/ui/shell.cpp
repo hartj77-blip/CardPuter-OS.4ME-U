@@ -22,6 +22,7 @@
 #include "ui/theme.h"
 #include "ui/tracker.h"
 #include "ui/wallpaper.h"
+#include "ui/welcome.h"
 
 // lv_theme_t is opaque in the public API; a child theme needs its size.
 #include "src/themes/lv_theme_private.h"
@@ -150,7 +151,7 @@ Shell& Shell::get() {
     return s;
 }
 
-void Shell::start(lv_indev_t* keypad) {
+void Shell::start(lv_indev_t* keypad, bool tour) {
     keypad_ = keypad;
     if (keypad_) {
         g_orig_read = lv_indev_get_read_cb(keypad_);
@@ -238,6 +239,8 @@ void Shell::start(lv_indev_t* keypad) {
 
     power().start();
     go_home();
+    // A new owner: the welcome tour first, instead of Home (Esc skips it).
+    if (tour && welcome_due()) pending_ = kWelcomeId;
     apply_pending();
     tick_timer_ = lv_timer_create(tick_cb, 100, this);
     update_statusbar();
@@ -601,6 +604,13 @@ void Shell::apply_pending() {
             app_registry_reload();
         }
         switch_to(make_launcher(), "");
+        return;
+    }
+    if (id == kWelcomeId) {   // not an app: never in Recent or All apps
+        app_id_ = id;
+        app_open_arg_ = app_arg_;
+        switch_to(make_welcome(), "Welcome");
+        app_arg_.clear();
         return;
     }
     if (app_find(id)) home_opened(id);

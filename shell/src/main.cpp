@@ -62,7 +62,8 @@ int main(int argc, char** argv) {
     lv_init();
 
     lv_indev_t* keypad = platform_init(theme::kScreenW, theme::kScreenH, zoom);
-    Shell::get().start(keypad);
+    // A script starts at Home, as the screenshots and tests expect.
+    Shell::get().start(keypad, script.empty());
     // New apps on home after a command-line install, without a restart.
     app_watch_start();
 

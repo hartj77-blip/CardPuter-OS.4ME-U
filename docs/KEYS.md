@@ -7,6 +7,22 @@ The keys are being redesigned to work the same on every screen ([UX.md](UX.md) i
 Screens move over one at a time: everything that is part of ZeroOS itself is done, and the
 installable apps follow.
 
+## The welcome tour
+
+The first time ZeroOS starts it shows a short tour of these keys instead of the home screen. Type
+`tour` on the home screen to see it again. [Every page of it](ux/welcome-tour.png).
+
+| Key | What it does in the tour |
+| --- | --- |
+| Enter, Right | Next page |
+| Esc, Left | Previous page. On the first page, Esc asks whether to skip the tour |
+| Arrows, on the arrow keys page | Light the key you pressed, to practise |
+| 1, 2, 3, on the last page | Open Wi-Fi, Date & time or Apps. Esc there comes back to the tour |
+
+Seen once, finished or skipped, it doesn't open by itself again (`welcome.done=1` in
+`~/.config/zeroos/settings.conf`). Someone who used ZeroOS before the tour existed doesn't get it
+after updating.
+
 ## Everywhere
 
 | Key | What it does |
