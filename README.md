@@ -74,7 +74,7 @@ builds on.
 
 ## Status: what is tested and what isn't
 
-ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.9.0. It is
+ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.9.1. It is
 being written faster than it can be tried on hardware, so this section says plainly where things
 stand.
 
@@ -1272,6 +1272,7 @@ cmake -S shell -B build/device-native -DZS_BACKEND=device && cmake --build build
 gcc -shared -fPIC -o build/fakedev.so shell/tests/device/fakedev.c -ldl
 python3 shell/tests/device/device_test.py build/device-native/zeroshell build/fakedev.so
 python3 shell/tests/device/apps_test.py build/device-native/zeroshell build/fakedev.so
+python3 shell/tests/device/handoff_test.py build/device-native/zeroshell build/fakedev.so
 ```
 
 Screenshots of every screen:
