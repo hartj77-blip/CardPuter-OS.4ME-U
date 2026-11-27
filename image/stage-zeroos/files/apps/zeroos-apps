@@ -524,6 +524,63 @@ keep_extras() {
     done
 }
 
+installed_pkgs() {
+    dpkg-query -W -f '${db:Status-Abbrev} ${Package}\n' 2>/dev/null | awk '$1 == "ii" {print $2}' | sort -u
+}
+
+# What apps' installs brought in ($STATE_DIR/brought), for take_brought.
+note_brought() {
+    local pre=$1
+    mkdir -p "$STATE_DIR"
+    { cat "$STATE_DIR/brought" 2>/dev/null; comm -13 <(echo "$pre") <(installed_pkgs); } |
+        grep -E '^[a-z0-9][a-z0-9+.-]*$' | sort -u > "$STATE_DIR/brought.new" &&
+        mv -f "$STATE_DIR/brought.new" "$STATE_DIR/brought"
+}
+
+# After an autoremove: purge what apps brought in that apt keeps only because
+# it also satisfies a dependency something else already has met another way
+# (Dock's desktop brings pinentry-gnome3, which provides gpg-agent's pinentry,
+# and apt then keeps it and the whole GTK stack). Only packages still marked
+# auto, none that anything outside them depends on or recommends, and only if
+# apt's own dry run would take nothing else.
+take_brought() {
+    [ -s "$STATE_DIR/brought" ] || return 0
+    local inst cands others keep rm outside round
+    inst=$(installed_pkgs)
+    comm -12 <(sort -u "$STATE_DIR/brought") <(echo "$inst") > "$STATE_DIR/brought.new" &&
+        mv -f "$STATE_DIR/brought.new" "$STATE_DIR/brought"
+    cands=$(comm -12 "$STATE_DIR/brought" <(apt-mark showauto 2>/dev/null | sort -u))
+    [ -n "$cands" ] || return 0
+    # What the rest of the system recommends stays, as autoremove would keep it.
+    others=$(comm -23 <(echo "$inst") <(echo "$cands"))
+    # shellcheck disable=SC2086
+    keep=$(apt-cache depends --installed --no-depends --no-pre-depends --no-suggests --no-conflicts \
+               --no-breaks --no-replaces --no-enhances $others 2>/dev/null |
+           awk '$1 ~ /Recommends:$/ {print $2}' | sort -u)
+    cands=$(comm -23 <(echo "$cands") <(echo "$keep"))
+    for round in 1 2 3 4 5 6 7 8; do
+        [ -n "$cands" ] || return 0
+        # shellcheck disable=SC2086
+        rm=$(apt-get -s purge $cands 2>/dev/null) || { log "can't work out what apps left behind"; return 0; }
+        rm=$(echo "$rm" | awk '$1 == "Purg" || $1 == "Remv" {print $2}' | sort -u)
+        outside=$(comm -23 <(echo "$rm") <(echo "$cands"))
+        if [ -z "$outside" ]; then
+            [ -n "$rm" ] || return 0
+            # shellcheck disable=SC2086
+            apt-get purge -y $rm >&2 || log "could not remove what apps left behind"
+            comm -12 "$STATE_DIR/brought" <(installed_pkgs) > "$STATE_DIR/brought.new" &&
+                mv -f "$STATE_DIR/brought.new" "$STATE_DIR/brought"
+            return 0
+        fi
+        # Something else needs some of them: keep all those it depends on.
+        # shellcheck disable=SC2086
+        keep=$(apt-cache depends --installed --recurse --no-recommends --no-suggests --no-conflicts \
+                   --no-breaks --no-replaces --no-enhances $outside 2>/dev/null | grep -v '^[[:space:]<]' | sort -u)
+        cands=$(comm -23 <(echo "$cands") <(sort -u <(echo "$keep") <(echo "$outside")))
+    done
+    return 0
+}
+
 # install_debs <id> <app.deb> [extra.deb]
 install_debs() {
     local id=$1 deb=$2 extra=${3:-} pkg arch ver xpkg
@@ -540,6 +597,8 @@ install_debs() {
     fi
     # apt treats an argument as a file only if it has a slash.
     case $deb in */*) ;; *) deb=./$deb ;; esac
+    local pre
+    pre=$(installed_pkgs)
     if [ -n "$extra" ]; then
         case $extra in */*) ;; *) extra=./$extra ;; esac
         xpkg=$(dpkg-deb -f "$extra" Package 2>/dev/null)
@@ -555,6 +614,7 @@ install_debs() {
     else
         apt_put_on "$deb" || fail "Could not install $id. Nothing else changed"
     fi
+    note_brought "$pre"
     status done 100 "$id $ver installed"
 }
 
@@ -638,6 +698,7 @@ remove_app() {
     # What it brought along (Tailscale, Syncthing...), unless another app needs it.
     keep_extras
     apt-get autoremove --purge -y >&2 || log "autoremove failed; extras may be left"
+    take_brought
     status done 100 "$id removed"
 }
 

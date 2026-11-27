@@ -55,7 +55,7 @@ export ZEROOS_APPS_ALLOW_FILE=1
 apt-get update -qq >/dev/null 2>&1
 # Always on the device (Raspberry Pi OS; zeroos-apps needs curl); here an app's extras would pull them
 # in, and apt then keeps them, so they would look left behind.
-apt-get install -y -qq --no-install-recommends curl ca-certificates file dbus systemd systemd-sysv libpam-systemd dbus-user-session >/dev/null 2>&1
+apt-get install -y -qq --no-install-recommends curl ca-certificates file dbus systemd systemd-sysv libpam-systemd dbus-user-session bsdextrautils libkmod2 sensible-utils >/dev/null 2>&1
 zeroos-apps refresh 2>/dev/null && ok "catalog read" || bad "zeroos-apps refresh"
 ids=${*:-$(awk -F= '$1 == "app" {print $2}' "$APPS/zeroos-apps.index")}
 offered=$(awk -v RS= '{ split($0, l, "\n"); print substr(l[1], 5) }' /var/lib/zeroos/apps/catalog)
