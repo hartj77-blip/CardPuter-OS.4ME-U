@@ -95,6 +95,7 @@ private:
     bool handoff_ = false;
     bool handoff_camera_ = false;   // handed to the camera app, not the terminal
     bool handoff_external_ = false; // handed to an M5Stack app
+    bool drawing_ = true;           // LVGL takes redraws (off: screen off or handed over)
     uint32_t external_esc_since_ = 0;   // Esc held down since (0: it isn't)
     uint32_t handoff_since_ = 0;
     uint32_t toast_since_ = 0;
