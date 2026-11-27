@@ -77,6 +77,23 @@ foreach(_id ${_zs_ids})
   get_property(_srcs GLOBAL PROPERTY ZS_APP_${_id}_SOURCES)
   list(REMOVE_ITEM ZS_SOURCES ${_srcs})
 endforeach()
+# Apps made for M5Stack's launcher that open the LCD's DRM card by the number
+# it has on M5's system get a small preload library (src/platform/m5_drm_shim.c).
+# It travels inside the zeroshell binary, so there is still one file to ship.
+if(ZS_DEVICE)
+  add_library(zs_m5_drm_shim MODULE src/platform/m5_drm_shim.c)
+  set_target_properties(zs_m5_drm_shim PROPERTIES PREFIX "" OUTPUT_NAME m5-drm-shim)
+  target_compile_options(zs_m5_drm_shim PRIVATE -Wall -Wextra -Os -g0)
+  target_link_options(zs_m5_drm_shim PRIVATE -s)
+  target_link_libraries(zs_m5_drm_shim PRIVATE ${CMAKE_DL_LIBS})
+  set(_zs_shim_c ${CMAKE_CURRENT_BINARY_DIR}/m5_drm_shim_blob.c)
+  add_custom_command(OUTPUT ${_zs_shim_c}
+    COMMAND ${CMAKE_COMMAND} -DIN=$<TARGET_FILE:zs_m5_drm_shim> -DOUT=${_zs_shim_c} -DNAME=zs_m5_drm_shim
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake
+    DEPENDS zs_m5_drm_shim ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake
+    VERBATIM)
+  list(APPEND ZS_SOURCES ${_zs_shim_c})
+endif()
 add_executable(zeroshell ${ZS_SOURCES})
 target_include_directories(zeroshell PRIVATE src)
 target_compile_definitions(zeroshell PRIVATE
@@ -115,6 +132,17 @@ if(NOT CMAKE_CROSSCOMPILING AND NOT ZS_BACKEND STREQUAL "web")
   target_include_directories(desktop_entry_test PRIVATE src)
   target_compile_options(desktop_entry_test PRIVATE -Wall -Wextra)
   add_test(NAME desktop_entry_test COMMAND desktop_entry_test)
+  # The LCD's DRM card, and (device build) the library that swaps two cards
+  # for an M5Stack app.
+  add_executable(lcd_drm_test tests/lcd_drm_test.cpp)
+  target_include_directories(lcd_drm_test PRIVATE src)
+  target_compile_options(lcd_drm_test PRIVATE -Wall -Wextra)
+  if(ZS_DEVICE)
+    add_dependencies(lcd_drm_test zs_m5_drm_shim)
+    add_test(NAME lcd_drm_test COMMAND lcd_drm_test $<TARGET_FILE:zs_m5_drm_shim>)
+  else()
+    add_test(NAME lcd_drm_test COMMAND lcd_drm_test)
+  endif()
   # What typed text finds: Home search and list filters.
   add_executable(search_match_test tests/search_match_test.cpp src/ui/search_match.cpp)
   target_include_directories(search_match_test PRIVATE src)

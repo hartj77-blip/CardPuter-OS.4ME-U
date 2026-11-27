@@ -355,6 +355,22 @@ repo**, and type `https://cardputer.cc/generated/registry.json`.
 Apps won't install, or Terminal opens nothing, after updating from 0.1.x. Open Update and
 install the newest version, then open Apps and choose Update all.
 
+DOOM Zero (from M5Stack's store) opens but every game says MISSING GAME DATA (ZeroOS 0.9.2 and
+older). It is a launcher with no game in it. Later versions install the shareware episode of DOOM
+with it: update ZeroOS, then **Apps > Tab > U** (Update all) brings it to a DOOM Zero that is
+already installed, and **DOOM (1993)** in its list starts. Your own WAD files go in
+`~/.local/share/doom-zero-dev0/wads`.
+
+AdvanceWebUI (from M5Stack's store) closes as soon as it is opened (ZeroOS 0.9.2 and older). It
+opens the screen as `/dev/dri/card1`, which is the LCD on M5's system and HDMI on ZeroOS. Later
+versions hand it the LCD under that name. Update ZeroOS and open it again.
+
+RaspyJack is removed, but its services still show in the boot text (ZeroOS 0.9.2 and older). Its
+install script sets up boot services, a 4 GB swap file and Kismet, and its package has nothing to
+take them off again. Later versions do that when RaspyJack is removed, and for one removed
+earlier: updating ZeroOS clears the services and the swap file, and **Apps > Tab > U** then takes
+Kismet off. [What is and isn't removed](docs/APPS.md#fix-ups-for-single-apps).
+
 "The package system needs repair first". From 0.3.3 on, Update and Apps fix this themselves.
 On older versions see [Updates](docs/UPDATE.md#it-says-the-package-system-needs-repair-first).
 
@@ -1078,17 +1094,20 @@ anything merges.
 | Device build with a fake screen and keyboard | Builds the real device version for the CI machine, runs it with a file standing in for the LCD and a pipe standing in for the keyboard, sends the exact key codes M5's driver sends, and checks the screen and what was typed into Notes, including a word finished with Tab | Broken key translation, typing that drops letters, word suggestions that don't appear or type the wrong thing, a device build that won't start |
 | Open every app with the keyboard | The same, opening every app from the home screen, once with simulated hardware and once with the real hardware layer on a machine with no Cardputer hardware | An app that hangs or crashes when its hardware or tools are missing |
 | Install every app for real | In a Debian trixie arm64 container with Raspberry Pi's repository added, installs every app with the real apt, side by side, then removes each and checks nothing is left | A dependency that doesn't exist, two apps that clash, files left behind |
-| Device build (arm64) | Cross-compiles for the Cardputer, runs the update, app-installer (signatures included), Bluetooth config and polkit rule tests, and builds the update package and every app package | A broken update or installer, a polkit rule that lets too much through, a package that won't build |
+| Device build (arm64) | Cross-compiles for the Cardputer, runs the update, app-installer (signatures included), M5Stack app fix-up, Bluetooth config and polkit rule tests, and builds the update package and every app package | A broken update or installer, a polkit rule that lets too much through, a package that won't build |
 | Browser simulator | Builds the WebAssembly version | Code that only builds on Linux |
 
 The unit tests (`shell/tests/`) cover key translation, IR code encoding and Flipper file parsing,
 the Jellyfin client, the AI app's requests and replies (no network), the parser for M5Stack
-launcher entries, and word suggestions (which word is being typed, what is offered, what is
+launcher entries, finding the LCD's DRM card and swapping two cards for an M5Stack app
+(`shell/tests/lcd_drm_test.cpp`), and word suggestions (which word is being typed, what is offered, what is
 learned, saved and forgotten: `shell/tests/suggest_test.cpp`). `image/tests/update-test.sh` builds a real update package and drives
 `zeroos-update` against a folder standing in for the server, with stand-ins for `dpkg -i` and
 `systemctl`: finding an update, refusing a bad checksum or a malformed manifest, installing,
 rolling back by hand and rolling back a version that keeps crashing. `image/tests/apps-test.sh`
-does the same for `zeroos-apps`.
+does the same for `zeroos-apps`, and `image/tests/m5-fixups-test.sh` for what ZeroOS does around
+single M5Stack apps (game data for DOOM Zero, cleaning up after RaspyJack), in a folder standing
+in for `/`.
 
 The fake screen and keyboard work through an `LD_PRELOAD` shim, `shell/tests/device/fakedev.c`,
 about 50 lines, which answers the few framebuffer and input `ioctl` calls a plain file and a pipe
@@ -1211,6 +1230,7 @@ cmake -S shell -B build/headless -DZS_BACKEND=headless && cmake --build build/he
 | `ZS_KEYLOG=1` | Log every raw key to the journal |
 | `ZS_APP_DIR` | Load app modules from this folder instead of `/usr/lib/zeroos/apps` |
 | `ZS_M5_APP_DIR`, `ZS_M5_STATE_DIR` | Read M5 launcher entries and `zeroos-apps`' notes on them from these folders instead of `/usr/share/APPLaunch/applications` and `/var/lib/zeroos/apps/m5` |
+| `ZS_M5_DRM_SWAP` | `<path>:<path>`: the two files an M5 app gets swapped when it opens either, instead of `/dev/dri/card1` and the LCD's DRM card ([how](docs/APPS.md#m5stacks-app-store)) |
 | `NOTIFY_SOCKET`, `WATCHDOG_USEC` | Set by systemd, not by hand: where and how often to send the watchdog ping |
 | `ZS_GAMES_DIR`, `ZS_GAMES_CORES` | Where the Libretro app looks for games and libretro cores |
 | `ZEROOS_IR_DB` | Use another IR code database |
@@ -1286,6 +1306,7 @@ The update and installer tests:
 ```sh
 image/tests/update-test.sh
 image/tests/apps-test.sh
+image/tests/m5-fixups-test.sh
 ```
 
 `image/tests/apps-install-test.sh` installs and removes packages system-wide, so it refuses to

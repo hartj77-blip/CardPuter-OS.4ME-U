@@ -1,0 +1,248 @@
+#!/bin/bash
+# m5-fixups: what a few of M5Stack's apps need on ZeroOS that their own
+# packages don't do (docs/APPS.md, "M5Stack's app store"). zeroos-apps calls it
+# around installing and removing an M5Stack app; apps not named here are
+# left exactly as their packages leave them.
+#
+#   m5-fixups installed <package>   after its package was installed
+#   m5-fixups removing <package>    before its package is taken off
+#   m5-fixups removed <package>     after its package was taken off
+#   m5-fixups sweep [--apt]         catch up: apps installed or removed before
+#                                   this script knew them. --apt: apt may be
+#                                   used (not from a package script, where
+#                                   dpkg is busy)
+#
+# doom-zero-dev0 (DOOM Zero): a launcher with no game in it. Every entry said
+#   MISSING GAME DATA until WAD files were copied over by hand. It looks in
+#   /usr/share/games/doom too, which is where Debian's game data packages put
+#   theirs: the shareware episode of DOOM, and Freedoom.
+#
+# raspyjack (RaspyJack): its install script makes four boot services, a web
+#   server set-up, a 4 GB swap file and (through one of those services) adds
+#   Kismet's own apt repository and installs Kismet. The package has no
+#   removal script, so all of it stayed: the services failed at every boot,
+#   in the boot text on the LCD, with RaspyJack long gone.
+#
+# Always exits 0: a fix-up that didn't work is logged, and never fails the
+# install or removal it rides on.
+set -u
+
+R=${ZEROOS_FIXUPS_ROOT:-}   # tests only: a folder standing in for /
+STATE_DIR=${ZEROOS_APPS_STATE:-/var/lib/zeroos/apps}
+EXTRAS=$STATE_DIR/m5-extras   # <package>: the Debian packages a fix-up installed for it
+export DEBIAN_FRONTEND=noninteractive
+
+log() { echo "m5-fixups: $*" >&2; }
+
+# "ii" (installed) or nothing.
+is_installed() {
+    dpkg-query -W -f '${db:Status-Abbrev}\n' "$1" 2>/dev/null | grep -q '^ii'
+}
+
+# As zeroos-apps installs: with old or missing package lists (a fresh card
+# has none), fetch them once and try again.
+lists_fresh=""
+apt_install() {
+    local opts="-y --no-install-recommends -o Dpkg::Options::=--force-confold -o Acquire::Retries=3"
+    # shellcheck disable=SC2086
+    apt-get install $opts "$@" >&2 && return 0
+    [ -z "$lists_fresh" ] || return 1
+    lists_fresh=1
+    apt-get update -o Acquire::Retries=3 >&2 || true
+    # shellcheck disable=SC2086
+    apt-get install $opts "$@" >&2
+}
+
+# bring <app package> <debian package>...: install, in one step, those that
+# aren't there yet, and write down which ones we brought, so that removing
+# the app takes only those.
+bring() {
+    local for=$1 p new=""
+    shift
+    for p in "$@"; do
+        is_installed "$p" || new="$new $p"
+    done
+    [ -n "$new" ] || return 0
+    # shellcheck disable=SC2086
+    if apt_install $new; then
+        mkdir -p "$EXTRAS"
+        for p in $new; do
+            grep -qxF -- "$p" "$EXTRAS/$for" 2>/dev/null || echo "$p" >> "$EXTRAS/$for"
+        done
+        log "$for: installed$new"
+    else
+        log "$for: could not install$new"
+        return 1
+    fi
+}
+
+# let_go <app package>: what bring() installed goes when nothing else needs
+# it (zeroos-apps runs apt-get autoremove next).
+let_go() {
+    local for=$1 p
+    [ -r "$EXTRAS/$for" ] || return 0
+    while read -r p; do
+        [[ $p =~ ^[a-z0-9][a-z0-9+.-]*$ ]] || continue
+        is_installed "$p" && apt-mark auto "$p" >&2
+    done < "$EXTRAS/$for"
+    rm -f -- "$EXTRAS/$for"
+    rmdir "$EXTRAS" 2>/dev/null
+    return 0
+}
+
+# ---- DOOM Zero ------------------------------------------------------------
+
+# Game data where the launcher looks: Debian's folder, the local one, and its
+# own in the home of the user ZeroShell runs as.
+doom_has_game() {
+    local home d f
+    home=$(getent passwd 1000 2>/dev/null | cut -d: -f6)
+    for d in /usr/share/games/doom /usr/local/share/games/doom "${home:-/home/pi}/.local/share/doom-zero-dev0/wads"; do
+        for f in "$R$d"/*.[wW][aA][dD]; do
+            [ -f "$f" ] && return 0
+        done
+    done
+    return 1
+}
+
+# The shareware episode is what the launcher's first entry, DOOM (1993),
+# starts with no question asked. It is in Debian's non-free section, which
+# this image's apt sources include. Where it can't be had: Freedoom, a whole
+# free game (its entries ask the launcher's question first). Freedoom's
+# package wants some Doom engine installed, and apt would pick dsda-doom with
+# a pile of libraries; chocolate-doom is the small one. DOOM Zero carries its
+# own engine and uses neither.
+doom_installed() {
+    doom_has_game && return 0   # theirs, or ours from before
+    bring doom-zero-dev0 doom-wad-shareware || bring doom-zero-dev0 freedoom chocolate-doom
+    doom_has_game || log "doom-zero-dev0: no game data could be installed; copy WAD files to ~/.local/share/doom-zero-dev0/wads"
+}
+
+# ---- RaspyJack --------------------------------------------------------------
+
+RJ_APP=/usr/share/APPLaunch/apps/raspyjack
+RJ_UNITS="raspyjack-provision raspyjack-webui raspyjack-device raspyjack-caddy-autoconfig"
+RJ_SWAP=/var/swap.raspyjack
+
+# Before its files go: nothing of it running, least of all the service that
+# is still installing things (it holds apt's lock for up to an hour).
+raspyjack_removing() {
+    local u
+    for u in $RJ_UNITS; do
+        [ -e "$R/etc/systemd/system/$u.service" ] && systemctl disable --now "$u.service" >&2
+    done
+    return 0
+}
+
+# Is anything of RaspyJack's set-up still here?
+raspyjack_left() {
+    local u
+    for u in $RJ_UNITS; do
+        [ -e "$R/etc/systemd/system/$u.service" ] && return 0
+    done
+    [ -e "$R$RJ_SWAP" ] || [ -e "$R/usr/local/sbin/raspyjack-caddy-autoconfig.sh" ] ||
+        [ -e "$R/var/lib/raspyjack" ] || [ -e "$R/etc/kismet/kismet_raspyjack.conf" ]
+}
+
+# With RaspyJack gone (and only then: not its package, nor a copy set up by
+# hand in /root/Raspyjack), undo what its install script set up. What it
+# collected (its "loot" and settings, left in $RJ_APP) is not touched.
+raspyjack_cleanup() {
+    local apt_ok=$1 u
+    is_installed raspyjack && return 0
+    [ -e "$R$RJ_APP/raspyjack.py" ] || [ -e "$R/root/Raspyjack/raspyjack.py" ] && return 0
+    raspyjack_left || return 0
+    log "raspyjack: cleaning up what its install script left"
+
+    # Boot services, and the script one of them runs.
+    local units=0
+    for u in $RJ_UNITS; do
+        [ -e "$R/etc/systemd/system/$u.service" ] || continue
+        systemctl disable --now "$u.service" >&2
+        rm -f -- "$R/etc/systemd/system/$u.service" "$R/etc/systemd/system/multi-user.target.wants/$u.service"
+        units=1
+    done
+    rm -f -- "$R/usr/local/sbin/raspyjack-caddy-autoconfig.sh"
+    if [ "$units" = 1 ]; then
+        systemctl daemon-reload >&2
+        systemctl reset-failed 'raspyjack-*.service' >&2 2>/dev/null
+    fi
+
+    # The 4 GB swap file. Its /etc/fstab line first: with the line left and
+    # the file gone, every boot would stop to report the missing swap.
+    if [ -f "$R/etc/fstab" ] && grep -q "^$RJ_SWAP[[:space:]]" "$R/etc/fstab"; then
+        sed -i "\\|^$RJ_SWAP[[:space:]]|d" "$R/etc/fstab"
+    fi
+    if [ -e "$R$RJ_SWAP" ]; then
+        swapoff "$R$RJ_SWAP" >&2 2>/dev/null   # in use and too full to empty: gone at the next boot instead
+        rm -f -- "$R$RJ_SWAP"
+    fi
+
+    # Kismet: the apt repository its provisioning added (every apt update
+    # asked it since) and the package it installed from there. Its own
+    # settings file says it got that far; a Kismet that was here before
+    # RaspyJack has none, and stays.
+    local kismet_list=$R/etc/apt/sources.list.d/kismet.list
+    if [ -e "$R/etc/kismet/kismet_raspyjack.conf" ] && is_installed kismet && [ "$apt_ok" != 1 ]; then
+        # No apt from here (a package script): the settings file stays as the
+        # note that Kismet is RaspyJack's, for the next sweep that may.
+        log "raspyjack: Kismet goes with the next \"Update all\" in Apps"
+    elif [ -e "$R/etc/kismet/kismet_raspyjack.conf" ] ||
+            { [ -e "$R/var/lib/raspyjack" ] && ! is_installed kismet; }; then
+        # (The second case: it added the repository and the install never worked.)
+        if [ -f "$kismet_list" ] && grep -q 'kismetwireless\.net' "$kismet_list"; then
+            rm -f -- "$kismet_list" "$R/usr/share/keyrings/kismet-archive-keyring.gpg"
+        fi
+        rm -f -- "$R/etc/kismet/kismet_raspyjack.conf"
+        rmdir "$R/etc/kismet" 2>/dev/null
+        # The suite hangs off the one package it asked for.
+        is_installed kismet && apt-mark auto kismet >&2
+    fi
+
+    # Its "already done" notes: a later reinstall sets everything up again.
+    rm -rf -- "$R/var/lib/raspyjack"
+    # /root/Raspyjack pointed at the app's folder.
+    if [ -L "$R/root/Raspyjack" ] && [ "$(readlink "$R/root/Raspyjack")" = "$RJ_APP" ] && [ ! -e "$R$RJ_APP" ]; then
+        rm -f -- "$R/root/Raspyjack"
+    fi
+
+    # What only RaspyJack needed (Kismet's suite, Caddy and the rest of its
+    # package's dependencies).
+    if [ "$apt_ok" = 1 ]; then
+        apt-get autoremove --purge -y >&2 || log "raspyjack: autoremove failed; Kismet may be left"
+    fi
+    # Its HTTPS certificate, once Caddy is gone too. A Caddy still here is
+    # somebody's own: left alone.
+    if ! is_installed caddy; then
+        rm -f -- "$R/etc/caddy/certs/raspyjack.crt" "$R/etc/caddy/certs/raspyjack.key"
+        rmdir "$R/etc/caddy/certs" "$R/etc/caddy" 2>/dev/null
+    fi
+    return 0
+}
+
+# ---- sweep -------------------------------------------------------------------
+
+sweep() {
+    local apt_ok=0
+    [ "${1:-}" = --apt ] && apt_ok=1
+    raspyjack_cleanup "$apt_ok"
+    # DOOM Zero installed before this script brought it a game.
+    if [ "$apt_ok" = 1 ] && is_installed doom-zero-dev0 && ! doom_has_game; then
+        doom_installed
+    fi
+    return 0
+}
+
+case "${1:-}:${2:-}" in
+    installed:doom-zero-dev0) doom_installed ;;
+    removed:doom-zero-dev0) let_go doom-zero-dev0 ;;
+    removing:raspyjack) raspyjack_removing ;;
+    removed:raspyjack) raspyjack_cleanup 1 ;;
+    sweep:*) sweep "${2:-}" ;;
+    installed:?*|removing:?*|removed:?*) ;;     # every other app: nothing to do
+    *)
+        sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' >&2
+        exit 1
+        ;;
+esac
+exit 0

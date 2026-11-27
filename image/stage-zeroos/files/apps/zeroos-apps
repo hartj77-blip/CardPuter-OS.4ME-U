@@ -49,6 +49,9 @@ M5_STORE=https://cardputer.cc/generated/registry.json
 M5_STORE_OLD=https://cardputerzero.github.io/generated/registry.json
 M5_DIR=$STATE_DIR/m5            # m5-<package>: what ZeroShell reads to list it
 M5_DESKTOP=/usr/share/APPLaunch/applications
+# What a few M5Stack apps need on ZeroOS that their packages don't do: game
+# data for DOOM Zero, cleaning up after RaspyJack (see the script).
+M5_FIXUPS=${ZEROOS_APPS_M5_FIXUPS:-/usr/lib/zeroos/m5-fixups}
 # Apps that became part of ZeroOS itself (Battery: Settings > Battery &
 # power). ZeroShell no longer loads their modules, so they are never offered
 # or installed, and update-all takes an installed one off.
@@ -268,6 +271,12 @@ m5_note() {
     grep -q '^desktop=' "$M5_DIR/$id" || log "$pkg has no launcher entry; it won't be on the home screen"
 }
 
+# m5_fixup <step> [package]: run m5-fixups. It never fails the job.
+m5_fixup() {
+    [ -x "$M5_FIXUPS" ] || return 0
+    ZEROOS_APPS_STATE=$STATE_DIR "$M5_FIXUPS" "$@" >&2 || true
+}
+
 # install_m5 <id> <deb>: an M5Stack app package, checked against the catalog.
 install_m5() {
     local id=$1 deb=$2 pkg want arch ver
@@ -298,6 +307,7 @@ install_m5() {
     APT_GUARD=m5 apt_put_on "$deb" || fail "Could not install $id. Nothing else changed"
     apt-mark manual "$pkg" >&2 || true
     m5_note "$id" "$pkg"
+    m5_fixup installed "$pkg"
     status done 100 "$id $ver installed"
 }
 
@@ -320,9 +330,12 @@ remove_m5() {
     local id=$1 pkg
     pkg=$(m5_package "$id")
     status removing 100
+    # First: an app's own services can be busy with apt (RaspyJack's are).
+    [ -n "$pkg" ] && m5_fixup removing "$pkg"
     dpkg --configure -a >&2 || true
     if [ -n "$pkg" ]; then
         apt-get purge -y "$pkg" >&2 || fail "Could not remove $id"
+        m5_fixup removed "$pkg"
     fi
     rm -f -- "$M5_DIR/$id"
     apt-get autoremove --purge -y >&2 || log "autoremove failed; extras may be left"
@@ -795,6 +808,8 @@ upgrade_all() {
         # extras keep (Tailscale's login: the device would leave the tailnet).
         apt-get autoremove -y >&2 || log "autoremove failed; old extras may be left"
     fi
+    # M5Stack apps installed or removed before m5-fixups knew them.
+    m5_fixup sweep --apt
     app=""
     status done 100 "$n app(s) updated"
 }
