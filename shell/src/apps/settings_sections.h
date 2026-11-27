@@ -1,5 +1,6 @@
 // The sections of Settings that have a file of their own: Wi-Fi
-// (apps/wifi.cpp) and Bluetooth (apps/bluetooth.cpp). They are not apps:
+// (apps/wifi.cpp), Bluetooth (apps/bluetooth.cpp) and Date & time
+// (apps/datetime.cpp). They are not apps:
 // Settings builds one in its own screen, hands it keys and ticks, and takes
 // the screen back when the section's on_back() has nowhere further to go.
 #pragma once
@@ -15,6 +16,7 @@ namespace zs {
 // when Settings was opened straight at the section (from search, or Tether).
 std::unique_ptr<App> make_wifi_section(const char* back);
 std::unique_ptr<App> make_bluetooth_section(const char* back);
+std::unique_ptr<App> make_datetime_section(const char* back);
 
 // The line over a section's list: "Settings > Wi-Fi" and, on the right, what
 // the section has to say for itself ("Connected to HomeNet"), in `color`.

@@ -1,9 +1,10 @@
 // Settings: one numbered list of sections (docs/UX.md), each a list of its
-// own. Values change with Left/Right (or Enter). Wi-Fi and Bluetooth are
-// sections with a file of their own (apps/settings_sections.h); Battery &
+// own. Values change with Left/Right (or Enter). Wi-Fi, Bluetooth and Date
+// & time are sections with a file of their own (apps/settings_sections.h); Battery &
 // power also shows the fuel gauge's readings; the sections that are apps
 // (Update, About) open them, and Esc there comes back here.
 #include <algorithm>
+#include <ctime>
 #include <functional>
 #include <string>
 #include <vector>
@@ -20,7 +21,7 @@ namespace zs {
 namespace {
 using namespace theme;
 
-enum class Page { Root, Wifi, Bluetooth, Display, Sound, Battery, Remote, Running, Power };
+enum class Page { Root, Wifi, Bluetooth, Time, Display, Sound, Battery, Remote, Running, Power };
 
 // A value row's choices: what it shows and what it stores.
 struct Choice {
@@ -36,9 +37,9 @@ public:
         root_ = root;
         // Opened at a section (home search: "Brightness" opens Display).
         static const std::pair<const char*, Page> kSections[] = {
-            {"wifi", Page::Wifi},       {"bluetooth", Page::Bluetooth}, {"display", Page::Display},
-            {"sound", Page::Sound},     {"battery", Page::Battery},     {"remote", Page::Remote},
-            {"running", Page::Running}, {"power", Page::Power}};
+            {"wifi", Page::Wifi},     {"bluetooth", Page::Bluetooth}, {"time", Page::Time},
+            {"display", Page::Display}, {"sound", Page::Sound},       {"battery", Page::Battery},
+            {"remote", Page::Remote},   {"running", Page::Running},   {"power", Page::Power}};
         std::string arg = shell_app_arg();
         for (auto& [name, page] : kSections)
             if (arg == name) {
@@ -77,15 +78,17 @@ private:
         list_.reset();
         lv_obj_clean(root_);
         lv_group_remove_all_objs(group);
-        if (p == Page::Wifi || p == Page::Bluetooth) {
+        if (p == Page::Wifi || p == Page::Bluetooth || p == Page::Time) {
             // The section draws the screen and sets its own actions.
             const char* back = direct_ ? "Back" : "Settings";
-            section_ = p == Page::Wifi ? make_wifi_section(back) : make_bluetooth_section(back);
+            section_ = p == Page::Wifi ? make_wifi_section(back)
+                       : p == Page::Bluetooth ? make_bluetooth_section(back)
+                                              : make_datetime_section(back);
             section_->group = group;
             section_->build(root_);
             return;
         }
-        static const char* const kNames[] = {"", "", "", "Display", "Sound", "Battery & power",
+        static const char* const kNames[] = {"", "", "", "", "Display", "Sound", "Battery & power",
                                              "Remote & sync", "Running programs", "Restart or shut down"};
         if (p == Page::Root) {
             list_.build(root_, 2, 2, kScreenW - 4, kBodyH - 4);
@@ -99,7 +102,8 @@ private:
         switch (p) {
             case Page::Root: root_page(); break;
             case Page::Wifi:
-            case Page::Bluetooth: break;   // sections, above
+            case Page::Bluetooth:
+            case Page::Time: break;   // sections, above
             case Page::Display: display_page(); break;
             case Page::Sound: sound_page(); break;
             case Page::Battery: battery_page(); break;
@@ -128,8 +132,8 @@ private:
     void focus_section(Page from) {
         // Rows on the root page, as root_page() adds them.
         static const std::pair<Page, int> kRows[] = {{Page::Wifi, 0},    {Page::Bluetooth, 1}, {Page::Display, 2},
-                                                     {Page::Sound, 3},   {Page::Battery, 4},   {Page::Remote, 5},
-                                                     {Page::Power, 9},   {Page::Running, 10}};
+                                                     {Page::Sound, 3},   {Page::Battery, 4},   {Page::Time, 5},
+                                                     {Page::Remote, 6},  {Page::Power, 8},     {Page::Running, 10}};
         int row = 0;
         for (auto& [page, r] : kRows)
             if (page == from) row = r;
@@ -156,12 +160,18 @@ private:
         std::string profile = kProfiles[std::clamp(int(p.profile()), 0, 2)];
         list_.add(LV_SYMBOL_BATTERY_3, "Battery & power", charge < 0 ? profile : fmt("%d%%, ", charge) + profile,
                   [this] { open(Page::Battery); });
+        time_t now = time(nullptr);
+        tm lt{};
+        localtime_r(&now, &lt);
+        char date[24];
+        strftime(date, sizeof date, "%a %-d %b", &lt);
+        list_.add(ZS_ICON_CLOCK, "Date & time", date, [this] { open(Page::Time); });
         list_.add(LV_SYMBOL_SHUFFLE, "Remote & sync", "", [this] { open(Page::Remote); });
         list_.add(LV_SYMBOL_DOWNLOAD, "Software update", version.empty() ? "" : version,
                   [] { shell_open_app("update"); });
-        list_.add(LV_SYMBOL_LIST, "About this device", "", [] { shell_open_app("sysmon"); });
         list_.add(LV_SYMBOL_POWER, "Restart or shut down", "", [this] { open(Page::Power); });
-        // Last, so Restart or shut down stays on 9.
+        // After it, so Restart or shut down stays on 9.
+        list_.add(LV_SYMBOL_LIST, "About this device", "", [] { shell_open_app("sysmon"); });
         size_t running = h.processes().size();
         list_.add(LV_SYMBOL_PLAY, "Running programs", running ? std::to_string(running) : "None",
                   [this] { open(Page::Running); });

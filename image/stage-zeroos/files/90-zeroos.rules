@@ -23,6 +23,13 @@ polkit.addRule(function(action, subject) {
         action.id == "org.freedesktop.login1.reboot-multiple-sessions") {
         return polkit.Result.YES;
     }
+    // Settings > Date & time: the clock, its time zone, and whether the time
+    // comes from the internet. Not set-local-rtc (the hardware clock stays in UTC).
+    if (action.id == "org.freedesktop.timedate1.set-time" ||
+        action.id == "org.freedesktop.timedate1.set-timezone" ||
+        action.id == "org.freedesktop.timedate1.set-ntp") {
+        return polkit.Result.YES;
+    }
     // Dock mode: ZeroShell starts and stops the desktop on the HDMI monitor.
     // Terminal app, Tailscale ("when needed"), Sync and updates are started the same way.
     var units = ["zeroos-dock.service", "zeroos-terminal.service", "tailscaled.service",

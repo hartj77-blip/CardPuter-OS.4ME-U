@@ -43,5 +43,10 @@ expect("pi may start the Terminal", decide("pi", M, "zeroos-terminal.service"), 
 expect("pi may let phones reach Mesh", decide("pi", M, "zeroos-mesh-lan.service"), "yes");
 expect("pi may not start sshd", decide("pi", M, "ssh.service"), "default");
 expect("pi may reboot", decide("pi", "org.freedesktop.login1.reboot", ""), "yes");
+// Settings > Date & time.
+for (const a of ["set-time", "set-timezone", "set-ntp"])
+    expect("pi may " + a, decide("pi", "org.freedesktop.timedate1." + a, ""), "yes");
+expect("pi may not put the hardware clock on local time", decide("pi", "org.freedesktop.timedate1.set-local-rtc", ""), "default");
+expect("another user can't set the time", decide("mallory", "org.freedesktop.timedate1.set-time", ""), "default");
 process.exit(fails ? 1 : 0);
 JS

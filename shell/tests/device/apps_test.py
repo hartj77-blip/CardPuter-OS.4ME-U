@@ -19,8 +19,8 @@ Runs ZeroShell twice, with the fake LCD and keyboard from device_test.py:
 
 For each app: from the home screen, open All apps, arrow to it and press Enter, check it
 opened and drew something, press a few keys, then Esc back home. Then the
-same for Wi-Fi, Bluetooth and Battery, which are sections of Settings and not
-on the home screen: each is found with the home search. Fails if ZeroShell exits,
+same for Wi-Fi, Bluetooth, Battery and Date & time, which are sections of
+Settings and not on the home screen: each is found with the home search. Fails if ZeroShell exits,
 an app doesn't open, the screen goes black, or Esc doesn't lead home.
 """
 import os
@@ -143,8 +143,9 @@ def run(binary, shim, shots, hal, expect, apps_dir, settle, env_extra=None):
         missing = [a for a in want if a not in visited]
         check(f"every app opened ({len(visited)})", not missing, "not reached: " + " ".join(missing))
 
-        # Wi-Fi, Bluetooth and Battery are sections of Settings, not apps: type
-        # the name on the home screen and Enter opens Settings at that section.
+        # Wi-Fi, Bluetooth, Battery and Date & time are sections of Settings,
+        # not apps: type the name on the home screen and Enter opens Settings
+        # at that section.
         def esc_home():
             for _ in range(6):
                 d.nav("esc")
@@ -154,7 +155,7 @@ def run(binary, shim, shots, hal, expect, apps_dir, settle, env_extra=None):
             return False
         esc_home()   # the loop above ends with the first app open again
         time.sleep(0.4)
-        for section in ("wifi", "bluetooth", "battery"):
+        for section in ("wifi", "bluetooth", "battery", "date"):
             if d.proc.poll() is not None:
                 break
             new_log()
@@ -169,7 +170,8 @@ def run(binary, shim, shots, hal, expect, apps_dir, settle, env_extra=None):
             check(f"settings > {section}: draws", any(d.frame()), "screen is black")
             d.shot(f"settings-{section}")
             # Off the switch, onto the first network or device (or the next
-            # value row), and Enter: join it, connect it, or step the value.
+            # row), and Enter: join it, connect it, step the value, or (Date &
+            # time) ask before setting the time by hand.
             d.nav("down")
             d.nav("enter")
             time.sleep(0.6)

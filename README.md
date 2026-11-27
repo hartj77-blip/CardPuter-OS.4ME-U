@@ -133,6 +133,14 @@ the device afterwards.
 - With a QR code: scan a Wi-Fi QR code with the [Camera](docs/CAMERA.md) app.
 - With a cable: the Cardputer Zero has an Ethernet port. Plug it in and it is used.
 
+### Date and time
+
+A fresh image is on UTC. Open **Settings > Date & time** (or type `time` on the home screen) and
+pick your **Time zone**: type the start of your city's name to find it. Online, the time sets
+itself. Offline, set **Time** and **Date** by hand: press Enter and type the digits (`1430` for
+14:30, `20261127` for 27 November 2026). Setting one by hand turns **Set automatically** off, after
+asking. The hardware clock is set too, so the time keeps running while the power is off.
+
 ### Logging in
 
 The user is `pi` and the password is `raspberry`. The first time you open the **Terminal** app
@@ -279,7 +287,7 @@ Settings, and typing `wifi`, `bluetooth` or `battery` on the home screen opens S
 | App | What it does |
 | --- | --- |
 | Apps | Browse, install, update and remove apps ([guide](docs/APPS.md)) |
-| Settings | Wi-Fi (find and join networks), Bluetooth (pair and connect devices), brightness, volume, battery (time left, power draw, power profile, power saving), running programs, restart, shut down |
+| Settings | Wi-Fi (find and join networks), Bluetooth (pair and connect devices), brightness, volume, battery (time left, power draw, power profile, power saving), date and time (set automatically or by hand, time zone), running programs, restart, shut down |
 | Update | Install a newer ZeroOS over the network ([guide](docs/UPDATE.md)) |
 
 ### Installable
@@ -694,7 +702,7 @@ ZeroOS:
 | Backlight | PWM | `/sys/class/backlight/*` |
 | Keyboard | TCA8418 | evdev, see above |
 | Motion sensor | BMI270 and BMM150 (not on the Lite) | iio, `/sys/bus/iio/devices/` |
-| Clock | RX8130CE | `/dev/rtc0` |
+| Clock | RX8130CE | `/dev/rtc0`; set with `timedatectl` from Settings > Date & time |
 | Wi-Fi and Bluetooth | BCM43439 | `nmcli` (NetworkManager), `bluetoothctl`, `rfkill` |
 | Audio | ES8389 codec, 1 W speaker, mic | `wpctl` (PipeWire), falling back to `amixer`; sox `play` and `rec` |
 | Infrared | GPIO transmitter and receiver | `ir-ctl` (rc-core), with codes encoded by `shell/src/ir/` |
@@ -993,6 +1001,8 @@ things without a password:
 
 - NetworkManager actions (join and forget networks).
 - Power off and reboot.
+- Set the clock and the time zone, and choose whether the time comes from the internet (Settings >
+  Date & time). Not switching the hardware clock to local time.
 - Start and stop these units: `zeroos-dock`, `zeroos-terminal`, `tailscaled`, the user's
   `syncthing@` instance, `meshtasticd`, `zeroos-mesh-lan` (Mesh's **Allow phones**),
   `zeroos-usb-stick`, `zeroos-update`, `zeroos-update-check`, and these `zeroos-apps@<job>`

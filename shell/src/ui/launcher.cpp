@@ -184,6 +184,8 @@ const SettingEntry kSettings[] = {
     {"Wi-Fi", "wireless internet network networks join", "settings", "wifi", LV_SYMBOL_WIFI},
     {"Bluetooth", "bt pair devices keyboard gamepad speaker headphones", "settings", "bluetooth",
      LV_SYMBOL_BLUETOOTH},
+    {"Date & time", "clock set hour minute day calendar", "settings", "time", ZS_ICON_CLOCK},
+    {"Time zone", "timezone clock region utc", "settings", "time", ZS_ICON_GLOBE},
     {"Display", "screen brightness dim", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Brightness", "screen display", "settings", "display", LV_SYMBOL_EYE_OPEN},
     {"Dim screen after", "display sleep timeout", "settings", "display", LV_SYMBOL_EYE_CLOSE},

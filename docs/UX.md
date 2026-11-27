@@ -222,6 +222,10 @@ settings and opens Settings at the section. The old app ids (`wifi`, `bluetooth`
 open them, for apps that link there (Tether). Battery & power lists the settings first, then the
 fuel gauge's readings as rows of the same list.
 
+Date & time is row 6: Set automatically, Time, Date and Time zone. A time or a date is typed as
+digits (1430, 20261127); the zone is picked from a list that typing filters. About this device
+moved below Restart or shut down, which stays on 9.
+
 ```
 Settings
  1 Wi-Fi            HomeNet
