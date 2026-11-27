@@ -118,8 +118,12 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "${files[@]}" --clobber
           else
+            # .github/release-notes.md goes at the top of every release's
+            # notes, above the list of what changed.
+            notes=()
+            [ -s .github/release-notes.md ] && notes=(--notes-file .github/release-notes.md)
             gh release create "$TAG" "${files[@]}" \
-              --title "ZeroOS ${TAG#v}" --generate-notes "${pre[@]}"
+              --title "ZeroOS ${TAG#v}" "${notes[@]}" --generate-notes "${pre[@]}"
           fi
 
   image:
