@@ -1,8 +1,13 @@
 # In the car
 
-The **Car** app gives two ways to play music through a car stereo. Neither is
-CarPlay or Android Auto: those only accept a phone certified by Apple or
-Google, and the Cardputer cannot stand in for one.
+The **Car** app plays music through a car stereo, over USB or Bluetooth. None
+of it is CarPlay or Android Auto: those only accept a phone certified by
+Apple or Google, and the Cardputer cannot stand in for one.
+
+This page covers the two ways the app began with. The app is in the apps
+repository, and [its own guide](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U/blob/main/apps/car/README.md)
+is the full one: Car 1.4 adds [USB live sound and iPod mode](#whatever-plays-now-over-usb),
+which send whatever the Cardputer plays down the USB cable.
 
 | | USB stick mode | Bluetooth |
 | --- | --- | --- |
@@ -17,7 +22,8 @@ Google, and the Cardputer cannot stand in for one.
 1. Set the **Host / Slave switch** on the left side of the Cardputer to
    **Slave**. In Slave the USB-A port, the other USB-C port and Ethernet are
    off; that is how the board is wired.
-2. Open **Car** and press Enter on **USB stick mode**. The first time (and
+2. Open **Car** and press Enter on **USB stick** (**USB stick mode** before
+   Car 1.4). The first time (and
    whenever `~/Music` has changed) it copies the music into a disk image:
    **Copying music 43%**. Then it says **on**.
 3. Plug the **right-hand USB-C port** into the car's USB socket. When the car
@@ -33,6 +39,27 @@ folders as `~/Music`, files in name order. It is a copy
 the music takes, and the car cannot change your files. Only music files are
 copied: mp3, m4a, aac, wma, wav, flac, ogg, opus. An older stereo may only
 play mp3 (and perhaps wma or aac) and skip the rest.
+
+## Whatever plays now, over USB
+
+USB stick mode only plays the files in `~/Music`. Car 1.4 adds two modes for
+everything else the Cardputer plays (a phone's music passed on, Media,
+Jellyfin, Maps' spoken directions), over the same one cable, which also
+charges. That leaves the aux socket empty, so there is no hum from charging
+off the car while the sound goes through the aux lead (a ground loop).
+
+- **USB live**: the Cardputer is a USB stick whose songs are the sound it is
+  making now. It works on any stereo that plays MP3 from a stick, and runs
+  three to five seconds late.
+- **USB iPod**: the Cardputer answers as an iPod would. No delay, but only
+  for stereos that play an iPod on their USB socket, and not all of those
+  accept it.
+
+One USB mode is on at a time, and all of them carry on with Car closed, so
+GPS or Maps can be on the screen meanwhile. The switch must be on Slave, so
+a USB GPS dongle is off; a GPS on the expansion or Grove port works.
+[Car's guide](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U/blob/main/apps/car/README.md#one-cable-music-and-power)
+has the steps and how they work.
 
 ## Bluetooth
 
@@ -89,10 +116,14 @@ off, and an update turns it off once.
 ## Power
 
 A car's USB socket often gives only 0.5 A (2.5 W), about what the Cardputer
-uses when idle, so it may hold its charge rather than gain any. M5 says to
-charge through "USB-C2" and recommends 5 V at 2 A; a 12 V socket charger
-gives that. Whether the right-hand (data) port also charges is one of the
-things still to check on a device.
+uses when idle, so on the car's own socket it may hold its charge rather
+than gain any. M5 recommends 5 V at 2 A, which a 12 V socket charger gives.
+
+The charging port is USB-C2, the right-hand one, which is also the port the
+USB modes use: M5 says charging works "with the device on or off and in
+either USB Switch position". So one cable to the car's USB socket carries
+the music and charges. That the battery gains charge that way is still to
+check on a device (**Settings > Battery & power** shows the current).
 
 ## How it works
 
@@ -110,14 +141,17 @@ None of this has run on a Cardputer or in a car. In particular:
   `dtoverlay=dwc2` once the switch is on Slave;
 - whether a given car accepts the stick (old stereos can be picky about
   size, folder depth and file types);
-- whether the data port charges the battery;
+- that the battery charges from the car through the data port while it
+  carries music (M5 documents that the port charges in either switch
+  position);
 - pairing with a real car, and that sound moves to it when it connects;
 - that the car's buttons arrive as media keys.
 
 ## Limits
 
 - The car's screen does not show the track name over Bluetooth.
-- No iPod emulation, so a stereo that only knows "iPod" on its USB socket
-  will not see the Cardputer.
+- Before Car 1.4, no iPod emulation: a stereo that only knows "iPod" on its
+  USB socket does not see the Cardputer. Car 1.4's iPod mode is for those,
+  where they accept it.
 - Pairing and scanning freeze the screen while they run (up to 40 seconds for
   a first pairing).
