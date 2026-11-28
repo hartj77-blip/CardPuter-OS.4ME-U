@@ -23,9 +23,10 @@ Only the newest release gets fixes. Use the **Update** app to stay current.
   first login asks for a new one, and until it is changed SSH takes keys
   only (no password logins).
 - Updates are only fetched from the addresses set in
-  `/etc/zeroos/update.conf`; see [docs/UPDATE.md](docs/UPDATE.md). Until the
-  project's release key is added, updates and app lists aren't signed (see
-  "Signatures" there), so you trust this repository's releases and HTTPS.
+  `/etc/zeroos/update.conf`; see [docs/UPDATE.md](docs/UPDATE.md). Updates and
+  this project's app lists are signed with its Ed25519 release key, and
+  unsigned ones are refused (see "Signatures" there). The private key is a
+  secret of this repository's GitHub `release` environment.
 - An app source you add can run anything as root when you install from it,
   which is why adding one asks for your password. M5Stack's store, on by
   default, is reviewed by M5Stack's community repository, not this project.

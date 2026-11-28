@@ -183,13 +183,12 @@ their own package, and its install scripts run as root. So:
   Anyone on that network could still swap the package. Anything else over
   `http://` is refused unless `/etc/zeroos/update.conf` also says
   `ALLOW_HTTP=1`.
-- Once ZeroOS has a release key (below), the manifest must also be signed with it, and the
-  manifest holds the package's SHA-256: then neither the address nor the network matters, only
-  the key.
+- The manifest must also be signed with ZeroOS's release key (below), and the manifest holds
+  the package's SHA-256, so neither the address nor the network matters, only the key.
 
 ## Signatures
 
-ZeroOS can check an Ed25519 signature on the update manifest and on each app source's
+ZeroOS checks an Ed25519 signature on the update manifest and on each app source's
 `zeroos-apps.index`. Every package's SHA-256 is in one of those two lists, so a valid signature
 covers the packages too.
 
@@ -197,9 +196,9 @@ covers the packages too.
   says which key signs what: `update` for ZeroOS updates, and each of this project's two app
   sources. The keys are the `.pem` files next to it. Your own keys can go in `/etc/zeroos/keys`,
   in the same layout (for example, to sign your own update server's manifest).
-- **While there is no key**, nothing changes: lists are taken unsigned, as before. A `signers`
-  line whose `.pem` file isn't there does nothing.
-- **Once there is one**, a manifest or index without a valid signature is refused. Update says
+- **The release key** (`zeroos-release.pem`) has shipped since ZeroOS 0.8.1, so a manifest or
+  index from this project without a valid signature is refused. A `signers` line whose `.pem`
+  file isn't there does nothing. Update says
   "The update isn't signed with ZeroOS's key". Apps leaves that source's apps out of its list
   and keeps the others. A source with no key (M5Stack's store, or one you added) is taken as
   before.
