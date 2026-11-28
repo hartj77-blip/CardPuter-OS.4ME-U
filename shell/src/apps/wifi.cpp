@@ -3,6 +3,9 @@
 // (apps/settings_sections.h), not an app of its own.
 //
 //   Left/Right on the first row  Wi-Fi on or off
+//   Left/Right on "Adapter"      which adapter scans and joins: Auto, the
+//                                built-in one or a USB Wi-Fi adapter (shown
+//                                only once there is more than one)
 //   Enter  join the network in focus.       Tab: R rescan
 //   Typing finds a network (ui/list_view.h).
 #include "apps/common.h"
@@ -25,11 +28,12 @@ public:
     ~WifiSection() override {   // left before a deferred step ran: don't run it on a freed section
         lv_async_call_cancel(connect_cb, this);
         lv_async_call_cancel(switched_cb, this);
+        lv_async_call_cancel(adapter_cb, this);
     }
 
     bool on_back() override {
         if (pw_page_) {
-            show_list(pick_ + 1);   // on the network it was for
+            show_list(pick_ + first_net_);   // on the network it was for
             return true;
         }
         return false;
@@ -54,9 +58,17 @@ private:
         bool on = st.wifi_enabled;
         nets_.clear();
         if (on) nets_ = hal().wifi_scan();
+        adapters_ = hal().wifi_adapters();
+        std::string chosen = hal().wifi_adapter();
+        // The choice only once there is one to make, or one was made (to
+        // go back to Auto after the USB adapter is taken out).
+        bool choose = on && (adapters_.size() > 1 || !chosen.empty());
 
-        settings_heading(root_, "Wi-Fi", !on ? "" : st.wifi_connected ? "Connected to " + st.wifi_ssid : "Not connected",
-                         st.wifi_connected ? kGood : kMuted);
+        std::string status = !on ? "" : st.wifi_connected ? "Connected to " + st.wifi_ssid : "Not connected";
+        if (st.wifi_connected && adapters_.size() > 1)
+            for (auto& a : adapters_)
+                if (a.iface == st.wifi_iface) status += " (" + a.label + ")";
+        settings_heading(root_, "Wi-Fi", status, st.wifi_connected ? kGood : kMuted);
 
         list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);
         list_.add_choice(LV_SYMBOL_WIFI, "Wi-Fi", {"Off", "On"}, on ? 1 : 0, [this](int i) {
@@ -65,6 +77,29 @@ private:
             lv_async_call_cancel(switched_cb, this);
             lv_async_call(switched_cb, this);
         });
+        first_net_ = 1;
+        if (choose) {
+            std::vector<std::string> names = {"Auto"};
+            int at = 0;
+            for (size_t i = 0; i < adapters_.size(); ++i) {
+                names.push_back(adapters_[i].label);
+                if (adapters_[i].id == chosen) at = int(i) + 1;
+            }
+            // Chosen but not plugged in: say so, and Auto is what's used.
+            if (!chosen.empty() && at == 0) {
+                names.push_back(chosen == "builtin" ? "Built-in (missing)" : "USB (not plugged in)");
+                at = int(names.size()) - 1;
+            }
+            list_.add_choice(LV_SYMBOL_USB, "Adapter", names, at, [this, names](int i) {
+                // "Auto" or an adapter; the "not plugged in" entry keeps the choice.
+                want_adapter_ = i == 0 ? "" : size_t(i) <= adapters_.size() ? adapters_[size_t(i) - 1].id
+                                                                              : hal().wifi_adapter();
+                want_adapter_name_ = names[size_t(i)];
+                lv_async_call_cancel(adapter_cb, this);
+                lv_async_call(adapter_cb, this);
+            });
+            first_net_ = 2;
+        }
         for (size_t i = 0; i < nets_.size(); ++i) {
             auto& n = nets_[i];
             std::string value = fmt("%d%%", n.signal) + (n.secure ? "" : "  open");
@@ -77,7 +112,7 @@ private:
         if (focus > 0 && focus < list_.size()) list_.focus(focus);
         if (on && nets_.empty()) {
             lv_obj_t* tip = label(root_, "No networks found. Tab > R rescans.", &zs_font_12, kMuted);
-            lv_obj_set_pos(tip, 10, 48);
+            lv_obj_set_pos(tip, 10, 24 + 24 * first_net_);   // under the rows above it (24 px each)
         }
 
         std::vector<Action> acts;
@@ -97,6 +132,14 @@ private:
         hal().set_wifi_enabled(s->want_on_);
         shell_toast(s->want_on_ ? "Wi-Fi on" : "Wi-Fi off");
         s->show_list();
+    }
+
+    static void adapter_cb(void* p) {
+        auto* s = static_cast<WifiSection*>(p);
+        if (s->want_adapter_ == hal().wifi_adapter()) return;
+        hal().set_wifi_adapter(s->want_adapter_);
+        shell_toast(s->want_adapter_.empty() ? "Adapter: automatic" : "Adapter: " + s->want_adapter_name_);
+        s->show_list(1);   // its networks, still on the Adapter row
     }
 
     void show_password() {
@@ -178,6 +221,10 @@ private:
     lv_obj_t* pw_page_ = nullptr;
     lv_obj_t* pw_label_ = nullptr;
     std::vector<WifiNetwork> nets_;
+    std::vector<WifiAdapter> adapters_;
+    int first_net_ = 1;               // the list row of the first network
+    std::string want_adapter_;        // the Adapter row, until adapter_cb() acts on it
+    std::string want_adapter_name_;
     ListView list_;
     int pick_ = -1;
     std::string pw_;

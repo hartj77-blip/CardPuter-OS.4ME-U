@@ -62,6 +62,7 @@
 #include "hal/play_clock.h"
 #include "hal/proc_stats.h"
 #include "hal/tailscale_up.h"
+#include "hal/wifi_adapters.h"
 #include "platform/shell_cmd.h"
 #include "platform/watchdog.h"
 #include "ui/prefs.h"
@@ -642,9 +643,30 @@ public:
         return s;
     }
 
+    std::vector<WifiAdapter> wifi_adapters() override { return wifi::find_adapters(sys_root_); }
+    std::string wifi_adapter() override { return prefs::get_str("wifi_adapter", ""); }
+    void set_wifi_adapter(const std::string& id) override { prefs::set_str("wifi_adapter", id); }
+
+    // The adapter chosen in Settings > Wi-Fi, if it's plugged in. Not plugged
+    // in (a USB adapter taken out): automatic, so Wi-Fi still works.
+    bool chosen_adapter(WifiAdapter& out) {
+        std::string id = wifi_adapter();
+        if (id.empty()) return false;
+        std::vector<WifiAdapter> v = wifi_adapters();
+        const WifiAdapter* a = wifi::pick(v, id);
+        if (!a) return false;
+        out = *a;
+        return true;
+    }
+    // " ifname wlan1" for nmcli when an adapter is chosen, "" for automatic.
+    std::string ifname_arg() {
+        WifiAdapter a;
+        return chosen_adapter(a) ? " ifname " + shell_quote(a.iface) : "";
+    }
+
     std::vector<WifiNetwork> wifi_scan() override {
         std::vector<WifiNetwork> v;
-        std::istringstream in(run("nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan auto"));
+        std::istringstream in(run("nmcli -t -f IN-USE,SSID,SIGNAL,SECURITY dev wifi list --rescan auto" + ifname_arg()));
         std::string line;
         while (std::getline(in, line)) {
             // IN-USE:SSID:SIGNAL:SECURITY (SSID colons are escaped as \:)
@@ -676,7 +698,7 @@ public:
     // The SECURITY column of the last scan for this network ("WPA2", "WPA3",
     // "WEP", "WPA2 802.1X"...); "" if it wasn't seen (a hidden network).
     std::string wifi_security(const std::string& ssid) {
-        std::istringstream in(run("nmcli -t -f SSID,SECURITY dev wifi list --rescan no"));
+        std::istringstream in(run("nmcli -t -f SSID,SECURITY dev wifi list --rescan no" + ifname_arg()));
         for (std::string line; std::getline(in, line);) {
             std::vector<std::string> f = nmcli_fields(line);
             if (f.size() >= 2 && f[0] == ssid && !f[1].empty() && f[1] != "--") return f[1];
@@ -689,10 +711,20 @@ public:
         if (ssid.empty() || ssid[0] == '-') return false;
         if (psk.find_first_of("\r\n") != std::string::npos) return false;
         std::string id = shell_quote(ssid);
+        // An adapter chosen in Settings: the network is joined on it, and its
+        // profile is tied to that adapter's address, so it reconnects there
+        // (and not on the other one). Automatic: tied to none.
+        WifiAdapter ad;
+        bool chosen = chosen_adapter(ad);
+        std::string ifname = chosen ? " ifname " + shell_quote(ad.iface) : "";
+        std::string bind_mac = chosen ? shell_quote(ad.mac) : std::string("''");
         if (psk.empty()) {
-            // A saved network (its own password), or an open one.
+            // A saved network (its own password), or an open one. A saved
+            // profile tied to the other adapter is moved to this one first,
+            // or NetworkManager wouldn't use it here.
+            run("nmcli connection modify id " + id + " 802-11-wireless.mac-address " + bind_mac);
             // --wait bounds the attempt (default 90 s): this runs on the UI thread.
-            if (run("nmcli --wait 20 dev wifi connect " + id + " && echo OK").find("OK") == std::string::npos)
+            if (run("nmcli --wait 20 dev wifi connect " + id + ifname + " && echo OK").find("OK") == std::string::npos)
                 return false;
             net_refresh_soon();
             return true;
@@ -713,11 +745,12 @@ public:
         std::string add = "nmcli connection add type wifi con-name " + tmp_name + " ssid " + id +
                           " wifi-sec.key-mgmt " + (wep ? "none wifi-sec.wep-key-type key" : sae_only ? "sae" : "wpa-psk");
         if (sec.empty()) add += " 802-11-wireless.hidden yes";   // not in the scan: maybe hidden
+        if (chosen && !ad.mac.empty()) add += " 802-11-wireless.mac-address " + bind_mac;
         run("nmcli connection delete id " + tmp_name);   // a leftover from an attempt cut short
         if (run(add + " >/dev/null && echo OK").find("OK") == std::string::npos) return false;
         std::string pf = private_tmp(std::string(wep ? "802-11-wireless-security.wep-key0:"
                                                      : "802-11-wireless-security.psk:") + psk + "\n");
-        bool ok = !pf.empty() && run("nmcli --wait 20 connection up id " + tmp_name + " passwd-file " +
+        bool ok = !pf.empty() && run("nmcli --wait 20 connection up id " + tmp_name + ifname + " passwd-file " +
                                      shell_quote(pf) + " && echo OK").find("OK") != std::string::npos;
         if (!pf.empty()) unlink(pf.c_str());
         if (!ok) {
@@ -2498,14 +2531,17 @@ private:
         // --rescan no: the list as NetworkManager has it. Without it every
         // look older than 30 s started a scan, which costs power and briefly
         // stalls the connection; the Wi-Fi page scans when it is opened.
-        std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL dev wifi list --rescan no"));
+        // Every adapter's networks (a USB Wi-Fi adapter's too): DEVICE says
+        // which one is connected.
+        std::istringstream in(run("nmcli -t -f ACTIVE,SSID,SIGNAL,DEVICE dev wifi list --rescan no"));
         std::string line;
         while (std::getline(in, line)) {
             std::vector<std::string> f = nmcli_fields(line);   // unescapes "\:" in the SSID
-            if (f.size() >= 3 && f[0] == "yes") {
+            if (f.size() >= 3 && f[0] == "yes" && !n.wifi_connected) {
                 n.wifi_connected = true;
                 n.wifi_ssid = f[1];
                 n.wifi_signal = std::atoi(f[2].c_str());
+                if (f.size() >= 4) n.wifi_iface = f[3];
             }
         }
         n.ip = demand::primary_address(addrs);
