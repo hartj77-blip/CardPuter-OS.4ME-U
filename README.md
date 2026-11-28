@@ -182,7 +182,7 @@ keyboard the arrows are Fn + F, Z, X and C.
 
 | Key | What it does |
 | --- | --- |
-| Esc | Back. Hold it to go to the home screen from anywhere |
+| Esc | Back. Hold it to go to the home screen from anywhere but the Terminal (Ctrl+Q leaves that) |
 | Ctrl + Space | Taskbar panel: Wi-Fi, Bluetooth, volume, brightness, battery |
 | 1 to 9 | Pick an item. In a list, the 1st to 9th row, like a phone menu (when you're not typing) |
 | 0 | Show the keys for the current screen |
@@ -198,7 +198,7 @@ On the home screen:
 
 | Key | What it does |
 | --- | --- |
-| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "music", "bt"). The best match is first, and Enter opens it |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "bt"; "music" once Media is installed). The best match is first, and Enter opens it |
 | 1 to 7 | Open the pinned apps. While searching, 1 to 9 pick a result |
 | Esc | Clear the search |
 | Tab | Open All apps (every app, A to Z). There, Tab on an app, P, then 1 to 7 pins it on that key |

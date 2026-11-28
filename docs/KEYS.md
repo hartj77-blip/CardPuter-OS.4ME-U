@@ -14,7 +14,7 @@ The first time ZeroOS starts it shows a short tour of these keys instead of the 
 
 | Key | What it does in the tour |
 | --- | --- |
-| Enter, Right | Next page |
+| Enter, Right, Space | Next page |
 | Esc, Left | Previous page. On the first page, Esc asks whether to skip the tour |
 | Arrows, on the arrow keys page | Light the key you pressed, to practise |
 | 1, 2, 3, on the last page | Open Wi-Fi, Date & time or Apps. Esc there comes back to the tour |
@@ -27,11 +27,11 @@ after updating.
 
 | Key | What it does |
 | --- | --- |
-| Esc | Back. Hold it for a moment to go to the home screen from anywhere, even from a text box (HOME on the key) |
+| Esc | Back. Hold it for a moment to go to the home screen from anywhere, even from a text box (HOME on the key). Not in the Terminal, which has the keys to itself: Ctrl+Q or `exit` leaves it. In an M5Stack app, hold Esc for 3 seconds |
 | Tab, held | Lock: the screen goes off at once (LOCK on the key). The next key wakes it to the lock screen (the time, the date and what is playing, over a photograph), and Tab unlocks. Other keys on the lock screen do nothing, and neither the waking key nor Tab does anything else |
 | Fn + J (PRSC) | Screenshot: saved as a PNG in ~/Pictures/Screenshots |
 | Fn + H (HELP) | Show every key for this screen, the same as 0 |
-| Ctrl + Space | Open or close the taskbar panel, from anywhere, even while typing |
+| Ctrl + Space | Open or close the taskbar panel, from anywhere but the Terminal, even while typing |
 | 1 to 9 | Pick the 1st to 9th item on screen: the same as moving to it and pressing Enter |
 | 0 | Show every key for this screen. On screens not moved over yet, show which number is which |
 
@@ -83,7 +83,7 @@ Home is a search box, seven pinned apps and the apps you opened last.
 
 | Key | What it does |
 | --- | --- |
-| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "music", "bt"). The best match is first, and Enter opens it |
+| Letters | Search apps, settings and actions ("wifi", "bright", "mute", "bt"; "music" once Media is installed). The best match is first, and Enter opens it |
 | 1 to 7 | Open a pinned app. While searching, 1 to 9 pick a result |
 | Arrows (Fn + F/Z/X/C) | Move between the pinned apps and the Recent list |
 | Esc | Clear the search |

@@ -10,6 +10,7 @@
 
 #include "hal/hal.h"
 #include "platform/keys.h"
+#include "ui/power.h"
 #include "ui/prefs.h"
 #include "ui/shell.h"
 #include "ui/theme.h"
@@ -221,7 +222,8 @@ private:
             a.push_back({"Next", 'n', "Enter", [this] { next(); }});
         }
         a.push_back({"Back", 'b', "Esc", [this] { show(page_ - 1); }});
-        a.push_back({"Skip tour", 's', nullptr, [this] { skip(); }});
+        // On the last page there is nothing left to skip.
+        if (page_ != kDone) a.push_back({"Skip tour", 's', nullptr, [this] { skip(); }});
         shell_set_actions(std::move(a));
     }
 
@@ -304,14 +306,19 @@ private:
         lv_obj_t* r = rows(root_);
         row(r, "[Enter]", "Open, choose, OK");
         row(r, "[Esc]", "Back. The ` key works too");
-        row(r, "[Esc] held", "Home, from anywhere");
+        // The Terminal has the screen and the keys to itself (Shell::
+        // hold_home does nothing there): tmux's Ctrl+Q is the way out. One
+        // line each: a fifth line would push the last row under the bar.
+        row(r, "[Esc] held", app_find("terminal") ? "Home. In the Terminal: Ctrl+Q" : "Home, from anywhere");
         row(r, "[1] - [9]", "Pick the 1st to 9th item on screen");
     }
 
     void home() {
         title("The home screen");
         lv_obj_t* r = rows(root_);
-        row(r, "[a] - [z]", "Just type to find apps, settings and actions: wifi, bright, music");
+        // Examples that find something on every device: no installable app
+        // ("music" finds only Media, which isn't on a new device).
+        row(r, "[a] - [z]", "Just type to find apps, settings and actions: wifi, bright, mute");
         row(r, "[1] - [7]", "Open your pinned apps");
         row(r, "[Tab]", "All apps, A to Z. There, Tab, P and a number pins one");
     }
@@ -346,10 +353,17 @@ private:
     void lock() {
         title("Lock and screenshots");
         lv_obj_t* r = rows(root_);
-        row(r, "[Tab] held", "Lock. Tab again unlocks");
-        row(r, "[Fn] + [J]", "Screenshot, into Pictures");
-        row(r, "Face down", "Screen off. Pick it up to wake");
-        note(r, "At 15% battery, power saving comes on by itself.");
+        // The key that wakes the screen does nothing else (Power::on_key);
+        // then the lock screen takes only Tab. One line each, or the note
+        // below goes off the bottom.
+        row(r, "[Tab] held", "Lock. Any key, then Tab, unlocks");
+        row(r, "[Fn] + [J]", "Screenshot: Pictures/Screenshots");
+        // Only with a motion sensor (not on the Lite), and as Settings has it.
+        // hal().imu() is read each tick, long before this page is reached.
+        if (hal().imu().available && power().sleep_face_down())
+            row(r, "Face down", power().wake_on_pickup() ? "Screen off. Pick it up to wake" : "Screen off");
+        // Power::tick: only on battery power; off again charging past 20%.
+        note(r, "On battery, power saving comes on at 15%.");
     }
 
     void done() {

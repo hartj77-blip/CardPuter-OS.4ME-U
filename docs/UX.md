@@ -39,7 +39,7 @@ These work on every screen, in every app, including in a text box.
 | --- | --- |
 | **Enter** | The main action on the item in focus (open, play, send, toggle) |
 | **Esc** (or \`) | Back one step. At an app's first screen, back to home. On home, clear the search |
-| **Hold Esc** (0.6 s) | Home, from anywhere |
+| **Hold Esc** (0.6 s) | Home, from anywhere but the Terminal (Ctrl+Q leaves it) and M5Stack apps (hold 3 s there) |
 | **Tab** | The menu: every action for the item in focus and the screen |
 | **Hold Tab** (0.6 s) | Lock: screen off now (LOCK on the key). The next key wakes it to the lock screen (the time, the date and what is playing); Tab unlocks, other keys do nothing |
 | **Fn + J** (PRSC) | Screenshot to ~/Pictures/Screenshots, from anywhere, even the Terminal |
