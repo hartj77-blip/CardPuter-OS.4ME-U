@@ -1,0 +1,5 @@
+# A USB drive with a file system is mounted under /media/<label> when plugged
+# in (zeroos-usb-mount), for Sync's USB backup and the Media app. Needs the
+# board's side switch on Host. The folder of an unplugged drive is cleaned up.
+SUBSYSTEM=="block", ACTION=="add", ENV{ID_BUS}=="usb", ENV{ID_FS_USAGE}=="filesystem", RUN+="/usr/lib/zeroos/usb-mount add $devnode"
+SUBSYSTEM=="block", ACTION=="remove", ENV{ID_BUS}=="usb", RUN+="/usr/lib/zeroos/usb-mount clean"

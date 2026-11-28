@@ -30,6 +30,9 @@ install -d "$D/etc/systemd/system/sound.target.wants"
 ln -sf ../zeroos-mic-gain.service "$D/etc/systemd/system/sound.target.wants/zeroos-mic-gain.service"
 install -m 0755 "$F/zeroos-measure"            "$D/usr/bin/zeroos-measure"
 install -m 0755 "$F/zeroos-power-perms"        "$D/usr/lib/zeroos/power-perms"
+# USB drives mount themselves under /media/<label> (Sync backup, Media).
+install -m 0755 "$F/usb/zeroos-usb-mount"      "$D/usr/lib/zeroos/usb-mount"
+install -m 0644 "$F/usb/90-zeroos-usb.udev"    "$D/etc/udev/rules.d/90-zeroos-usb.rules"
 # BlueZ options for Bluetooth LE gamepads; the postinst applies them.
 install -m 0755 "$F/bluetooth/zeroos-bluetooth-conf" "$D/usr/lib/zeroos/bluetooth-conf"
 # Dock mode: labwc desktop on the HDMI monitor (docs/DOCK.md).

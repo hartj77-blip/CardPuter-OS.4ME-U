@@ -84,6 +84,7 @@ jobs:
           image/tests/apps-test.sh
           image/tests/bluetooth-conf-test.sh
           image/tests/polkit-test.sh
+          image/tests/usb-mount-test.sh
       - name: Package
         run: |
           image/package.sh build/device/zeroshell build/update

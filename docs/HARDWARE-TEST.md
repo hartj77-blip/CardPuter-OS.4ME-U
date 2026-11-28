@@ -62,6 +62,8 @@ New after 0.9.1 and not yet checked on a unit ([PERFORMANCE.md](PERFORMANCE.md#s
 - [ ] **Tether**: share your phone's internet over USB or Bluetooth; Wi-Fi off, a page still loads in Terminal (`curl -I example.com`).
 - [ ] **Remote**: sign in to Tailscale with the link or QR, your other devices are listed, SSH to one opens.
 - [ ] **Sync**: shows a device ID; pair with Syncthing on your PC, a note syncs across.
+- [ ] **Sync, USB backup**: side switch on Host, plug in a FAT or exFAT stick: it mounts under `/media/<label>` by itself (Media lists it too). **Back up to USB** copies Notes, Documents and Recordings into `CardputerBackup` (readable on a PC); a second run copies 0 files. Delete a note, **Restore from USB** brings it back and keeps a file that is newer on the Cardputer. Pull the stick mid-copy: "The drive was removed", no crash. Check it doesn't fight the Car app's USB modes (those need the switch on Slave).
+- [ ] **Sync, device address**: Enter on a paired PC says `online at <ip>:22000`; **Tab > P**, type the PC's IP, and it still connects; blank goes back to automatic; a bad address (`a b`) is refused.
 - [ ] **Car**: USB stick mode builds, then a car stereo (or PC) sees a USB drive with your music; Bluetooth pairs with a speaker. (The image is now built as `pi`, not root: check it still builds, and that `/var/lib/zeroos/car/music.img` is owned by root.)
 - [ ] **Bluetooth pairing**: pairing a keyboard, headphones and an Xbox pad from Settings still works (the pairing window is now only open for the device you picked, and scanning no longer opens one).
 - [ ] **Remote with an auth key**: signing in to Tailscale with an auth key still works (the key goes to `tailscale up` as a file now).

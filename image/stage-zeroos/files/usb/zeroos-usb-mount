@@ -1,0 +1,41 @@
+#!/bin/bash
+# Mount a USB drive that was plugged in, under /media/<label>, owned by the UI
+# user (uid 1000), so Sync's "Back up to USB" / "Restore from USB" and the Media
+# app can see it. Run as root by udev (90-zeroos-usb.udev).
+#
+#   zeroos-usb-mount add DEVNODE    mount it (udev's ID_FS_TYPE / ID_FS_LABEL are used)
+#   zeroos-usb-mount clean          remove the empty folders of drives that were unplugged
+#
+# systemd-mount ties the mount to the device, so unplugging the drive unmounts
+# it by itself. Mounted noexec,nosuid,nodev: nothing on a stick ever runs.
+set -u
+MEDIA=${ZEROOS_MEDIA_DIR:-/media}
+MOUNT=${ZEROOS_SYSTEMD_MOUNT:-systemd-mount}
+
+case "${1:-}" in
+add)
+    dev=${2:-}
+    [[ $dev == /dev/* ]] || exit 1
+    name=${ID_FS_LABEL:-}
+    name=$(printf '%s' "$name" | tr -c 'A-Za-z0-9._-' '_' | cut -c1-32)
+    name=${name#.}                      # never a hidden folder, never ".."
+    [ -n "$name" ] || name=$(basename "$dev")
+    opts=nosuid,nodev,noexec
+    case "${ID_FS_TYPE:-}" in
+        vfat|exfat|ntfs|ntfs3) opts+=,uid=1000,gid=1000,umask=0022 ;;
+        ext2|ext3|ext4|btrfs|xfs|f2fs) ;;
+        *) exit 0 ;;                    # swap, LUKS, a RAID member, unknown: leave it alone
+    esac
+    exec "$MOUNT" --no-block --collect --options="$opts" "$dev" "$MEDIA/$name"
+    ;;
+clean)
+    for d in "$MEDIA"/*/; do
+        [ -d "$d" ] && ! mountpoint -q "$d" && rmdir "$d" 2>/dev/null
+    done
+    exit 0
+    ;;
+*)
+    echo "usage: zeroos-usb-mount add DEVNODE | clean" >&2
+    exit 2
+    ;;
+esac

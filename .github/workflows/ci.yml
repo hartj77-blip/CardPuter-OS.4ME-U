@@ -166,6 +166,8 @@ jobs:
         run: image/tests/bluetooth-conf-test.sh
       - name: Polkit rule tests
         run: image/tests/polkit-test.sh
+      - name: USB mount helper tests
+        run: image/tests/usb-mount-test.sh
       - name: Package
         run: image/package.sh build/device/zeroshell build/update
       - name: Package the apps
