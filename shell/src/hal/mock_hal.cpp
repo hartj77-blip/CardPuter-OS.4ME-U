@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <ctime>
 
 #include <cstring>
@@ -74,6 +75,7 @@ public:
         n.wifi_connected = wifi_on_;
         n.wifi_ssid = wifi_on_ ? connected_ssid_ : "";
         n.wifi_signal = 72;
+        n.wifi_iface = wifi_on_ ? connected_iface_ : "";
         n.ip = wifi_on_ ? "192.168.1.42" : "";
         n.bt_enabled = bt_on_;
         n.bt_connected = bt_on_ && bt_paired_ ? 1 : 0;
@@ -134,8 +136,22 @@ public:
     bool wifi_connect(const std::string& ssid, const std::string&) override {
         connected_ssid_ = ssid;
         wifi_on_ = true;
+        connected_iface_ = "wlan0";
+        for (auto& a : wifi_adapters())
+            if (a.id == wifi_adapter_) connected_iface_ = a.iface;
         return true;
     }
+    // The built-in chip; ZS_MOCK_USB_WIFI=1 plugs in a pretend USB adapter
+    // too, to try the adapter choice in Settings > Wi-Fi.
+    std::vector<WifiAdapter> wifi_adapters() override {
+        std::vector<WifiAdapter> v = {{"builtin", "Built-in", "wlan0", "brcmfmac", "", "d8:3a:dd:00:00:01", false}};
+        const char* usb = std::getenv("ZS_MOCK_USB_WIFI");
+        if (usb && *usb && *usb != '0')
+            v.push_back({"usb", "USB", "wlan1", "rtl8xxxu", "802.11n NIC", "00:e0:4c:00:00:02", true});
+        return v;
+    }
+    std::string wifi_adapter() override { return wifi_adapter_; }
+    void set_wifi_adapter(const std::string& id) override { wifi_adapter_ = id; }
     void set_wifi_enabled(bool on) override { wifi_on_ = on; }
     void set_bt_enabled(bool on) override {
         bt_on_ = on;
@@ -944,6 +960,8 @@ private:
     bool bt_on_ = true;
     bool bt_paired_ = true;   // headphones "connected" until Bluetooth is toggled
     std::string connected_ssid_ = "HomeNet";
+    std::string connected_iface_ = "wlan0";
+    std::string wifi_adapter_;   // "" = automatic
     int brightness_ = 80;
     int volume_ = 60;
     bool muted_ = false;

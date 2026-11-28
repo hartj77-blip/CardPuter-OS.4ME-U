@@ -135,6 +135,8 @@ the device afterwards.
 - Through your phone: use the [Tether](docs/TETHER.md) app (Wi-Fi hotspot, USB or Bluetooth).
 - With a QR code: scan a Wi-Fi QR code with the [Camera](docs/CAMERA.md) app.
 - With a cable: the Cardputer Zero has an Ethernet port. Plug it in and it is used.
+- With a USB Wi-Fi adapter: plug it into the USB-A port. **Settings > Wi-Fi > Adapter** chooses
+  between it and the built-in Wi-Fi ([details](docs/HARDWARE.md#usb-wi-fi-adapters)).
 
 ### Date and time
 

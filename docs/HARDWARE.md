@@ -18,13 +18,48 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 | IMU* | BMI270 + BMM150 | iio (`in_accel_*`, `in_anglvel_*`, `in_magn_*`) | Compass, level |
 | IR | TX + RX on GPIO | rc-core: `ir-ctl` sends our own encoded timings and learns raw (docs/IR.md) | IR Remote |
 | Audio | ES8389 codec, AW8737A amp, 1 W speaker, mic, TRRS | ALSA/PipeWire; sox `play`/`rec` | Media app (music), Recorder app (voice notes), volume, mute |
-| Wi-Fi / BT | BCM43439 2.4 GHz | NetworkManager, BlueZ | Settings (Wi-Fi, Bluetooth), Bluetooth audio in the Car app |
+| Wi-Fi / BT | BCM43439 2.4 GHz (plus any USB Wi-Fi adapter, see below) | NetworkManager, BlueZ | Settings (Wi-Fi, Bluetooth), Bluetooth audio in the Car app |
 | Ethernet | SR9900A (USB) | `eth0` | Status, System app |
 | USB | GL852G hub, USB-A, 2x USB-C, Host/Slave switch (Slave: right USB-C is a device port) | `dwc2`, configfs gadgets | USB stick mode in the Car app, see CAR.md |
 | Camera* | IMX219 8 MP, CSI | libcamera (RPi fork) | Camera app (M5's CameraApp, started by ZeroShell; QR codes read by ZeroShell through `rpicam-vid`), see CAMERA.md |
 | Video | HDMI 1080p30, H.264 enc/dec | vc4 (a DRM card of its own: card0 on M5's image, card1 on ZeroOS, where the LCD's driver starts first and is card0; fb0 only with a monitor connected), V4L2 M2M | Dock mode (labwc on the HDMI card only; mpv hardware H.264), see DOCK.md |
 | Storage | microSD | | Root filesystem |
 | Expansion | Grove HY2.0 (I2C/UART), 14-pin EXT bus | i2c-dev, spidev, UART | GPS app (gpsd), Mesh app (meshtasticd, Cap LoRa-1262); see EXPANSION.md |
+
+## USB Wi-Fi adapters
+
+A USB Wi-Fi adapter (dongle) can be used in the USB-A port, or in a USB-C port with the switch on
+Host. It's handy for 5 GHz (the built-in chip is 2.4 GHz only), an external antenna, or a second
+radio. Nothing needs installing for the common chips: ZeroOS uses the Raspberry Pi kernel, which
+has the in-kernel USB Wi-Fi drivers (Realtek `rtl8xxxu`/`rtw88`, MediaTek `mt76`/`mt7601u`,
+Ralink `rt2800usb`, Atheros `ath9k_htc`), and Raspberry Pi OS's firmware packages. Adapters that
+need a driver built from outside the kernel (some newer Realtek ones) are not supported.
+
+Once an adapter is plugged in, **Settings > Wi-Fi** has an **Adapter** row (Left/Right):
+
+| Choice | What scans and joins |
+| --- | --- |
+| Auto (the default) | Either adapter; NetworkManager picks. A network joined in Auto can reconnect on either. |
+| Built-in | Only the built-in chip. |
+| USB | Only the USB adapter (with two plugged in: USB and USB 2). |
+
+A network joined with Built-in or USB chosen is tied to that adapter (its profile gets the
+adapter's MAC address in `802-11-wireless.mac-address`), so after a restart it reconnects on the
+same one. Joining it again in Auto unties it. The choice is saved as `wifi_adapter` in
+`~/.config/zeroos/settings.conf`. If the chosen adapter is unplugged, the row says
+"USB (not plugged in)" and Wi-Fi works as in Auto. The heading says which adapter you're
+connected through, e.g. "Connected to HomeNet (USB)".
+
+From Terminal: `nmcli dev` lists the adapters (wlan0 is the built-in one), and
+`nmcli dev wifi connect <name> ifname wlan1` joins on a specific one.
+
+Things to know:
+
+- A dongle draws power from the battery the whole time it's plugged in.
+- USB stick mode in the Car app switches the USB port to Slave, which turns the USB-A port off,
+  dongle included.
+- Built-in or USB is found by looking at the driver in `/sys/class/net/*/device`
+  (`hal/wifi_adapters.h`), not by interface name, which can change between restarts.
 
 ## Known issues from early owners, and what the image does
 
@@ -60,4 +95,5 @@ Sources: [M5 CardputerZero docs](https://docs.m5stack.com/en/CardputerZero), M5'
 - Exact names under `/sys/class/leds`, `/sys/class/backlight` and the iio devices.
 - IMU axis orientation and magnetometer calibration. Motion wake assumes `in_accel_z` reads +1 g lying face up; if face down and pickup act the wrong way round, set `motion.z_sign=-1` in `~/.config/zeroos/settings.conf`.
 - Whether IR transmit works with the stock driver (one owner saw no output on a non-stock image).
+- USB Wi-Fi adapters (see above): which common chips come up without help, on the USB-A port and on a USB-C port in Host.
 - Boot time and idle power with ZeroOS versus stock (stock: about 2.5 W idle).
