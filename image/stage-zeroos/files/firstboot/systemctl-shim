@@ -1,0 +1,8 @@
+#!/bin/sh
+# systemctl for Raspberry Pi's cancel-rename only (see /usr/lib/zeroos/cancel-rename):
+# getty@tty1 stays masked and off, since ZeroShell owns tty1. Anything else
+# goes to the real systemctl.
+for a in "$@"; do
+    case $a in getty@tty1|getty@tty1.service) exit 0 ;; esac
+done
+exec /usr/bin/systemctl "$@"

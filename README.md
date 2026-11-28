@@ -102,7 +102,7 @@ You need a microSD card and a computer to write it from.
 
 1. Download [zeroos-cardputerzero-arm64.img.xz](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest/download/zeroos-cardputerzero-arm64.img.xz)
    from the [latest release](https://github.com/hartj77-blip/CardPuter-OS.4ME-U/releases/latest).
-   It's about 1.2 GB.
+   It's about 1.4 GB.
 2. Optionally, check the download. The release has a `.sha256` file next to the image. In the
    folder you downloaded both to:
 
@@ -110,13 +110,23 @@ You need a microSD card and a computer to write it from.
    sha256sum -c zeroos-cardputerzero-arm64.img.xz.sha256
    ```
 
-   On a Mac, use `shasum -a 256 -c` instead. It should print `OK`.
+   On a Mac, use `shasum -a 256 -c` instead. It should print `OK`. If it fails, check for an older
+   download in the same folder: the browser saves the new one as `...img(1).xz`, and the check
+   reads the old file. Delete the old one and download again.
 3. Write it to the card with [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
    (Choose OS > Use custom) or [balenaEtcher](https://etcher.balena.io/). Both take the `.xz`
    file as it is, no need to unzip it.
    In Raspberry Pi Imager, pick Raspberry Pi Zero 2 W as the device (the CM0 is the same chip).
+   Its settings (all optional) are applied on the first boot:
+   - **Hostname**: set it to `cardputer`. Imager otherwise uses `raspberrypi`, and the device is
+     then `raspberrypi.local` on your network, not `cardputer.local` as in this guide.
+   - **Username and password**: your own instead of `pi`. Then there's no "choose a new
+     password" step.
+   - **Wi-Fi**: your network's name and password, and your country.
+   - **SSH**: on, with a password or (better) your public key.
 4. Put the card in the Cardputer and switch it on. The first boot takes a few minutes, because the
-   card's filesystem is grown to fill the card. Boot text is shown on the screen while it runs.
+   card's filesystem is grown to fill the card and Imager's settings are applied. Boot text is
+   shown on the screen while it runs.
 5. The first screen is a short welcome tour of the keys: Enter turns the page, Esc goes back a
    page (on the first page it skips the tour). Its last page sets up Wi-Fi and the time zone. To
    see it again later, type `tour` on the home screen.

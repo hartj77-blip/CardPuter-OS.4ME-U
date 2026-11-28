@@ -187,11 +187,39 @@ grep -q '^Include /etc/ssh/sshd_config.d/\*.conf' /etc/ssh/sshd_config ||
     echo "zeroos: WARNING: sshd_config has no sshd_config.d include; SSH won't ask for a new password"
 systemctl enable zeroos-password-check.service zeroos-password-check.path
 
+# Raspberry Pi Imager's user rename ends with cancel-rename, which turns tty1's
+# login prompt back on; masked here, that failed and cloud-init marked all of
+# its stages failed (owner report, 0.9.4). Ours runs theirs without that step
+# (files/firstboot/cancel-rename). Diverted, so an update of userconf-pi
+# installs its copy beside ours instead of over it.
+if [ -e /usr/bin/cancel-rename ]; then
+    dpkg-divert --local --rename --divert /usr/bin/cancel-rename.distrib --add /usr/bin/cancel-rename
+    ln -sf /usr/lib/zeroos/cancel-rename /usr/bin/cancel-rename
+else
+    echo "zeroos: WARNING: no /usr/bin/cancel-rename; an Imager rename may fail cloud-init again"
+fi
+
 groupadd -f spi   # /dev/spidev* stays root-only without it (owner report)
 groupadd -f bluetooth   # normally made by bluez; zeroshell.service names it
 for g in video input audio netdev i2c gpio spi dialout adm bluetooth; do   # adm: read service logs; bluetooth: pair devices
     getent group "$g" >/dev/null && usermod -aG "$g" pi
 done
+# The first boot applies systemd's presets to every unit (the machine ID is
+# "uninitialized"). 00-zeroos.preset makes that change nothing; check it here,
+# where it would otherwise turn adbd and the rest back on, unseen.
+units() { find /etc/systemd/system -type l -printf '%p -> %l\n' | sort; }
+units > /tmp/zeroos-units-before
+systemctl preset-all --preset-mode=enable-only ||
+    { echo "zeroos: ERROR: first-boot presets fail (the boot would show it)" >&2; exit 1; }
+units > /tmp/zeroos-units-after
+if ! cmp -s /tmp/zeroos-units-before /tmp/zeroos-units-after; then
+    echo "zeroos: ERROR: first-boot presets would change these services:" >&2
+    diff /tmp/zeroos-units-before /tmp/zeroos-units-after >&2 || true
+    exit 1
+fi
+rm -f /tmp/zeroos-units-before /tmp/zeroos-units-after
+echo "zeroos: first-boot presets change nothing"
+
 # The initramfs picks up modprobe.d (the panel blacklist). It has always been
 # allowed to fail here (qemu chroot), but say so loudly in the build log.
 update-initramfs -u -k all || echo "zeroos: WARNING: update-initramfs failed; the image keeps its old initramfs"

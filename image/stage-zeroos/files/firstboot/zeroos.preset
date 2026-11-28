@@ -1,0 +1,13 @@
+# ZeroOS: the image decides which services run (image/stage-zeroos/01-run.sh),
+# so the first boot changes none of them.
+#
+# A card's first boot (/etc/machine-id says "uninitialized") makes systemd
+# apply "presets" to every unit. Debian's presets turn on everything they
+# don't name, which would bring back what the image turns off: adbd (a root
+# shell on the USB port), Raspberry Pi's rename dialog on tty8,
+# systemd-networkd beside NetworkManager, apt's daily jobs... On 0.9.4 that
+# step ran while / was still read-only, so it changed nothing, but it left
+# "Failed to populate /etc with preset unit settings" on the screen. With
+# this rule first, it has nothing to do: no change and no message.
+# (The machine ID stays "uninitialized": each card must make its own.)
+disable *

@@ -129,6 +129,20 @@ install -D -m 0644 "$F/modprobe-zeroos-panel.conf" "$D/etc/modprobe.d/zeroos-pan
 # ship neither that launcher nor a logo (boot text is on the LCD instead), so
 # switch it off; held open, nothing ZeroShell draws reaches the screen.
 ln -sf /dev/null "$D/etc/systemd/system/fb_load.service"
+# First boot, quietly (each file says why):
+#   - systemd's first-boot presets change nothing (and print no error)
+#   - Imager's user rename doesn't try to bring back tty1's login prompt,
+#     which failed every cloud-init stage (01-run.sh diverts cancel-rename
+#     to this wrapper)
+#   - cloud-init's progress goes to the journal, not over the boot screen
+#     (Raspberry Pi already does this for cloud-init-main)
+install -D -m 0644 "$F/firstboot/zeroos.preset" "$D/usr/lib/systemd/system-preset/00-zeroos.preset"
+install -m 0755 "$F/firstboot/cancel-rename"   "$D/usr/lib/zeroos/cancel-rename"
+install -D -m 0755 "$F/firstboot/systemctl-shim" "$D/usr/lib/zeroos/cancel-rename-shim/systemctl"
+for u in cloud-init-local cloud-init-network cloud-config cloud-final; do
+    install -d "$D/etc/systemd/system/$u.service.d"
+    printf '[Service]\nStandardOutput=journal\n' > "$D/etc/systemd/system/$u.service.d/zeroos-quiet.conf"
+done
 
 # (IR Remote's code database travels with the IR Remote app: image/apps/ir.pkg.)
 
