@@ -3,8 +3,8 @@
 // first time it starts for a user; after that, "tour" in the home search
 // opens it again.
 //
-//   Enter, Right   next page       Esc, Left   previous page (on the first: skip)
-//   last page      1 Wi-Fi, 2 Date & time, 3 Apps; Enter goes home
+//   Enter, Right, Space   next page       Esc, Left   previous page (on the first: skip)
+//   last page             1 Wi-Fi, 2 Date & time, 3 Apps; Enter goes home
 //
 // The page with the arrows is a practice page: there the arrows light their
 // keys instead of turning the page.
