@@ -98,8 +98,8 @@ password from a pipe, never from the command line.
 
 **Trust.** An app runs with the same access as the home screen, and installing one runs its
 package's scripts as root. The SHA-256 in the index only proves the download is complete; the
-index comes from the same place. Once ZeroOS has a release key, this project's two sources must
-sign their index ([UPDATE.md, "Signatures"](UPDATE.md#signatures)). Only add sources you trust.
+index comes from the same place. This project's two sources sign their index with ZeroOS's
+release key, and an unsigned or wrongly signed one is refused ([UPDATE.md, "Signatures"](UPDATE.md#signatures)). Only add sources you trust.
 
 Other checks on every install:
 

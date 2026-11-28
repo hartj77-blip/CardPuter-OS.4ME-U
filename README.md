@@ -21,7 +21,7 @@ This is a community project. It isn't made, endorsed or supported by M5Stack.
 [apps repository](https://github.com/hartj77-blip/CardPuter-Apps.4ME-U). Every release is built
 from `main` by GitHub Actions, in public, and is only published if the full test run passes on that
 commit. Each download comes with a `.sha256` file so you can check it ([how](#install)). Updates are
-checked against their SHA-256 before they're installed, and if the new version doesn't start, the
+checked against the project's signature and their SHA-256 before they're installed, and if the new version doesn't start, the
 previous one goes back on. [Security and what you are trusting](#security-and-what-you-are-trusting)
 says exactly what you rely on, and [the credits](#license-and-third-party-code) list every project it
 builds on.
@@ -118,7 +118,7 @@ You need a microSD card and a computer to write it from.
 4. Put the card in the Cardputer and switch it on. The first boot takes a few minutes, because the
    card's filesystem is grown to fill the card. Boot text is shown on the screen while it runs.
 5. The first screen is a short welcome tour of the keys: Enter turns the page, Esc goes back a
-   page (on the first page it skips the tour). Its last page sets up Wi-Fi and the time zone. To
+   page (on the first page it asks whether to skip the tour). Its last page sets up Wi-Fi and the time zone. To
    see it again later, type `tour` on the home screen.
 
 The image is built after each release is published, so for about 10 minutes after a new release
@@ -344,7 +344,7 @@ Every app above can be tried without a Cardputer in the
 ### From M5Stack's app store
 
 The Apps app also lists [M5Stack's app store](https://github.com/CardputerZero/packages): about
-180 community apps made for M5's own launcher, marked **M5**. ZeroOS installs and opens them its own
+190 community apps made for M5's own launcher, marked **M5**. ZeroOS installs and opens them its own
 way ([how](docs/APPS.md#m5stacks-app-store)), but they were made and tested for M5's system, so not
 all of them work here. The [compatibility checklist](docs/M5-APPS.md) lists every one of them, what
 a look inside its package found, and what has been checked on a real Cardputer running ZeroOS.
@@ -357,8 +357,8 @@ has a one-line fix.
 
 No **M5** apps in the Apps list (ZeroOS 0.8.0 and older, from late November 2026). M5Stack moved
 its app list to `cardputer.cc`, and the old address now sends ZeroOS to a plain-http page, which
-it refuses. The next release reads the new address. Until then: **Apps > Tab > P**, **Add a GitHub
-repo**, and type `https://cardputer.cc/generated/registry.json`.
+it refuses. ZeroOS 0.8.1 and newer read the new address, so update ZeroOS. If you can't: **Apps >
+Tab > P**, **Add a GitHub repo**, and type `https://cardputer.cc/generated/registry.json`.
 
 Apps won't install, or Terminal opens nothing, after updating from 0.1.x. Open Update and
 install the newest version, then open Apps and choose Update all.
@@ -505,9 +505,9 @@ ZeroShell is one C++17 program. Facts about it:
 - A failed LVGL assertion calls `abort()` (`LV_ASSERT_HANDLER` in `shell/lv_conf.h`). It used to
   spin forever (`while(1);`), which froze the screen and ignored systemd's stop signal. Now the
   process ends and systemd starts it again.
-- About 26,000 lines of C++ in `shell/src/`, not counting the generated fonts and wallpaper (UI
-  6,900, hardware layer 6,000, apps that are still in this repository 11,100, screen and keyboard
-  1,200, IR library 700). The rest of the apps are in the apps repository.
+- About 28,000 lines of C++ in `shell/src/`, not counting the generated fonts and wallpaper (UI
+  7,400, hardware layer 7,000, apps that are still in this repository 11,600, screen and keyboard
+  1,400, IR library 700). The rest of the apps are in the apps repository.
 - One binary, four ways to build it, chosen with `-DZS_BACKEND`:
 
   | Backend | Screen | Keyboard | Hardware | Used for |
@@ -895,8 +895,9 @@ root (`image/stage-zeroos/files/update/zeroos-update`). It:
 1. Takes a lock, so only one update runs at a time.
 2. Refuses the update address if it's plain `http://` to anything but your own network (see
    [Security](#security-and-what-you-are-trusting)).
-3. Downloads the manifest and checks every field against a strict pattern. The manifest is never
-   run or sourced.
+3. Downloads the manifest and its signature, checks the signature against ZeroOS's release key
+   (an unsigned or wrongly signed manifest is refused), and checks every field against a strict
+   pattern. The manifest is never run or sourced.
 4. Compares versions with `dpkg --compare-versions`. If the offered version isn't newer, it stops.
 5. Checks there's free space for four times the package size, and if the Apps app is
    mid-install, waits for it. (The Update app itself won't start an update under 20% battery
@@ -995,7 +996,7 @@ how they were worked out and how to measure them are in
 The version comes from git (`image/version.sh`). A tagged commit `v0.4.0` is version `0.4.0`.
 Three commits after it is `0.4.0+3.gabc1234`, which dpkg sorts as newer than 0.4.0 and older
 than 0.4.1. Uncommitted changes add `.dirty`. The running version is in `/etc/zeroos-release`
-and in Settings > About this device.
+and in Settings, as the value of **Software update**.
 
 App packages carry the app level in their version: `1.2.0-abi4` is version 1.2.0 built for
 level 4.
@@ -1026,11 +1027,12 @@ screen, input, audio, network, I2C, GPIO and Bluetooth. A polkit rule
 (`image/stage-zeroos/files/90-zeroos.rules`) lets that one user, and no other, do exactly these
 things without a password:
 
-- NetworkManager actions (join and forget networks).
+- NetworkManager actions (joining and forgetting networks, and the rest of what Settings > Wi-Fi does).
 - Power off and reboot.
 - Set the clock and the time zone, and choose whether the time comes from the internet (Settings >
   Date & time). Not switching the hardware clock to local time.
-- Start and stop these units: `zeroos-dock`, `zeroos-terminal`, `tailscaled`, the user's
+- Start and stop these units: `zeroos-dock`, `zeroos-terminal`, `tailscaled`, `bluetooth` (bluetoothd runs only while
+  Bluetooth is on or in use), the user's
   `syncthing@` instance, `meshtasticd`, `zeroos-mesh-lan` (Mesh's **Allow phones**),
   `zeroos-usb-stick`, `zeroos-update`, `zeroos-update-check`, and these `zeroos-apps@<job>`
   jobs: refresh, upgrade, install, remove, and removing or reordering a source. Adding a source
@@ -1043,21 +1045,20 @@ changes permissions on the CPU frequency and panel power files. `pi` has no pass
 
 Updates. Updates come from the address in `/etc/zeroos/update.conf`, by default this
 repository's GitHub releases over HTTPS. The download must match the SHA-256 in the manifest,
-but the manifest comes from the same place as the package, so the checksum only proves the
-download is complete. It says nothing about who made it. In practice you are trusting whoever can
-publish releases on this repository, and GitHub's HTTPS. The package is installed by dpkg as
+and the manifest must be signed with the project's Ed25519 release key, so neither the server nor
+the network can swap the package. The private key is a secret of this repository's GitHub
+`release` environment: you are trusting whoever can approve a release, and GitHub. The package is installed by dpkg as
 root. Plain `http://` is only accepted for addresses on your own network (localhost, private
 ranges, Tailscale's 100.64.0.0/10 and `*.ts.net`, and `.local`, `.lan` and `.home.arpa` names),
-and anywhere else only if you add `ALLOW_HTTP=1` yourself. ZeroOS can check an Ed25519
-signature on the manifest and on the app lists, which takes the server and the network out of
-the picture. It switches on once the project's release key is added
-([docs/UPDATE.md, "Signatures"](docs/UPDATE.md#signatures)); until then, lists are taken
-unsigned as before. Releases only come from commits on `main`, and the release workflows use
+and anywhere else only if you add `ALLOW_HTTP=1` yourself. The same key signs the app lists of
+this project's two app sources; an unsigned or wrongly signed one is refused
+([docs/UPDATE.md, "Signatures"](docs/UPDATE.md#signatures)). M5Stack's store and sources you add
+yourself aren't signed, and are only checked against their SHA-256. Releases only come from commits on `main`, and the release workflows use
 actions pinned to exact commits.
 
 Apps. An installed app runs inside ZeroShell with the same access as the home screen, and
-installing one runs its package's scripts as root. Like updates, the index's SHA-256 only proves
-a complete download (until the signing key is added). Only add sources you trust; adding one
+installing one runs its package's scripts as root. Like updates, this project's app indexes are signed with
+the release key, and each package must match the SHA-256 in the index. Only add sources you trust; adding one
 asks for your password. Apps never installs an older version over a newer one, and an app's own
 apt repository must be checked against the app's key. Apps from M5Stack's store are reviewed by
 M5Stack's community repository, not by this project; ZeroOS checks that each download is the
@@ -1441,7 +1442,8 @@ and it will be added.
 | [Tailscale](https://github.com/tailscale/tailscale) (from [Tailscale's repository](https://pkgs.tailscale.com/stable/)) and [Headscale](https://github.com/juanfont/headscale) as a login server | Remote | BSD-3 |
 | [Syncthing](https://github.com/syncthing/syncthing) | Sync | MPL-2.0 |
 | [libretro](https://www.libretro.com) emulator cores: Nestopia, Gambatte and mGBA from Debian; more downloaded when you ask, from [libretro's buildbot](https://buildbot.libretro.com) | The Libretro app | Each core's own. A few, such as Snes9x and Genesis Plus GX, are for non-commercial use only |
-| Raspberry Pi OS and Debian: NetworkManager, BlueZ, PipeWire, labwc, Chromium, mpv, tmux, curl and the rest of `image/stage-zeroos/00-packages` | Everything underneath | Each package's own |
+| The [DOOM](https://github.com/id-Software/DOOM) shareware episode (Debian's `doom-wad-shareware`, by id Software), or else [Freedoom](https://github.com/freedoom/freedoom) with [Chocolate Doom](https://github.com/chocolate-doom/chocolate-doom) | Installed for M5's DOOM Zero app when you install it (`m5-fixups`) | Shareware licence; BSD-3 and GPL-2.0 |
+| Raspberry Pi OS and Debian: NetworkManager, BlueZ, PipeWire, labwc, Chromium, mpv, tmux, curl and the rest of `image/stage-zeroos/00-packages`, and the Debian packages the apps depend on (`image/apps/*.pkg`) | Everything underneath | Each package's own |
 
 ### Building and testing
 
