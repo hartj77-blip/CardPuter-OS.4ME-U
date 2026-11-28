@@ -74,7 +74,7 @@ builds on.
 
 ## Status: what is tested and what isn't
 
-ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.9.4. It is
+ZeroOS is young. The first commit was on 13 November 2026 and the newest release is 0.9.5. It is
 being written faster than it can be tried on hardware, so this section says plainly where things
 stand.
 
