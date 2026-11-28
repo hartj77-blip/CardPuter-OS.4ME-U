@@ -9,6 +9,7 @@
   zeroos-sync accept-folder FOLDER LABEL DEVICE   into ~/Sync/LABEL
   zeroos-sync ignore-folder FOLDER LABEL DEVICE
   zeroos-sync rescan
+  zeroos-sync address ID [ADDRESS]    show, or set, where to reach a device (below)
   zeroos-sync usb                     the USB drives that are mounted
   zeroos-sync backup MOUNT            copy Notes, Documents, Recordings to MOUNT/CardputerBackup
   zeroos-sync restore MOUNT           copy them back (newer files here are kept)
@@ -20,6 +21,12 @@ status prints:
   request-device  ID NAME
   request-folder  FOLDERID LABEL DEVICEID DEVICENAME
 and exits 2 if Syncthing isn't answering.
+
+address with no ADDRESS prints "address<TAB>VALUE": the fixed address, or "automatic";
+then, if the device is connected, "connected<TAB>IP:PORT": where it really is right now.
+With one it sets it: an IP or host name, with an optional port (default 22000), e.g.
+192.168.1.50 or mypc.local:22000. "automatic" (or empty) goes back to finding the
+device by itself. A fixed address is tried first; discovery stays on as a fallback.
 
 usb prints one line per drive: usb MOUNT LABEL FREE_MB WRITABLE(0/1) BACKUP_TIME
 (BACKUP_TIME is when the drive's backup was made, seconds since 1970, or 0).
@@ -42,7 +49,7 @@ import urllib.parse
 import urllib.request
 
 HOME = os.path.expanduser("~")
-API = "http://127.0.0.1:8384"
+API = os.environ.get("ZEROOS_SYNCTHING_API", "http://127.0.0.1:8384")   # the variable is for tests
 
 # id, label, path: what ZeroOS keeps in sync.
 FOLDERS = [
@@ -198,6 +205,35 @@ def add_device(dev, name=""):
         "deviceID": dev, "name": name, "addresses": ["dynamic"], "autoAcceptFolders": False,
     })
     share_with(dev)
+
+
+def normalize_address(a):
+    """tcp://HOST:PORT for what the user typed, or None for "find it by itself"."""
+    a = a.strip()
+    if a.lower() in ("", "automatic", "dynamic"):
+        return None
+    m = re.fullmatch(r"(?:tcp[46]?://)?(\[[0-9A-Fa-f:.]+\]|[A-Za-z0-9][A-Za-z0-9._-]*)(?::(\d{1,5}))?", a)
+    if not m or not 1 <= int(m.group(2) or 22000) <= 65535:
+        sys.exit("not an address: use an IP or host name, like 192.168.1.50 or mypc.local:22000")
+    return "tcp://%s:%s" % (m.group(1), m.group(2) or "22000")
+
+
+def device_address(dev, new=None):
+    d = get("/rest/config/devices/" + q(dev))
+    if new is None:
+        fixed = [x for x in d.get("addresses", []) if x != "dynamic"]
+        out("address", fixed[0][len("tcp://"):] if fixed and fixed[0].startswith("tcp://") else (fixed[0] if fixed else "automatic"))
+        try:
+            c = get("/rest/system/connections").get("connections", {}).get(dev, {})
+            if c.get("connected") and c.get("address"):
+                out("connected", re.sub(r"^[a-z0-9]+://", "", c["address"]))
+        except (OSError, urllib.error.URLError, ValueError):
+            pass
+        return False
+    addr = normalize_address(new)
+    d["addresses"] = [addr, "dynamic"] if addr else ["dynamic"]
+    call("PUT", "/rest/config/devices/" + q(dev), d)
+    return True
 
 
 def ignore_device(dev, name=""):
@@ -439,6 +475,9 @@ def main(argv):
             ignore_folder(*args)
         elif cmd == "rescan":
             call("POST", "/rest/db/scan")
+        elif cmd == "address" and len(args) in (1, 2):
+            if not device_address(args[0], args[1] if len(args) > 1 else None):
+                return
         elif cmd == "usb":
             usb_list()
         elif cmd in ("backup", "restore") and len(args) == 1:
