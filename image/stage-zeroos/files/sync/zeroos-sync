@@ -9,6 +9,9 @@
   zeroos-sync accept-folder FOLDER LABEL DEVICE   into ~/Sync/LABEL
   zeroos-sync ignore-folder FOLDER LABEL DEVICE
   zeroos-sync rescan
+  zeroos-sync usb                     the USB drives that are mounted
+  zeroos-sync backup MOUNT            copy Notes, Documents, Recordings to MOUNT/CardputerBackup
+  zeroos-sync restore MOUNT           copy them back (newer files here are kept)
 
 status prints:
   id      MYDEVICEID
@@ -18,11 +21,20 @@ status prints:
   request-folder  FOLDERID LABEL DEVICEID DEVICENAME
 and exits 2 if Syncthing isn't answering.
 
+usb prints one line per drive: usb MOUNT LABEL FREE_MB WRITABLE(0/1) BACKUP_TIME
+(BACKUP_TIME is when the drive's backup was made, seconds since 1970, or 0).
+backup and restore need no Syncthing. They write their progress to
+~/.cache/zeroos/usb-job.state (the Sync app reads it):
+  running  KIND PERCENT        done  KIND COPIED SKIPPED FAILED        error  KIND WHY
+
 Runs as pi. The API key comes from Syncthing's own config.xml.
 """
+import fcntl
 import json
 import os
 import re
+import shutil
+import stat
 import sys
 import time
 import urllib.error
@@ -219,6 +231,195 @@ def ignore_folder(fid, label, dev):
     call("DELETE", "/rest/cluster/pending/folders", folder=fid, device=dev)
 
 
+# --- USB drives: backup and restore -------------------------------------
+# A drive is anything mounted under /media, /run/media or /mnt that isn't a
+# network share (the same rule as the Media app). The image mounts sticks
+# under /media/<label> (zeroos-usb-mount). The backup is a plain folder tree,
+# so any computer can read it:  MOUNT/CardputerBackup/{Notes,Documents,Recordings}.
+USB_ROOTS = ("/media/", "/run/media/", "/mnt/")
+NET_FS = {"nfs", "nfs4", "cifs", "smb3", "smbfs", "fuse.sshfs", "afs", "ceph", "9p"}
+BACKUP_DIR = "CardputerBackup"
+BACKUP_MARK = ".zeroos-backup"
+STATE = HOME + "/.cache/zeroos/usb-job.state"
+TRASH = HOME + "/.local/share/zeroos/restore-trash"
+SKIP_DIRS = {".stversions", ".stfolder"}
+SLACK = 2.0          # FAT keeps times to 2 s
+SPARE = 4 << 20      # leave a little room on the drive
+
+
+def unescape_mount(s):
+    # /proc/mounts writes a space as \040.
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), s)
+
+
+def drives():
+    """[(mount, label, rw)] of the mounted USB drives."""
+    found = []
+    try:
+        with open(os.environ.get("ZEROOS_PROC_MOUNTS", "/proc/mounts")) as f:
+            for line in f:
+                p = line.split()
+                if len(p) < 4:
+                    continue
+                dev, mp, fs, opts = p[0], unescape_mount(p[1]), p[2], p[3].split(",")
+                if fs in NET_FS or not dev.startswith("/dev/") or not mp.startswith(USB_ROOTS):
+                    continue
+                if mp.rstrip("/") not in [d[0] for d in found]:
+                    found.append((mp.rstrip("/"), os.path.basename(mp.rstrip("/")), "rw" in opts))
+    except OSError:
+        pass
+    return found
+
+
+def usb_list():
+    for mp, label, rw in drives():
+        try:
+            free = os.statvfs(mp).f_bavail * os.statvfs(mp).f_frsize >> 20
+        except OSError:
+            continue
+        when = 0
+        try:
+            with open(mp + "/" + BACKUP_DIR + "/" + BACKUP_MARK) as f:
+                when = int(json.load(f).get("time", 0))
+        except (OSError, ValueError, AttributeError):
+            pass
+        out("usb", mp, label, free, int(rw), when)
+
+
+def find_drive(mount):
+    mount = mount.rstrip("/")
+    for mp, label, rw in drives():
+        if mp == mount:
+            return mp, label, rw
+    sys.exit("not a USB drive that is plugged in")
+
+
+def write_state(*fields):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    tmp = STATE + ".tmp"
+    with open(tmp, "w") as f:
+        f.write("\t".join(clean(x) for x in fields) + "\n")
+    os.replace(tmp, STATE)
+
+
+def files_under(src):
+    """(path, relative path, size, mtime) of the regular files under src."""
+    for root, dirs, names in os.walk(src, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not os.path.islink(os.path.join(root, d)))
+        for n in sorted(names):
+            if n.startswith(".syncthing.") and n.endswith(".tmp"):
+                continue
+            p = os.path.join(root, n)
+            try:
+                st = os.lstat(p)
+            except OSError:
+                continue
+            if stat.S_ISREG(st.st_mode):
+                yield p, os.path.relpath(p, src), st.st_size, st.st_mtime
+
+
+def plan(pairs, restoring):
+    """What to copy: [(src, dst, size, mtime, replaces)] and how many are already there."""
+    todo, same = [], 0
+    for src_root, dst_root in pairs:
+        if not os.path.isdir(src_root):
+            continue
+        for p, rel, size, mtime in files_under(src_root):
+            dst = os.path.join(dst_root, rel)
+            try:
+                d = os.lstat(dst)
+            except OSError:
+                todo.append((p, dst, size, mtime, False))
+                continue
+            if not stat.S_ISREG(d.st_mode):
+                todo.append((p, dst, size, mtime, False))
+            elif restoring:
+                # Keep what is newer here; replace what is older.
+                if mtime > d.st_mtime + SLACK:
+                    todo.append((p, dst, size, mtime, True))
+                else:
+                    same += 1
+            elif size != d.st_size or abs(mtime - d.st_mtime) > SLACK:
+                todo.append((p, dst, size, mtime, True))
+            else:
+                same += 1
+    return todo, same
+
+
+def copy_one(src, dst, mtime, trash):
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if trash and os.path.lexists(dst):
+        keep = os.path.join(trash[0], os.path.relpath(dst, trash[1]))
+        os.makedirs(os.path.dirname(keep), exist_ok=True)
+        shutil.move(dst, keep)
+    part = dst + ".part"
+    shutil.copyfile(src, part)
+    os.utime(part, (mtime, mtime))
+    os.replace(part, dst)
+
+
+def usb_job(kind, mount):
+    mp, label, rw = find_drive(mount)
+    restoring = kind == "restore"
+    if not restoring and not rw:
+        sys.exit("the drive is read-only")
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    lock = open(os.path.dirname(STATE) + "/usb-job.lock", "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        sys.exit("a backup or restore is already running")
+    root = mp + "/" + BACKUP_DIR
+    if restoring and not os.path.isdir(root):
+        write_state("error", kind, "No backup on this drive")
+        sys.exit("no backup on this drive")
+    write_state("running", kind, 0)
+    try:
+        if restoring:
+            pairs = [(root + "/" + lab, path) for _, lab, path in FOLDERS]
+            room_at = HOME
+        else:
+            pairs = [(path, root + "/" + lab) for _, lab, path in FOLDERS]
+            room_at = mp
+        todo, same = plan(pairs, restoring)
+        need = sum(t[2] for t in todo)
+        vfs = os.statvfs(room_at)
+        if need + SPARE > vfs.f_bavail * vfs.f_frsize:
+            write_state("error", kind, "Not enough space (%d MB needed)" % ((need >> 20) + 1))
+            sys.exit("not enough space")
+        trash = None
+        if restoring and any(t[4] for t in todo):
+            trash = (TRASH + "/" + time.strftime("%Y%m%d-%H%M%S"), HOME)
+        done = failed = 0
+        sofar, shown = 0, 0.0
+        for src, dst, size, mtime, replaces in todo:
+            try:
+                copy_one(src, dst, mtime, trash if replaces else None)
+                done += 1
+            except OSError:
+                # A name the drive can't hold (FAT: : ? * "), a full drive, a pulled plug.
+                failed += 1
+                try:
+                    os.unlink(dst + ".part")
+                except OSError:
+                    pass
+                if not os.path.isdir(mp):
+                    write_state("error", kind, "The drive was removed")
+                    sys.exit("the drive was removed")
+            sofar += size
+            if time.time() - shown > 0.5:
+                shown = time.time()
+                write_state("running", kind, int(100 * sofar / need) if need else 100)
+        if not restoring:
+            with open(root + "/" + BACKUP_MARK, "w") as f:
+                json.dump({"time": int(time.time()), "host": os.uname().nodename}, f)
+            os.sync()
+        write_state("done", kind, done, same, failed)
+    except OSError as e:
+        write_state("error", kind, e.strerror or "failed")
+        sys.exit("%s: %s" % (kind, e))
+
+
 def main(argv):
     cmd, args = (argv[0], argv[1:]) if argv else ("status", [])
     try:
@@ -238,11 +439,15 @@ def main(argv):
             ignore_folder(*args)
         elif cmd == "rescan":
             call("POST", "/rest/db/scan")
+        elif cmd == "usb":
+            usb_list()
+        elif cmd in ("backup", "restore") and len(args) == 1:
+            usb_job(cmd, args[0])
         else:
             sys.exit(__doc__)
     except (OSError, urllib.error.URLError) as e:
         sys.exit("syncthing: %s" % e)
-    if cmd != "status":
+    if cmd not in ("status", "usb"):
         print("ok")
 
 

@@ -1,6 +1,6 @@
 # Sync (docs/SYNC.md): Syncthing for Notes, Documents and Recordings.
 NAME="Sync"
-SUMMARY="Keep Notes, Documents and Recordings the same on your PC and phone"
+SUMMARY="Keep Notes, Documents and Recordings the same on your PC and phone, and back them up to a USB drive"
 DEPENDS="syncthing, python3"
 STOP_ON_REMOVE="syncthing@pi.service"
 payload() {
