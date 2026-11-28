@@ -72,7 +72,6 @@ struct NetStatus {
     bool wifi_connected = false;
     std::string wifi_ssid;
     int wifi_signal = 0;
-    std::string wifi_iface;   // the interface it's connected on (wlan0, wlan1)
     std::string ip;
     bool bt_enabled = false;
     int bt_connected = 0;
@@ -338,12 +337,6 @@ public:
     virtual std::vector<WifiNetwork> wifi_scan() = 0;
     virtual bool wifi_connect(const std::string& ssid, const std::string& psk) = 0;
     virtual void set_wifi_enabled(bool on) = 0;
-    // Which Wi-Fi adapter scans and joins: the built-in one, a USB one, or ""
-    // for automatic (NetworkManager picks). Saved; a network joined with one
-    // chosen reconnects on that adapter only.
-    virtual std::vector<WifiAdapter> wifi_adapters() = 0;
-    virtual std::string wifi_adapter() = 0;   // the saved choice's id, "" = automatic
-    virtual void set_wifi_adapter(const std::string& id) = 0;
     virtual void set_bt_enabled(bool on) = 0;
 
     virtual int brightness() = 0;            // 0..100
@@ -558,6 +551,19 @@ public:
     // Every time zone's name ("Europe/London"), A to Z.
     virtual std::vector<std::string> time_zones() = 0;
     virtual bool set_time_zone(const std::string& zone) = 0;
+
+    // Added in 0.9.5. New calls go here, at the end: apps call Hal by slot
+    // number, so one added higher up moves every slot after it and already-
+    // built apps call the wrong thing (shell/tests/app_abi_test.py checks).
+    // Which Wi-Fi adapter scans and joins: the built-in one, a USB one, or ""
+    // for automatic (NetworkManager picks). Saved; a network joined with one
+    // chosen reconnects on that adapter only.
+    virtual std::vector<WifiAdapter> wifi_adapters() = 0;
+    virtual std::string wifi_adapter() = 0;   // the saved choice's id, "" = automatic
+    virtual void set_wifi_adapter(const std::string& id) = 0;
+    // The interface Wi-Fi is connected on (wlan0, wlan1), "" if none. Not in
+    // NetStatus: apps get that struct by value, so it can't grow.
+    virtual std::string wifi_iface() = 0;
 };
 
 // MockHal for the simulator and tests; LinuxHal for the device.

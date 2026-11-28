@@ -62,6 +62,10 @@ bool app_modules_stale();
 // matches ZS_APP_ABI. Bump ZS_APP_ABI whenever a header an app includes
 // (ui/, hal/, apps/common.h, LVGL or lv_conf.h) changes in a way that
 // breaks already-built modules: the store then offers only matching builds.
+// 0.9.5 inserted Hal calls mid-vtable and a NetStatus field on 4, so abi4
+// apps called the wrong Hal methods (Jellyfin crashed ZeroShell, Sync
+// stopped Tailscale). 0.9.6 put the 4 layout back; shell/tests/
+// app_abi_test.py now fails CI if it changes without a bump here.
 #define ZS_APP_ABI 4
 
 struct AppModule {

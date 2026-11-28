@@ -312,6 +312,11 @@ std::string find_power_supply() {
     return base + "bq27220-0/";
 }
 
+// NetStatus plus what apps don't get in it (it can't grow: app ABI).
+struct NetSnap : NetStatus {
+    std::string wifi_iface;
+};
+
 class LinuxHal : public Hal {
 public:
     ~LinuxHal() override {
@@ -433,6 +438,7 @@ public:
     BatteryInfo battery() override { return bat_cache_; }
     ImuSample imu() override { return imu_cache_; }
     NetStatus net() override { return net_cache_; }
+    std::string wifi_iface() override { return net_cache_.wifi_iface; }
 
     // The status thread. read_net() runs nmcli and bluetoothctl, up to a
     // second together on this CPU: on the UI thread that froze the screen and
@@ -462,7 +468,7 @@ public:
             if (changed || settle > 0 || refresh) {
                 if (!changed && settle > 0) --settle;
                 last_fp = fp;
-                NetStatus n = read_net(sys_root_, addrs);
+                NetSnap n = read_net(sys_root_, addrs);
                 last_read = clock::now();
                 std::lock_guard<std::mutex> lock(net_mu_);
                 net_shared_ = n;
@@ -2525,8 +2531,8 @@ private:
 
     // Runs on the status thread: must not touch any member. Three programs
     // at most (it was seven): addresses and radio switches are read directly.
-    static NetStatus read_net(const std::string& root, const std::vector<demand::Addr>& addrs) {
-        NetStatus n;
+    static NetSnap read_net(const std::string& root, const std::vector<demand::Addr>& addrs) {
+        NetSnap n;
         n.wifi_enabled = run("nmcli radio wifi").find("enabled") != std::string::npos;
         // --rescan no: the list as NetworkManager has it. Without it every
         // look older than 30 s started a scan, which costs power and briefly
@@ -2622,8 +2628,8 @@ private:
     std::string bat_, accel_, magn_, backlight_;
     BatteryInfo bat_cache_;
     ImuSample imu_cache_;
-    NetStatus net_cache_;          // UI thread's copy
-    NetStatus net_shared_;         // from the network thread, under net_mu_
+    NetSnap net_cache_;            // UI thread's copy
+    NetSnap net_shared_;         // from the network thread, under net_mu_
     bool net_new_ = false, net_stop_ = false, net_now_ = false;
     std::mutex net_mu_;
     std::condition_variable net_cv_;

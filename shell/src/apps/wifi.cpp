@@ -65,9 +65,11 @@ private:
         bool choose = on && (adapters_.size() > 1 || !chosen.empty());
 
         std::string status = !on ? "" : st.wifi_connected ? "Connected to " + st.wifi_ssid : "Not connected";
-        if (st.wifi_connected && adapters_.size() > 1)
+        if (st.wifi_connected && adapters_.size() > 1) {
+            std::string iface = hal().wifi_iface();
             for (auto& a : adapters_)
-                if (a.iface == st.wifi_iface) status += " (" + a.label + ")";
+                if (a.iface == iface) status += " (" + a.label + ")";
+        }
         settings_heading(root_, "Wi-Fi", status, st.wifi_connected ? kGood : kMuted);
 
         list_.build(root_, 2, 18, kScreenW - 4, kBodyH - 20);

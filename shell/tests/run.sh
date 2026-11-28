@@ -20,3 +20,4 @@ ${CXX:-g++} -std=c++17 -Wall -Wextra -I"$HERE/../src" "$HERE/demand_test.cpp" -o
 "$OUT/demand_test"
 ${CXX:-g++} -std=c++17 -Wall -Wextra -I"$HERE/../src" "$HERE/wifi_adapters_test.cpp" -o "$OUT/wifi_adapters_test"
 "$OUT/wifi_adapters_test"
+python3 "$HERE/app_abi_test.py"
