@@ -33,7 +33,7 @@ In **Sync**:
 | Top left | Up to date, Syncing *n*%, Waiting for devices, or Problem |
 | *device* asks / *device*: *folder* | Enter accepts, Del ignores. A folder someone shares with you goes into `~/Sync/<name>`. |
 | A folder | Enter looks for changes now (it also notices changes by itself) |
-| A device | Del twice stops syncing with it |
+| A device | Enter shows whether it is online and the address it is connected at. **Tab > P** sets an address for it (below); **Tab > D** (or Del) stops syncing with it, after asking |
 | Sync now | Runs until everything is up to date, then stops |
 | Show my device ID | QR code and ID, to add this Cardputer on another device |
 | Runs: ... | When Sync runs (below) |
@@ -62,6 +62,21 @@ In every mode it also runs while the Sync app is open, and **Sync now**
 works anywhere: it runs until all your online devices are up to date, then
 stops (or gives up after 3 minutes if none of them is online, or 10 minutes
 in all). It stops a minute after it's no longer wanted.
+
+## Where is the other computer?
+
+You don't normally set an address. Devices find each other by ID: on the same
+Wi-Fi by Syncthing's local discovery, elsewhere through its discovery and
+relay servers. Enter on a device in **Sync** shows where it is right now
+(for example `online at 192.168.1.50:22000`).
+
+If a device stays "off" (a router that keeps devices apart, another VLAN or
+subnet, a VPN), tell the Cardputer where it is: select the device, **Tab > P**
+(Set address), and type its IP or name, such as `192.168.1.50` or
+`mypc.local`, with `:port` if the PC doesn't use Syncthing's usual 22000.
+The Cardputer tries that address first and still falls back to discovery.
+Leave it blank to go back to finding it by itself. The PC needs a steady
+address for this: give it a reservation in your router, or use its name.
 
 ## Back up to a USB drive
 
@@ -100,7 +115,7 @@ room (backup) or with a backup on it (restore) is used.
 | --- | --- |
 | `syncthing` package | From Debian. `syncthing@<user>.service` (the UI user, uid 1000: `pi` unless renamed in Raspberry Pi Imager) is never started at boot; ZeroShell starts and stops it (polkit allows that user exactly this unit). |
 | `syncthing@.service.d/zeroos.conf` | Small for 512 MB: Go heap limit 48 MB, two cores, low CPU and disk priority, no default folder, no self-upgrade. earlyoom closes it before anything you're using. After start it runs `zeroos-sync setup`. |
-| `zeroos-sync` | Python helper that talks to Syncthing's local API (key from Syncthing's own config). `setup` turns off usage and crash reports, syncs one folder at a time, and creates the three folders (`zeroos-notes`, `zeroos-documents`, `zeroos-recordings`) with file watching and 14-day trash-can versioning. Also `status`, `add-device`, `remove-device`, `ignore-device`, `accept-folder`, `ignore-folder`, `rescan`, and `usb`, `backup MOUNT` and `restore MOUNT` for USB drives (they copy in the background and write progress to `~/.cache/zeroos/usb-job.state`; tested by `tests/usb-backup-test.sh`). Works over ssh too. |
+| `zeroos-sync` | Python helper that talks to Syncthing's local API (key from Syncthing's own config). `setup` turns off usage and crash reports, syncs one folder at a time, and creates the three folders (`zeroos-notes`, `zeroos-documents`, `zeroos-recordings`) with file watching and 14-day trash-can versioning. Also `status`, `add-device`, `remove-device`, `ignore-device`, `accept-folder`, `ignore-folder`, `rescan`, `address`, and `usb`, `backup MOUNT` and `restore MOUNT` for USB drives (they copy in the background and write progress to `~/.cache/zeroos/usb-job.state`; tested by `tests/usb-backup-test.sh`). Works over ssh too. |
 | ZeroShell | Decides when Syncthing runs (`sync.mode`), runs "Sync now", and draws the Sync app from `zeroos-sync status` (every few seconds, only while the app is open). |
 | `zeroos-usb-mount` | Part of the base image (`90-zeroos-usb.udev`): udev mounts a plugged-in USB drive under `/media/<label>` with `systemd-mount`, owned by the UI user and `noexec,nosuid,nodev`. Unplugging unmounts it. |
 
