@@ -1343,7 +1343,9 @@ Pull requests are welcome. All CI checks have to pass before anything merges int
   removed.
 - If you change a header that apps include (`shell/src/ui/`, `shell/src/hal/`,
   `shell/src/apps/common.h`, LVGL or `lv_conf.h`) in a way that breaks already-built modules,
-  raise `ZS_APP_ABI` in `shell/src/ui/app.h` in the same pull request.
+  raise `ZS_APP_ABI` in `shell/src/ui/app.h` in the same pull request. New `Hal` calls go at the
+  end of the class, and structs apps get from `Hal` don't change: `shell/tests/app_abi_test.py`
+  fails CI otherwise.
 - Changes to the image or system files say which problem they fix in a comment, as the existing
   ones do.
 - If you have a Cardputer Zero, results from the [hardware test checklist](docs/HARDWARE-TEST.md)

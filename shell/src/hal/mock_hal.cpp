@@ -75,7 +75,6 @@ public:
         n.wifi_connected = wifi_on_;
         n.wifi_ssid = wifi_on_ ? connected_ssid_ : "";
         n.wifi_signal = 72;
-        n.wifi_iface = wifi_on_ ? connected_iface_ : "";
         n.ip = wifi_on_ ? "192.168.1.42" : "";
         n.bt_enabled = bt_on_;
         n.bt_connected = bt_on_ && bt_paired_ ? 1 : 0;
@@ -151,6 +150,7 @@ public:
         return v;
     }
     std::string wifi_adapter() override { return wifi_adapter_; }
+    std::string wifi_iface() override { return wifi_on_ ? connected_iface_ : ""; }
     void set_wifi_adapter(const std::string& id) override { wifi_adapter_ = id; }
     void set_wifi_enabled(bool on) override { wifi_on_ = on; }
     void set_bt_enabled(bool on) override {

@@ -1,0 +1,141 @@
+call ~Hal() = default
+call void poll()
+call BatteryInfo battery()
+call ImuSample imu()
+call NetStatus net()
+call SystemInfo system()
+call std::vector<WifiNetwork> wifi_scan()
+call bool wifi_connect(const std::string& ssid, const std::string& psk)
+call void set_wifi_enabled(bool on)
+call void set_bt_enabled(bool on)
+call int brightness()
+call void set_brightness(int pct)
+call void set_screen_on(bool on)
+call bool has_backlight()
+call void set_cpu_mode(CpuMode mode)
+call DisplayStatus display()
+call void dock_start()
+call void dock_stop()
+call bool dock_open(const std::string& what, const std::string& path = "")
+call TsStatus tailscale()
+call void tailscale_start()
+call void tailscale_stop()
+call void tailscale_logout()
+call bool taildrop_send(const std::string& path, const std::string& peer)
+call SyncStatus sync()
+call bool sync_running()
+call void sync_start()
+call void sync_stop()
+call bool sync_answer(const SyncRequest& r, bool accept)
+call bool sync_add_device(const std::string& id, const std::string& name)
+call bool sync_remove_device(const std::string& id)
+call void sync_rescan()
+call bool ext_power()
+call void set_ext_power(bool on)
+call GpsFix gps()
+call void gps_stop()
+call void scan_start()
+call void scan_stop()
+call CamState scan_state()
+call bool scan_frame(CameraFrame& out)
+call TetherStatus tether()
+call void tether_search()
+call void tether_pair(const std::string& mac)
+call void tether_connect(const std::string& mac)
+call void tether_disconnect(const std::string& mac)
+call void tether_forget(const std::string& mac)
+call MeshStatus mesh()
+call void mesh_start()
+call void mesh_stop()
+call std::vector<MeshMessage> mesh_messages()
+call bool mesh_send(const std::string& text)
+call int mesh_seq()
+call bool terminal_open(const std::string& command)
+call bool terminal_active()
+call CameraStatus camera()
+call bool camera_open()
+call bool camera_active()
+call void camera_close()
+call int volume()
+call void set_volume(int pct)
+call bool muted()
+call void set_muted(bool m)
+call std::vector<Track> music_library()
+call bool play(const std::string& path)
+call bool play_stream(const std::string& url, const std::string& auth, int duration_s)
+call void set_paused(bool paused)
+call void stop()
+call PlaybackState playback()
+call bool jellyfin_login(const std::string& server, const std::string& user, const std::string& password, const std::string& device_id, JfSession& out, std::string& error)
+call bool jellyfin_list(const JfSession& s, JfView view, const std::string& arg, std::vector<JfItem>& out, std::string& error)
+call void jellyfin_report(const JfSession& s, JfReport what, const std::string& item_id, const std::string& play_session, int pos_s, bool paused)
+call bool video_open(const std::string& url, const std::string& auth, int start_s, int w, int h, std::string& error)
+call bool video_frame(uint16_t* rgb565)
+call VideoState video()
+call void video_pause(bool paused)
+call void video_seek(int seconds, bool absolute)
+call void video_close()
+call std::vector<BtDevice> bt_devices()
+call void bt_scan()
+call bool bt_connect(const std::string& address, std::string& error)
+call void bt_disconnect(const std::string& address)
+call void bt_forget(const std::string& address)
+call void bt_set_visible(int seconds)
+call MediaKey media_key()
+call UsbStickStatus usb_stick()
+call void usb_stick_start()
+call void usb_stick_stop()
+call UpdateStatus update()
+call void update_check()
+call void update_install()
+call std::vector<Track> recordings()
+call bool record_start()
+call void record_stop()
+call RecordState record_state()
+call bool delete_recording(const std::string& path)
+call void set_led(Led led, bool on)
+call bool ir_send(const ir::Wave& wave)
+call bool ir_learn(std::vector<uint32_t>& timings, int timeout_ms)
+call void power_off()
+call void reboot()
+call void beep(int freq_hz, int ms)
+call bool external_open(const std::string& command)
+call bool external_active()
+call void external_close()
+call std::vector<ProcInfo> processes()
+call bool process_stop(int pid)
+call bool phone_media_key(MediaKey k)
+call bool phone_playing()
+call TimeSettings time_settings()
+call bool set_time_automatic(bool on)
+call bool set_time(int year, int month, int day, int hour, int minute, int second)
+call std::vector<std::string> time_zones()
+call bool set_time_zone(const std::string& zone)
+struct BatteryInfo: int percent = -1 ; bool charging = false ; bool external_power = false ; int voltage_mv = 0 ; int current_ma = 0 ; int temp_c10 = 0 ; int minutes_left = -1 ; int health_percent = -1 ; int cycle_count = -1 ; int power_mw = 0 ; int charge_now_mah = -1 ; int charge_full_mah = -1
+struct ImuSample: float ax = 0, ay = 0, az = 0 ; float gx = 0, gy = 0, gz = 0 ; float heading_deg = 0 ; float pitch_deg = 0, roll_deg = 0 ; bool available = false
+struct WifiNetwork: std::string ssid ; int signal = 0 ; bool secure = true ; bool connected = false
+struct NetStatus: bool wifi_enabled = true ; bool wifi_connected = false ; std::string wifi_ssid ; int wifi_signal = 0 ; std::string ip ; bool bt_enabled = false ; int bt_connected = 0 ; bool ethernet = false ; bool usb_gadget = false ; std::string tailscale_ip ; std::string tether
+struct TsPeer: std::string name ; std::string ip ; std::string os ; bool online = false
+struct TsStatus: bool installed = false ; bool running = false ; std::string state ; std::string auth_url ; std::string self_name, self_ip, tailnet ; std::vector<TsPeer> peers
+struct SyncFolder: std::string id, label, path ; std::string state ; int percent = 100 ; int need_files = 0 ; std::string error
+struct SyncDevice: std::string id, name ; bool connected = false ; int percent = 100
+struct SyncRequest: bool is_folder = false ; std::string device_id, device_name ; std::string folder_id, folder_label
+struct SyncStatus: bool installed = false ; bool running = false ; bool ready = false ; std::string device_id ; std::vector<SyncFolder> folders ; std::vector<SyncDevice> devices ; std::vector<SyncRequest> requests
+struct GpsFix: bool device = false ; int mode = 0 ; double lat = 0, lon = 0 ; double alt_m = 0 ; double speed_mps = 0, track_deg = 0 ; double error_m = 0 ; int sats_used = 0, sats_seen = 0 ; std::string time
+struct MeshStatus: bool installed = false ; bool running = false ; bool no_radio = false ; bool failing = false ; std::string error ; std::string web_url ; std::string api ; bool connected = false ; std::string my_name ; int nodes = 0
+struct MeshMessage: std::string from ; std::string text ; bool mine = false ; bool direct = false ; long time = 0
+struct CameraFrame: int w = 0, h = 0 ; const uint8_t* y = nullptr ; const uint8_t* u = nullptr ; const uint8_t* v = nullptr ; uint32_t seq = 0
+struct TetherPhone: std::string mac, name ; bool link = false ; bool online = false
+struct TetherStatus: bool bt_on = false ; bool usb = false ; std::string usb_name, usb_ip ; std::vector<TetherPhone> phones ; std::vector<TetherPhone> found ; std::string busy, busy_mac ; std::string passkey ; std::string error
+struct BtDevice: std::string address ; std::string name ; bool paired = false ; bool connected = false
+struct UsbStickStatus: enum State { Off, Building, Ready, Attached, Error } state = Off ; int percent = 0 ; std::string error
+struct UpdateStatus: enum State { Idle, Checking, UpToDate, Available, Offline, Downloading, Installing, Restarting, Done, RolledBack, Failed, } state = Idle ; std::string current ; std::string latest ; int percent = 0 ; std::string message ; bool busy() const { return state == Checking || state == Downloading || state == Installing || state == Restarting ; }
+struct CameraStatus: bool installed = false ; bool present = false ; bool simulated = false
+struct Track: std::string path ; std::string title ; std::string artist ; int duration_s = -1
+struct PlaybackState: std::string path ; bool playing = false ; bool paused = false ; bool finished = false ; int pos_ms = 0 ; int dur_ms = -1
+struct RecordState: bool recording = false ; std::string path ; int elapsed_ms = 0
+struct ProcMem: std::string name ; int rss_kb = 0
+struct TimeSettings: bool can_automatic = false ; bool automatic = false ; bool synced = false ; std::string zone
+struct ProcInfo: int pid = 0 ; std::string name ; std::string command ; int rss_kb = 0 ; int cpu_percent = -1
+struct SystemInfo: std::string hostname ; std::string model ; std::string kernel ; std::string os_version ; int cpu_temp_c = 0 ; int cpu_load_percent = 0 ; int cpu_mhz = 0, cpu_max_mhz = 0 ; std::string cpu_governor ; int mem_used_mb = 0, mem_total_mb = 0 ; int mem_avail_mb = 0, mem_cache_mb = 0 ; float zram_stored_mb = 0, zram_ram_mb = 0 ; int zram_capacity_mb = 0 ; int disk_swap_used_mb = 0, disk_swap_total_mb = 0 ; int self_rss_kb = 0, self_peak_kb = 0 ; std::vector<ProcMem> top_procs ; int disk_used_gb10 = 0, disk_total_gb10 = 0 ; long uptime_s = 0 ; bool simulated = false
+struct DisplayStatus: bool hdmi_connected = false ; std::string hdmi_mode ; bool dock_running = false
