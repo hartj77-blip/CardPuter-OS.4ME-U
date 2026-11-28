@@ -1,0 +1,18 @@
+#!/bin/sh
+# ZeroOS's /usr/bin/cancel-rename (01-run.sh diverts Raspberry Pi's copy to
+# cancel-rename.distrib, so an update of userconf-pi keeps this in place).
+#
+# Setting a username in Raspberry Pi Imager renames pi on the first boot:
+# cloud-init runs /usr/lib/userconf-pi/userconf, which ends with
+# cancel-rename. Raspberry Pi's script then turns the login prompt on tty1
+# back on (systemctl enable, then start getty@tty1). On ZeroOS tty1 is
+# ZeroShell's and getty@tty1 is masked, so both fail, the script exits 1, and
+# cloud-init marks all five of its stages failed although the rename and
+# everything else worked. Started, that prompt would also stop ZeroShell
+# (zeroshell.service: Conflicts=getty@tty1.service).
+#
+# So run Raspberry Pi's script as it is, with a systemctl that leaves
+# getty@tty1 alone and passes everything else on.
+PATH=/usr/lib/zeroos/cancel-rename-shim:$PATH
+export PATH
+exec /usr/bin/cancel-rename.distrib "$@"

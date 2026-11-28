@@ -5,6 +5,12 @@ After=systemd-user-sessions.service NetworkManager.service sound.target
 Wants=user@1000.service
 After=user@1000.service
 Conflicts=getty@tty1.service
+# First boot: start after cloud-init has applied Raspberry Pi Imager's
+# settings. Its config stage changes the keyboard and console setup, which
+# took the screen from the welcome tour for a moment (0.9.4). Not
+# cloud-init.target: that comes after multi-user.target, which waits for us.
+# Later boots skip cloud-init (cloud-init.disabled), so this costs nothing.
+After=cloud-config.service
 # ZeroShell exits when it has no screen to draw on; keep starting it.
 StartLimitIntervalSec=0
 
