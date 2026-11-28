@@ -591,7 +591,7 @@ gives up the keyboard), starts the program, and takes the screen back when the p
 ### How word suggestions work
 
 The feature is part of ZeroShell, not of any app, so every text box gets it, including those in
-installed apps, and no app had to change (the app level, `ZS_APP_ABI`, stays at 4).
+installed apps, and no app had to change (it needed no `ZS_APP_ABI` bump).
 
 | Piece | File | What it does |
 | --- | --- | --- |

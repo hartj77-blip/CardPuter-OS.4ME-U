@@ -62,7 +62,12 @@ bool app_modules_stale();
 // matches ZS_APP_ABI. Bump ZS_APP_ABI whenever a header an app includes
 // (ui/, hal/, apps/common.h, LVGL or lv_conf.h) changes in a way that
 // breaks already-built modules: the store then offers only matching builds.
-#define ZS_APP_ABI 4
+// 5: Hal gained wifi_adapters()/wifi_adapter()/set_wifi_adapter() in the
+//    middle of its vtable and NetStatus gained wifi_iface. 0.9.5 shipped
+//    that on 4, so abi4 apps called the wrong Hal methods (Jellyfin crashed
+//    ZeroShell on open). New virtuals shift every slot after them: add them
+//    last, or bump this.
+#define ZS_APP_ABI 5
 
 struct AppModule {
     int abi;                  // ZS_APP_ABI the module was built with
